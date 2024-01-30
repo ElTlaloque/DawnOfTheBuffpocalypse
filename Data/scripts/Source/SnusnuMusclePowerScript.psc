@@ -17,7 +17,7 @@ event OnEffectStart(Actor akTarget, Actor akCaster)
 	If StorageUtil.GetIntValue(akTarget, "PSQ_HasMuscle") <= 0
 		;StorageUtil.SetIntValue(akTarget, "PSQ_HasMuscle", 1)
 		StorageUtil.SetIntValue(akTarget, "SNU_UltraMuscle", 1)
-;/
+
 		If snusnuMain.isWeightMorphsLoaded
 			WeightMorphsMCM WMCM = Game.GetFormFromFile(0x05000888, "WeightMorphs.esp") As WeightMorphsMCM
 			If WMCM != none && snusnuMain.removeWeightMorphs
@@ -29,7 +29,7 @@ event OnEffectStart(Actor akTarget, Actor akCaster)
 				EndIf
 			EndIf
 		EndIf
-/;		
+		
 		If snusnuMain.tfAnimation
 			; 0 - Dialogue Anger		8 - Mood Anger		15 - Combat Anger
 			akTarget.SetExpressionOverride(8, 65)
@@ -124,9 +124,9 @@ event OnEffectStart(Actor akTarget, Actor akCaster)
 			switchMuscleNormals(akTarget, 4, 100 )
 		EndIf
 		
-		If snusnuMain.useAltAnims
-			snusnuMain.setMuscleAnimations(akTarget)
-		EndIf
+		;If snusnuMain.useAltAnims
+		;	snusnuMain.setMuscleAnimations(akTarget)
+		;EndIf
 		
 		;Ultra punching strength
 		akTarget.AddItem(snusnuMain.FistsOfRage, 1, True)
@@ -169,6 +169,16 @@ event OnEffectStart(Actor akTarget, Actor akCaster)
 			akTarget.ChangeHeadPart(snusnuMain.MuscleHead)
 			akTarget.RegenerateHead()
 		EndIf
+		
+		;TLALOC- New features!
+		;TLALOC- For use with DAR
+		snusnuMain.MuscleLevel.setValue(4)
+		
+		If (snusnuMain.heavyItemsEquiped > 0 || snusnuMain.lightItemsEquiped > 0) && snusnuMain.PlayerRef.GetActorValue("CarryWeight") < -100
+			Debug.Trace("SNU - All heavy items were removed. Restoring carryWeight")
+			
+			snusnuMain.PlayerRef.ModActorValue("CarryWeight", snusnuMain.actualCarryWeight + 500)
+		EndIf
 	EndIf
 	
 	Debug.Trace("SNU - Finished applying transformation effect")
@@ -187,7 +197,7 @@ EndEvent
 event OnEffectFinish(Actor akTarget, Actor akCaster)
 	;StorageUtil.SetIntValue(akTarget, "PSQ_HasMuscle", -1)
 	StorageUtil.SetIntValue(akTarget, "SNU_UltraMuscle", 0)
-;/	
+	
 	If snusnuMain.isWeightMorphsLoaded
 		WeightMorphsMCM WMCM = Game.GetFormFromFile(0x05000888, "WeightMorphs.esp") As WeightMorphsMCM
 		If WMCM != none && snusnuMain.removeWeightMorphs
@@ -198,7 +208,7 @@ event OnEffectFinish(Actor akTarget, Actor akCaster)
 			EndIf
 		EndIf
 	EndIf
-/;	
+	
 	;TLALOC-ToDo- Make a deflate animation for this
 	clearMuscleMorphs(akTarget)
 	snusnuMain.clearBoneScales(akTarget)
@@ -208,9 +218,11 @@ event OnEffectFinish(Actor akTarget, Actor akCaster)
 	RemoveAllReferenceSkinOverrides(akTarget);For the custom normals
 	;RemoveSkinOverride(akTarget, true, false, 0x04, 9, 1)
 	
+	;/
 	If snusnuMain.useAltAnims
 		snusnuMain.setMuscleAnimations(akTarget, true)
 	EndIf
+	/;
 	
 	akTarget.RemoveItem(snusnuMain.FistsOfRage, akTarget.GetItemCount(snusnuMain.FistsOfRage), True)
 	
@@ -226,6 +238,18 @@ event OnEffectFinish(Actor akTarget, Actor akCaster)
 	EndIf
 	
 	Game.SetGameSettingFloat("fJumpHeightMin", 76.0)
+	
+	;TLALOC- New features!
+	;TLALOC- For use with DAR
+	snusnuMain.MuscleLevel.setValue(1)
+	
+	If snusnuMain.heavyItemsEquiped > 0 || snusnuMain.lightItemsEquiped > 0
+		snusnuMain.actualCarryWeight = snusnuMain.PlayerRef.GetActorValue("CarryWeight")
+		Float modWeight = snusnuMain.actualCarryWeight + 500.0
+		Debug.Trace("SNU - actualCarryWeight="+snusnuMain.actualCarryWeight)
+		
+		snusnuMain.PlayerRef.ModActorValue("CarryWeight", -modWeight)
+	EndIf
 endevent
 
 Function removeNormalMuscle(Actor buffTarget, Float changePercent)
@@ -285,10 +309,10 @@ Function muscleChange(Actor buffTarget, Float changePercent)
 	SetBodyMorph(buffTarget, "UNPSH High", SNUSNU_BUFF_KEY, changePercent)
 	
 	;TLALOC- BHUNP
-	;SetBodyMorph(buffTarget, "ChubbyArms", SNUSNU_BUFF_KEY, changePercent * 0.3 )
-	;SetBodyMorph(buffTarget, "MuscleArms", SNUSNU_BUFF_KEY, changePercent * 1.5 )
-	;SetBodyMorph(buffTarget, "MuscleAbs", SNUSNU_BUFF_KEY, changePercent)
-	;SetBodyMorph(buffTarget, "MusclePecs", SNUSNU_BUFF_KEY, changePercent)
+	SetBodyMorph(buffTarget, "ChubbyArms", SNUSNU_BUFF_KEY, changePercent * 0.3 )
+	SetBodyMorph(buffTarget, "MuscleArms", SNUSNU_BUFF_KEY, changePercent * 1.5 )
+	SetBodyMorph(buffTarget, "MuscleAbs", SNUSNU_BUFF_KEY, changePercent)
+	SetBodyMorph(buffTarget, "MusclePecs", SNUSNU_BUFF_KEY, changePercent)
 	
 	UpdateModelWeight(buffTarget)
 EndFunction
@@ -387,7 +411,7 @@ Function applyMuscleNormals(Actor buffTarget, int stage)
 EndFunction
 
 ;TLALOC- Blatantly ripped from Blush When Aroused
-string Function initOverlaySlot(Actor buffTarget)
+string Function initOverlaySlot(Actor buffTarget) Global
 	String normalsPath = "textures\\Snusnu\\Normals\\"
 	string deftex = "Actors\\Character\\Overlays\\Default.dds"
 	string newOverlayID = "x"
@@ -416,7 +440,7 @@ string Function initOverlaySlot(Actor buffTarget)
 	return newOverlayID
 EndFunction
 
-string Function getCurrentOverlayString(Actor target, int index)
+string Function getCurrentOverlayString(Actor target, int index) Global
 	string overlayID = "Body [Ovl" + index + "]"
 	string tx = ""
 

@@ -2,6 +2,14 @@ ScriptName Snusnu Extends ReferenceAlias
 
 Import StorageUtil
 
+;/ >>>>>---- NEW IDEAS ----<<<<<
+
+- Calculate muscle gain only by the weight of the weapon and armor being
+  used, instead of only checking the type (This modification could also be
+  applied to weightMorphs!)
+
+/;
+
 ; Version data
 Int Property SKEE_VERSION = 1 AutoReadOnly
 Int Property NIOVERRIDE_SCRIPT_VERSION = 6 AutoReadOnly
@@ -20,6 +28,7 @@ SPELL Property AbilityCombat  Auto
 SPELL Property DecreaseCombat  Auto  
 
 GlobalVariable Property GameDaysPassed  Auto  
+GlobalVariable Property MuscleLevel  Auto  
 
 Bool Property Enabled = False Auto
 Bool Property useWeightSlider = False Auto
@@ -33,11 +42,16 @@ Float Property MultGainMisc = 1.0 Auto
 Float Property Stamina = 0.0 Auto
 Float Property Speed = 0.0 Auto
 Float Property combatProficiency = 0.0 Auto
+Float Property carryWeightBoost = 0.0 Auto
+Float Property currentExtraCarryWeight = 0.0 Auto
 
 Float Property LastDegradationTime = 0.0 Auto
 Float Property startSleepTime = 0.0 Auto
 Float Property totalSleepTime = 0.0 Auto
 Bool Property justWakeUp = false Auto
+
+Float bowDrawTime = 0.0
+Float Property malnourishmentValue = -0.9 Auto
 
 Float Property lostMuscle = 0.0 Auto
 Float Property storedMuscle = 0.0 Auto
@@ -57,6 +71,9 @@ String buildCrusherString = "boneCrusher"
 String pregStageString = "_PREG"
 String slimStageString = "_SLIM"
 Bool musclePeakReached = False
+Bool malnourishmentWarning = False
+Bool Property usePecs = False Auto
+Armor Property handsFix Auto
 
 Bool effectsChanged = False
 
@@ -67,7 +84,9 @@ Int Property selectedBody = 0 Auto ;0=UUNP, 1=CBBE SE, 2=Vanilla
 Bool Property isWeightMorphsLoaded Auto
 Bool Property removeWeightMorphs = true Auto
 ;PlayerSuccubusMenu PSQM
-;WeightMorphsMCM WMCM
+WeightMorphsMCM WMCM
+
+Bool Property is3BAPhysicsLoaded Auto
 
 ;TLALOC- TF related stuff
 SPELL Property MusclePowerSpell  Auto  
@@ -83,8 +102,24 @@ HeadPart Property MuscleHead  Auto
 HeadPart Property originalHead Auto
 Sound Property snusnuTFSound  Auto  
 
-float prevPositionZ = 0.0
-Bool cleavageRemoved = False
+;Experimental custom NPC muscle. For now we just apply a fixed value
+Float Property npcMuscleScore = 500.0 Auto
+
+;TLALOC- Body management stuff
+Float prevPositionZ = 0.0
+;Will change when onEquip/Unequip relevant items
+Bool Property hasCleavage = false Auto
+Bool Property cleavageRemoved = false Auto
+FormList Property PushupExceptions Auto
+Bool firstUpdateForBoobs = true
+
+Float Property actualCarryWeight = 0.0 Auto
+Bool Property hardcoreMode = false Auto
+int Property lightItemsEquiped = 0 Auto
+int Property heavyItemsEquiped = 0 Auto
+Keyword property daggerKeyword auto
+
+Bool Property isWerewolf = false Auto
 
 ;TLALOC- Custom animations
 int Property snuModID Auto
@@ -100,251 +135,17 @@ String[] cbbeSliders
 String[] uunpSliders
 String[] bhunpSliders
 String[] cbbeSESliders
+String[] cbbe3BASliders
 
-Float[] cbbeValues
-Float[] uunpValues
-Float[] bhunpValues
-Float[] cbbeSEValues
-
-;CBBE Morphs (52)
-Float Property MultBreasts = 0.0 Auto
-Float Property MultBreastsSmall = 0.0 Auto
-Float Property MultBreastsSH = 0.0 Auto
-Float Property MultBreastsSSH = -0.8 Auto
-Float Property MultBreastsFantasy = -1.0 Auto
-Float Property MultDoubleMelon = 0.7 Auto
-Float Property MultBreastCleavage = 0.0 Auto
-Float Property MultBreastFlatness = -0.1 Auto
-Float Property MultBreastGravity = 1.1 Auto
-Float Property MultPushUp = -0.4 Auto
-Float Property MultBreastHeight = 1.6 Auto
-Float Property MultBreastPerkiness = -1.2 Auto
-Float Property MultBreastWidth = 1.2 Auto
-
-Float Property MultNippleDistance = -0.6 Auto
-Float Property MultNipplePerkiness = 0.0 Auto
-Float Property MultNippleLength = -0.4 Auto
-Float Property MultNippleSize = 0.0 Auto
-Float Property MultNippleAreola = 0.0 Auto
-Float Property MultNippleUp = -1.0 Auto
-Float Property MultNippleDown = 0.2 Auto
-Float Property MultNippleTip = 0.0 Auto
-
-Float Property MultArms = 0.0 Auto
-Float Property MultChubbyArms = 1.1 Auto
-Float Property MultShoulderSmooth = 0.1 Auto
-Float Property MultShoulderWidth = 0.5 Auto
-
-Float Property MultBelly = 0.0 Auto
-Float Property MultBigBelly = 0.0 Auto
-Float Property MultPregnancyBelly = 0.0 Auto
-Float Property MultTummyTuck = 0.0 Auto
-
-Float Property MultBigTorso = 0.5 Auto
-Float Property MultWaist = -0.45 Auto
-Float Property MultWideWaistLine = 0.05 Auto
-Float Property MultChubbyWaist = -0.6 Auto
-Float Property MultBack = 0.4 Auto
-
-Float Property MultButtCrack = 0.0 Auto
-Float Property MultButt = -0.1 Auto
-Float Property MultButtSmall = 0.0 Auto
-Float Property MultButtShape2 = 0.4 Auto
-Float Property MultBigButt = 0.8 Auto
-Float Property MultChubbyButt = 0.0 Auto
-Float Property MultAppleCheeks = -0.6 Auto
-Float Property MultRoundAss = 0.0 Auto
-Float Property MultGroin = 0.0 Auto
-
-Float Property MultHipbone = 0.0 Auto
-Float Property MultHips = 0.0 Auto
-
-Float Property MultSlimThighs = 0.7 Auto
-Float Property MultThighs = -0.5 Auto
-Float Property MultChubbyLegs = 0.2 Auto
-Float Property MultLegs = 0.0 Auto
-Float Property MultKneeHeight = 0.0 Auto
-Float Property MultCalfSize = -0.25 Auto
-Float Property MultCalfSmooth = -0.25 Auto
-
-;TLALOC - UUNP sliders (74)
-Float Property Mult7BLow = 0.0 Auto
-Float Property Mult7BHigh = 0.0 Auto
-Float Property Mult7BBombshellLow = 0.0 Auto
-Float Property Mult7BBombshellHigh = 0.0 Auto
-Float Property Mult7BNaturalLow = 0.0 Auto
-Float Property Mult7BNaturalHigh = 0.0 Auto
-Float Property Mult7BCleavageLow = 0.0 Auto
-Float Property Mult7BCleavageHigh = 0.0 Auto
-Float Property Mult7BBCupLow = 0.0 Auto
-Float Property Mult7BBCupHigh = 0.0 Auto
-Float Property Mult7BUNPLow = 0.0 Auto
-Float Property Mult7BUNPHigh = 0.0 Auto
-Float Property Mult7BCHLow = 0.0 Auto
-Float Property Mult7BCHHigh = 0.0 Auto
-Float Property Mult7BOppaiLow = 0.0 Auto
-Float Property Mult7BOppaiHigh = 0.0 Auto
-Float Property MultUNPLow = 0.0 Auto
-Float Property MultUNPHigh = 0.0 Auto
-Float Property MultUNPPushupLow = 0.0 Auto
-Float Property MultUNPPushupHigh = 0.0 Auto
-Float Property MultUNPSkinnyLow = 0.0 Auto
-Float Property MultUNPSkinnyHigh = 0.0 Auto
-Float Property MultUNPPerkyLow = 0.0 Auto
-Float Property MultUNPPerkyHigh = 0.0 Auto
-Float Property MultUNPBLow = 0.0 Auto
-Float Property MultUNPBHigh = 0.0 Auto
-Float Property MultUNPBChapi = 0.0 Auto
-Float Property MultUNPBOppaiv1 = 0.0 Auto
-Float Property MultUNPBOppaiv3Low = 0.0 Auto
-Float Property MultUNPBOppaiv3High = 0.0 Auto
-Float Property MultUNPetiteLow = 0.0 Auto
-Float Property MultUNPetiteHigh = 0.0 Auto
-Float Property MultUNPCLow = 0.0 Auto
-Float Property MultUNPCHigh = 0.0 Auto
-Float Property MultUNPCMLow = 0.0 Auto
-Float Property MultUNPCMHigh = 0.0 Auto
-Float Property MultUNPSHLow = 0.0 Auto
-Float Property MultUNPSHHigh = 0.5 Auto
-Float Property MultUNPKLow = 0.0 Auto
-Float Property MultUNPKHigh = 0.0 Auto
-Float Property MultUNPKBonusLow = 0.0 Auto
-Float Property MultUNPKBonusHigh = 0.0 Auto
-Float Property MultUN7BLow = 0.0 Auto
-Float Property MultUN7BHigh = 0.0 Auto
-Float Property MultUNPBBLow = 0.0 Auto
-Float Property MultUNPBBHigh = 0.0 Auto
-Float Property MultSeraphimLow = 0.0 Auto
-Float Property MultSeraphimHigh = 0.0 Auto
-Float Property MultDemonfetLow = 0.0 Auto
-Float Property MultDemonfetHigh = 0.0 Auto
-Float Property MultDreamGirlLow = 0.0 Auto
-Float Property MultDreamGirlHigh = 0.0 Auto
-Float Property MultTopModelLow = 0.0 Auto
-Float Property MultTopModelHigh = 0.0 Auto
-Float Property MultLeitoLow = 0.0 Auto
-Float Property MultLeitoHigh = 0.0 Auto
-Float Property MultUNPFLow = 0.0 Auto
-Float Property MultUNPFHigh = 0.0 Auto
-Float Property MultUNPFxLow = 0.0 Auto
-Float Property MultUNPFxHigh = 0.0 Auto
-Float Property MultCNHFLow = 0.0 Auto
-Float Property MultCNHFHigh = 0.0 Auto
-Float Property MultCNHFBonusLow = 0.0 Auto
-Float Property MultCNHFBonusHigh = 0.0 Auto
-Float Property MultMCBMLow = 0.0 Auto
-Float Property MultMCBMHigh = 0.5 Auto
-Float Property MultVenusLow = 0.0 Auto
-Float Property MultVenusHigh = 0.0 Auto
-Float Property MultZGGBR2Low = 0.0 Auto
-Float Property MultZGGBR2High = 0.0 Auto
-Float Property MultMangaLow = 0.0 Auto
-Float Property MultMangaHigh = 0.0 Auto
-Float Property MultCHSBHCLow = 0.0 Auto
-Float Property MultCHSBHCHigh = 0.0 Auto
+Float[] Property cbbeValues Auto
+Float[] Property uunpValues Auto
+Float[] Property bhunpValues Auto
+Float[] Property cbbeSEValues Auto
+Float[] Property cbbe3BAValues Auto
 
 ;Bone related sliders
 Float Property MultSpineBone = 1.05 Auto
 Float Property MultForearmBone = 1.05 Auto
-
-;BHUNP Sliders (43)
-Float Property MultBreastsTogether = 0.0 Auto
-Float Property MultBreastCenter = 0.0 Auto
-Float Property MultBreastCenterBig = 0.0 Auto
-Float Property MultTopSlope = 0.0 Auto
-Float Property MultBreastConverge = 0.0 Auto
-Float Property MultBreastsGone = 0.0 Auto
-Float Property MultBreastsPressed = 0.0 Auto
-Float Property MultNipplePuffyAreola = 0.0 Auto
-Float Property MultNipBGone = 0.0 Auto
-Float Property MultNippleInverted = 0.0 Auto
-Float Property MultChestDepth = 0.0 Auto
-Float Property MultChestWidth = 0.0 Auto
-Float Property MultRibsProminance = 0.0 Auto
-Float Property MultSternumDepth = 0.0 Auto
-Float Property MultSternumHeight = 0.0 Auto
-Float Property MultWaistHeight = 0.0 Auto
-Float Property MultBackArch = 0.0 Auto
-Float Property MultCrotchBack = 0.0 Auto
-Float Property MultLegsThin = 0.0 Auto
-Float Property MultKneeShape = 0.0 Auto
-Float Property MultKneeSlim = 0.0 Auto
-Float Property MultMuscleAbs = 0.0 Auto
-Float Property MultMuscleArms = 0.0 Auto
-Float Property MultMuscleButt = 0.0 Auto
-Float Property MultMuscleLegs = 0.0 Auto
-Float Property MultMusclePecs = 0.0 Auto
-Float Property MultHipForward = 0.0 Auto
-Float Property MultHipUpperWidth = 0.0 Auto
-Float Property MultForearmSize = 0.0 Auto
-Float Property MultShoulderTweak = 0.0 Auto
-Float Property MultBotePregnancy = 0.0 Auto
-Float Property MultBellyFatLower = 0.0 Auto
-Float Property MultBellyFatUpper = 0.0 Auto
-Float Property MultBellyObesity = 0.0 Auto
-Float Property MultBellyPressed = 0.0 Auto
-Float Property MultBellyLowerSwell1 = 0.0 Auto
-Float Property MultBellyLowerSwell2 = 0.0 Auto
-Float Property MultBellyLowerSwell3 = 0.0 Auto
-Float Property MultBellyCenterProtrude = 0.0 Auto
-Float Property MultBellyCenterUpperProtrude = 0.0 Auto
-Float Property MultBellyBalls = 0.0 Auto
-Float Property MultAruru6DuckLow = 0.0 Auto
-Float Property MultAruru6DuckHigh = 0.0 Auto
-
-;CBBE SE (52 -> 27)
-Float Property MultBreastsSmall2 = 0.0 Auto
-Float Property MultBreastsNewSH = 0.0 Auto
-Float Property MultBreastsNewSHSymmetry = 0.0 Auto
-;Float Property MultBreastsTogether = 0.0 Auto
-;Float Property MultBreastCenter = 0.0 Auto
-;Float Property MultBreastCenterBig = 0.0 Auto
-Float Property MultBreastTopSlope = 0.0 Auto
-Float Property MultBreastFlatness2 = 0.0 Auto
-;Float Property MultBreastsGone = 0.0 Auto
-Float Property MultBreastGravity2 = 0.0 Auto
-Float Property MultBreastSideShape = 0.0 Auto
-Float Property MultBreastUnderDepth = 0.0 Auto
-Float Property MultAreolaSize = 0.0 Auto
-Float Property MultNippleManga = 0.0 Auto
-Float Property MultNipplePerkManga = 0.0 Auto
-Float Property MultNippleTipManga = 0.0 Auto
-Float Property MultNippleDip = 0.0 Auto
-;Float Property MultNipBGone = 0.0 Auto
-;Float Property MultForearmSize = 0.0 Auto
-;Float Property MultShoulderTweak = 0.0 Auto
-;Float Property MultChestDepth = 0.0 Auto
-;Float Property MultChestWidth = 0.0 Auto
-;Float Property MultRibsProminance = 0.0 Auto
-;Float Property MultSternumDepth = 0.0 Auto
-;Float Property MultSternumHeight = 0.0 Auto
-;Float Property MultWaistHeight = 0.0 Auto
-;Float Property MultBackArch = 0.0 Auto
-Float Property MultNavelEven = 0.0 Auto
-Float Property MultButtClassic = 0.0 Auto
-Float Property MultButtDimples = 0.0 Auto
-Float Property MultButtUnderFold = 0.0 Auto
-;Float Property MultCrotchBack = 0.0 Auto
-;Float Property MultHipBoneNew = 0.0 Auto
-;Float Property MultHipForward = 0.0 Auto
-;Float Property MultHipUpperWidth = 0.0 Auto
-Float Property MultHipCarved = 0.0 Auto
-;Float Property MultKneeShape = 0.0 Auto
-Float Property MultLegShapeClassic = 0.0 Auto
-;Float Property MultLegsThin = 0.0 Auto
-Float Property MultFeetFeminine = 0.0 Auto
-;Float Property MultMuscleAbs = 0.0 Auto
-;Float Property MultMuscleArms = 0.0 Auto
-;Float Property MultMuscleButt = 0.0 Auto
-;Float Property MultMuscleLegs = 0.0 Auto
-;Float Property MultMusclePecs = 0.0 Auto
-Float Property MultAnkleSize = 0.0 Auto
-Float Property MultWristSize = 0.0 Auto
-Float Property MultVanillaSSELo = 0.0 Auto
-Float Property MultVanillaSSEHi = 0.0 Auto
-Float Property MultOldBaseShape = 0.0 Auto
-Float Property Mult7BLower = 0.0 Auto
-Float Property Mult7BUpper = 0.0 Auto
 
 ; Male morphs
 Float Property MultSamuel = 1.0 Auto
@@ -388,8 +189,6 @@ Event OnPlayerLoadGame()
 			PlayerRef = Game.getPlayer()
 		EndIf
 		
-		isWeightMorphsLoaded = false
-;/		
 		isWeightMorphsLoaded = (Game.GetModByName("WeightMorphs.esp") != 255)
 		If isWeightMorphsLoaded
 			WMCM = Game.GetFormFromFile(0x05000888, "WeightMorphs.esp") As WeightMorphsMCM
@@ -402,7 +201,13 @@ Event OnPlayerLoadGame()
 			;PSQM = none
 			;Debug.Trace("SNU - PSQ mod was not found")
 		EndIf
-/;		
+		
+		is3BAPhysicsLoaded = (Game.GetModByName("3BBB.esp") != 255)
+		Debug.Trace("SNU - Is 3BBB loaded? "+is3BAPhysicsLoaded)
+		If is3BAPhysicsLoaded
+			firstUpdateForBoobs = true
+		EndIf
+		
 		initSliderArrays()
 		RegisterEvents(True)
 		UpdateEffects()
@@ -413,6 +218,12 @@ Event OnPlayerLoadGame()
 		;TLALOC-ToDo- Add MCM option to choose a different key
 		RegisterForKey(getInfoKey)
 		
+		;Experimental NPC muscle gain
+		RegisterForKey(37);K
+		
+		;Pushup exceptions management
+		RegisterForKey(38);L
+		
 		If !snuCRC
 			initFNISanims()
 		EndIf
@@ -420,11 +231,16 @@ Event OnPlayerLoadGame()
 EndEvent
 
 Event OnRaceSwitchComplete()
+	isWerewolf = !isWerewolf
 	If Enabled
-		;Debug.Trace("SNU - OnRaceSwitchComplete()")
-		RegisterEvents(True)
-		UpdateEffects()
-		checkBodyNormalsState()
+		Debug.Trace("SNU - OnRaceSwitchComplete(isWerewolf="+isWerewolf+")")
+		Debug.Trace("SNU - PC Race: "+PlayerRef.getRace().getName())
+		If !isWerewolf
+			RegisterEvents(True)
+			UpdateEffects()
+			checkBodyNormalsState()
+			addWerewolfBuild()
+		EndIf
 	EndIf
 EndEvent
 
@@ -472,7 +288,9 @@ Event OnUpdate()
 			If justWakeUp
 				Debug.Trace("SNU - justWakeUp, totalDegradation="+totalDegradation)
 				Float sleepBonus = getSleepBonus()
-				Debug.Notification("You got back "+sleepBonus+" muscle score points")
+				If sleepBonus > 0.0
+					Debug.Notification("I got back "+sleepBonus+" muscle score points")
+				EndIf
 				totalDegradation = totalDegradation + sleepBonus
 				Debug.Trace("SNU -             finalDegradation="+totalDegradation)
 			EndIf
@@ -505,25 +323,188 @@ Event OnUpdate()
 ;			LastDegradationTime = GameDaysPassed.GetValue()
 ;		EndIf
 		
-		RegisterForSingleUpdate(10) ;Was 6
+		RegisterForSingleUpdate(15) ;Was 6
+		RegisterForSleep()
 	EndIf
 EndEvent
+
+
+;ITEM TYPES:
+;0=LightArmor, 1=HeavyArmor, 2=LightWeapon, 3=HeavyWeapon, 4=Bow, 5=Shield
+Int Function getEquipedItemType(Form theItem)
+	If theItem as Armor
+		Armor itemArmor = theItem as Armor
+		
+		If Math.LogicalAnd(itemArmor.getSlotMask(), itemArmor.kSlotMask32)
+			If itemArmor.GetWeightClass() == 0
+				return 0
+			ElseIf itemArmor.GetWeightClass() == 1
+				return 1
+			Else
+				return -1
+			EndIf
+		EndIf
+	ElseIf theItem as Weapon
+		Weapon itemWeapon = theItem as Weapon
+		If itemWeapon.hasKeyword(daggerKeyword)
+			return -2
+		ElseIf itemWeapon.isBow()
+			return 4
+		ElseIf itemWeapon.getEquipType().getNumParents() == 2
+			return 3
+		ElseIf !itemWeapon.isStaff()
+			return 2
+		EndIf
+	EndIf
+	
+	return -2
+EndFunction
+
+;Skill modifier: 
+;           get skill for that particular item then divide it by 15 then multipy that for the current muscle score
+;           skill / 15 ->  This means that if the skill level is at the minimum (15), there will not be any skill bonus,
+;           but if for example, skill is 30, the skill bonus will double the muscle score for this calculation
+Float Function getEquipmentSkillBonus(Int itemType)
+	Float bonus = 1.0
+	
+	If itemType == 2
+		bonus = PlayerRef.getBaseActorValue("OneHanded")
+	ElseIf itemType == 3
+		bonus = PlayerRef.getBaseActorValue("TwoHanded")
+	ElseIf itemType == 4
+		bonus = PlayerRef.getBaseActorValue("Marksman")
+	ElseIf itemType == 1
+		bonus = PlayerRef.getBaseActorValue("HeavyArmor")
+	ElseIf itemType == 0
+		bonus = PlayerRef.getBaseActorValue("LightArmor")
+	EndIf
+	
+	Debug.Trace("SNU - Skill value is: "+bonus)
+	bonus = bonus/15
+	Debug.Trace("SNU - Calculated skill bonus for equiped item: "+bonus)
+	If bonus < 1.0
+		bonus = 1.0
+	EndIf
+	
+	return bonus
+EndFunction
+
+;ToDo- Nueva logica:
+;         Sumar el peso de todos los items equipados en los slots principales (+Slot 49) mas las armas y escudos
+;         y hacer el calculo con el rango de 10 como minimo y 150 como maximo
+Event OnObjectEquipped(Form type, ObjectReference ref)
+	;ITEM TYPES:
+	;0=LightArmor, 1=HeavyArmor, 2=LightWeapon, 3=HeavyWeapon, 4=Bow, 5=Shield
+	Int itemType = getEquipedItemType(type)
+	Debug.Trace("SNU - Item "+type.getName())
+	Debug.Trace("SNU - Item type is "+itemType)
+	
+	;Cleavage management
+	If type as Armor && itemType < 2 && itemType > -2
+		If PushupExceptions.find(type) == -1
+			hasCleavage = true
+			UpdateWeight(true)
+		EndIf
+	EndIf
+	
+	If !hardcoreMode || itemType < 0
+		return
+	EndIf
+	
+	Bool failedSkillCheck = false
+
+	If itemType >= 2
+		;WEAPONS
+		if muscleScore*getEquipmentSkillBonus(itemType) < muscleScoreMax * 0.1
+			Debug.Notification("I'm too weak to use any weapons!")
+			failedSkillCheck = true
+		ElseIf itemType == 3 && muscleScore*getEquipmentSkillBonus(itemType) < muscleScoreMax / 2
+			Debug.Notification("This weapon is too heavy for me!")
+			failedSkillCheck = true
+		EndIf
+	ElseIf (itemType == 1 && muscleScore*getEquipmentSkillBonus(itemType) < muscleScoreMax / 2) || \
+	(itemType == 0 && muscleScore*getEquipmentSkillBonus(itemType) < muscleScoreMax * 0.1)
+		;ARMOR
+		Debug.Notification("This armor is too heavy for me!")
+		failedSkillCheck = true
+	EndIf
+	
+	If failedSkillCheck
+		If itemType == 0 || itemType == 2 || itemType == 4
+			lightItemsEquiped = lightItemsEquiped + 1
+		Else
+			heavyItemsEquiped = heavyItemsEquiped + 1
+		EndIf
+		
+		Debug.Trace("SNU - lightItemsEquiped="+lightItemsEquiped)
+		Debug.Trace("SNU - heavyItemsEquiped="+heavyItemsEquiped)
+		
+		
+		If StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle") != 0
+			return
+		EndIf
+	
+		actualCarryWeight = PlayerRef.GetActorValue("CarryWeight")
+		Float modWeight = actualCarryWeight + 500.0
+		Debug.Trace("SNU - actualCarryWeight="+actualCarryWeight)
+		;Debug.Notification("Carry weight: "+actualCarryWeight)
+	
+		;PlayerRef.UnequipItem(type, true)
+		PlayerRef.ModActorValue("CarryWeight", -modWeight)
+	EndIf
+EndEvent
+
+Event OnObjectUnequipped(Form type, ObjectReference ref)
+	Int itemType = getEquipedItemType(type)
+	
+	;Cleavage management
+	If type as Armor && itemType < 2 && itemType > -2
+		hasCleavage = false
+		removeCleavageEffect(0.0, true)
+		NiOverride.UpdateModelWeight(PlayerRef)
+	EndIf
+	
+	If !hardcoreMode && lightItemsEquiped == 0 && heavyItemsEquiped == 0
+		return
+	EndIf
+	
+	If lightItemsEquiped > 0 && (itemType == 0 || itemType == 2 || itemType == 4)
+		lightItemsEquiped = lightItemsEquiped - 1
+	ElseIf heavyItemsEquiped > 0 && (itemType == 1 || itemType == 3)
+		heavyItemsEquiped = heavyItemsEquiped - 1
+	EndIf
+	
+	If heavyItemsEquiped < 1 && lightItemsEquiped < 1 && PlayerRef.GetActorValue("CarryWeight") < -100
+		Debug.Trace("SNU - All heavy items were removed. Restoring carryWeight")
+		;Debug.Notification("Restoring carry weight: "+actualCarryWeight+"+500")
+		
+		PlayerRef.ModActorValue("CarryWeight", actualCarryWeight + 500)
+	EndIf
+EndEvent
+
+Function cleanupHardcoreMode()
+	If lightItemsEquiped != 0 || heavyItemsEquiped != 0
+		lightItemsEquiped = 0
+		heavyItemsEquiped = 0
+		
+		If PlayerRef.GetActorValue("CarryWeight") < -100
+			PlayerRef.ModActorValue("CarryWeight", actualCarryWeight + 500)
+		EndIf
+	EndIf
+EndFunction
 
 Event OnAnimationEvent(ObjectReference akSource, string asEventName)
 	If Enabled && akSource == PlayerRef && StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle") == 0
 		;Debug.Trace("SNU - OnAnimationEvent("+asEventName+")")
 		Float scoreAddition = 0.0
 		Bool isRunningUp = false
-		If asEventName == "FootSprintLeft" || asEventName == "weaponSwing" || asEventName == "weaponLeftSwing" || \
-		asEventName == "SoundPlay.NPCHumanWoodChopDistant" || asEventName == "SoundPlay.NPCHumanPickAxe"
-			If asEventName == "weaponSwing" || asEventName == "weaponLeftSwing"
-				scoreAddition = scoreAddition + (0.25 * MultGainFight)
-			ElseIf asEventName == "SoundPlay.NPCHumanWoodChopDistant" || asEventName == "SoundPlay.NPCHumanPickAxe"
-				scoreAddition = scoreAddition + (0.25 * MultGainMisc)
-				If asEventName == "SoundPlay.NPCHumanWoodChopDistant"
-					Debug.Notification("Chopping wood makes me feel a little stronger")
-				ElseIf asEventName == "SoundPlay.NPCHumanPickAxe"
-					Debug.Notification("Minning makes me feel a little stronger")
+		If asEventName == "FootSprintLeft" || asEventName == "weaponSwing" || asEventName == "weaponLeftSwing"
+			If asEventName == "weaponSwing" || asEventName == "weaponLeftSwing"				
+				Weapon eqWeapon = PlayerRef.GetEquippedWeapon()
+				if eqWeapon != None && eqWeapon.getEquipType().getNumParents() == 2
+					scoreAddition = scoreAddition + (0.5 * MultGainFight)
+				Else
+					scoreAddition = scoreAddition + (0.25 * MultGainFight)
 				EndIf
 			ElseIf PlayerRef.GetPositionZ() > prevPositionZ + 40.0 ;Was 30.0
 				;Debug.Notification("Running up!")
@@ -543,8 +524,20 @@ Event OnAnimationEvent(ObjectReference akSource, string asEventName)
 				EndIf
 				;Debug.Trace("SNU - Sprinting extra muscle development for wearing heavy armor")
 			EndIf
+		ElseIf asEventName == "SoundPlay.NPCHumanWoodChopDistant" || asEventName == "SoundPlay.NPCHumanPickAxe" || \
+		asEventName == "SoundPlay.OBJBlacksmithForge" || asEventName == "SoundPlay.NPCHumanBlacksmithForgeTake" || \
+		asEventName == "SoundPlay.NPCHumanBlacksmithHammer" || asEventName == "SoundPlay.NPCHumanBlacksmithRepairHammer"
+		
+			scoreAddition = scoreAddition + (0.25 * MultGainMisc)
+			If asEventName == "SoundPlay.NPCHumanWoodChopDistant"
+				Debug.Notification("Chopping wood makes me feel a little stronger")
+			ElseIf asEventName == "SoundPlay.NPCHumanPickAxe"
+				Debug.Notification("Minning makes me feel a little stronger")
+			ElseIf asEventName == "SoundPlay.NPCHumanBlacksmithForgeTake"
+				Debug.Notification("A blacksmith requieres a strong build")
+			EndIf
 		ElseIf asEventName == "JumpUp" || asEventName == "PowerAttack_Start_end" || asEventName == "PowerAttackStop"
-			;Debug.Trace("SNU- "+asEventName+" reduces the most of calories!")
+			;Debug.Trace("SNU - "+asEventName+" reduces the most of calories!")
 			prevPositionZ = PlayerRef.GetPositionZ()
 			
 			If asEventName == "JumpUp"
@@ -554,7 +547,12 @@ Event OnAnimationEvent(ObjectReference akSource, string asEventName)
 					;Debug.Trace("SNU - Jumping extra muscle development for wearing heavy armor")
 				EndIf
 			Else
-				scoreAddition = scoreAddition + (0.5 * MultGainFight) ;16
+				Weapon eqWeapon = PlayerRef.GetEquippedWeapon()
+				if eqWeapon != None && eqWeapon.getEquipType().getNumParents() == 2
+					scoreAddition = scoreAddition + (0.8 * MultGainFight) ;16
+				Else
+					scoreAddition = scoreAddition + (0.5 * MultGainFight) ;16
+				EndIf
 			EndIf
 		ElseIf asEventName == "SoundPlay.FSTSwimSwim"
 			scoreAddition = scoreAddition + (0.2 * MultGainMisc)
@@ -564,6 +562,23 @@ Event OnAnimationEvent(ObjectReference akSource, string asEventName)
 				scoreAddition = scoreAddition + (0.3 * MultGainArmor) ;Swimming while wearing heavy armor sure would lead to some muscle development
 				;Debug.Trace("SNU - Swimming extra muscle development for wearing heavy armor")
 			EndIf
+		ElseIf asEventName == "bowDrawStart"
+			;bowDrawTime = GameDaysPassed.GetValue()
+			
+		ElseIf asEventName == "bowDrawn" || asEventName == "arrowRelease" ;&& bowDrawTime != 0.0
+			;TLALOC- This event will trigger when the bow if in "full charge", so there is no need to get the "charge time" 
+			;        as it will be always the same
+			
+			;bowDrawTime = GameDaysPassed.GetValue() - bowDrawTime
+			;Debug.Notification("bowDrawTime: "+bowDrawTime)
+			
+			scoreAddition = scoreAddition + (0.25 * MultGainFight)
+			;Debug.Notification("Drawing my bow to full charge surely requieres a certain ammount of strenght")
+			
+			;bowDrawTime = 0.0
+		Else
+			;TLALOC- Experimental custom events debug
+			Debug.Notification(asEventName)
 		EndIf
 		
 		If scoreAddition != 0.0
@@ -611,21 +626,34 @@ EndFunction
 
 Event OnKeyDown(Int KeyCode)
 	If KeyCode == getInfoKey
-;		If isWeightMorphsLoaded
-;			Debug.Notification("WeightMorphs Weight="+WMCM.WMorphs.Weight)
-;		EndIf
-		Debug.Notification("muscleScore="+muscleScore+", normalsScore="+normalsScore)
-		Debug.Notification("lostMuscle="+lostMuscle+", storedMuscle="+storedMuscle)
+		
+		;WetFunctionRedux info
+		Debug.Notification("Wetness: "+StorageUtil.GetFloatValue(PlayerRef, "WetFunction_Actor_wetness", 0.0))
+		
+		;WeightMorphs info
+		If isWeightMorphsLoaded
+			Debug.Notification("WeightMorphs Weight="+WMCM.WMorphs.Weight)
+		EndIf
+		
+		Debug.Notification("muscleScore="+getMuscleValuePercent(muscleScore)+"%, normalsScore="+getMuscleValuePercent(normalsScore)+"%")
+		Debug.Notification("lostMuscle="+getMuscleValuePercent(lostMuscle)+"%, storedMuscle="+getMuscleValuePercent(storedMuscle)+"%")
+		
 		If !disableNormals
 			Debug.Notification("Normals="+getFinalNormalsPath())
 		EndIf
+	ElseIf KeyCode == 37 && !UI.IsTextInputEnabled() && !Utility.IsInMenuMode()
+		 ;37 = K
+		applyNPCMuscle(npcMuscleScore)
+	ElseIf KeyCode == 38 && !UI.IsTextInputEnabled() && !Utility.IsInMenuMode()
+		;38 = L
+		addPushupException()
 	EndIf
 EndEvent
 
 Float Function getfightingMuscle()
 	Int PlayerSex = PlayerRef.GetActorBase().GetSex()
 	Float fightingMuscle = muscleScore / muscleScoreMax
-;/		
+		
 	; Female
 	If PlayerSex == 1	&& isWeightMorphsLoaded && WMCM.WMorphs.Weight > 0.2 ;There will be always at least 20% muscularity
 		;TLALOC- If getting chubbier, muscle mass gets smaller (This is to avoid overly big arms and thighs on bigger muscleScore)
@@ -633,13 +661,17 @@ Float Function getfightingMuscle()
 		fightingMuscle = fightingMuscle * ( 1.2 - WMCM.WMorphs.Weight )
 		;Debug.Trace("SNU - chubbyMuscle="+fightingMuscle)
 	EndIf
-	
+;/	
 	;TLALOC- Disguise form should not be too muscular
 	If fightingMuscle > 0.5 && PlayerRef.hasSpell(PSQM.PSQ.PSQDisguiseCastSpell)
 		fightingMuscle = 0.5
 	EndIf
 /;	
 	return fightingMuscle
+EndFunction
+
+Float Function getMuscleValuePercent(Float theValue)
+	return (theValue / muscleScoreMax) * 100
 EndFunction
 
 Float Function getSpineSize()
@@ -677,13 +709,16 @@ Function UpdateWeight(Bool applyNow = True)
 				;TLALOC- Apply bone changes
 				changeSpineBoneScale(PlayerRef, getSpineSize() * Math.abs( 1.0 - MultSpineBone ))
 				changeForearmBoneScale(PlayerRef, getSpineSize() * Math.abs( 1.0 - MultForearmBone ))
+				
+				;TLALOC- Custom Boobs physics
+				updateBoobsPhysics()
 			EndIf
 		Else
 			Int PlayerSex = PlayerRef.GetActorBase().GetSex()
 			
 			; Female
 			If PlayerSex == 1	
-				;removeCleavageEffect(fightingMuscle)
+				removeCleavageEffect(fightingMuscle)
 			
 				If fightingMuscle > 0.0 && StorageUtil.GetIntValue(PlayerRef, "PSQ_HasMuscle") == 0 && \
 				StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle") == 0 ;ToDo- PSQ_HasMuscle logic will be used for FMG spell
@@ -701,8 +736,26 @@ Function UpdateWeight(Bool applyNow = True)
 					;TLALOC- Apply bone changes
 					changeSpineBoneScale(PlayerRef, getSpineSize() * Math.abs( 1.0 - MultSpineBone ))
 					changeForearmBoneScale(PlayerRef, getSpineSize() * Math.abs( 1.0 - MultForearmBone ))
+					
+					;TLALOC- Werewolf body morph --------------------------------------------------------------------
+					
+					;NiOverride.SetBodyMorph(PlayerRef, "BodyHigh", SNUSNU_KEY, fightingMuscle * 1.5) ;1.5
+					;NiOverride.SetBodyMorph(PlayerRef, "BreastsLowHDT", SNUSNU_KEY, fightingMuscle * -1.0)
+					
+					;SMALL version
+					NiOverride.SetBodyMorph(PlayerRef, "BodyHigh", SNUSNU_KEY, fightingMuscle * 2.0)
+					NiOverride.SetBodyMorph(PlayerRef, "BreastsLowHDT", SNUSNU_KEY, fightingMuscle * -0.5)
+					
+					;WeightMorphs;
+					If isWeightMorphsLoaded && WMCM.WMorphs.Weight >= 0.0
+						NiOverride.SetBodyMorph(PlayerRef, "BodyHighHDT", SNUSNU_KEY, WMCM.WMorphs.Weight * 0.5);0.8
+						;NiOverride.SetBodyMorph(PlayerRef, "BodyVeryHighHDT", SNUSNU_KEY, fightingMuscle * 0.4)
+					EndIf
+					;TLALOC- Werewolf body morph --------------------------------------------------------------------
 				EndIf
 				
+				;TLALOC- Custom Boobs physics
+				updateBoobsPhysics()
 			; Male
 			ElseIf PlayerSex == 0
 				If MultSamuel != 0.0
@@ -747,14 +800,21 @@ Function updateMuscleScore(float incValue)
 			Float succuEnergy = PSQM.PSQ.SuccubusEnergy.GetValue() / PSQM.PSQ.MaxEnergy
 			incValue = ( incValue * ( succuEnergy * 2.0 ) )
 		EndIf
+/;		
 		
-		;CFCU- If Weight is too low muscle can't grow much due to lack of carbs
+		;TLALOC- If Weight is too low muscle can't grow much due to lack of carbs
 		If isWeightMorphsLoaded
-			If WMCM.WMorphs.Weight < -0.99
+			If WMCM.WMorphs.Weight < malnourishmentValue
+				If !malnourishmentWarning
+					Debug.Notification("I can barely develop any muscle mass with this diet!")
+					malnourishmentWarning = true
+				EndIf
+				
 				incValue = incValue * 0.25
+			ElseIf malnourishmentWarning
+				malnourishmentWarning = false
 			EndIf
 		EndIf
-/;		
 		
 		storedMuscle = storedMuscle + incValue
 	EndIf
@@ -789,6 +849,14 @@ Function updateMuscleScore(float incValue)
 	EndIf
 EndFunction
 
+Function recalculateAllMuscleVars(Float factor)	
+	muscleScore = muscleScore * factor
+	normalsScore = normalsScore * factor
+
+	lostMuscle = lostMuscle * factor
+	storedMuscle = storedMuscle * factor
+EndFunction
+
 ;TLALOC- BUG FIX: changes applied to main bones will cause a one frame glitch in the character animation, so we need to avoid it
 ;         as much as we can and only apply it when the change difference is big enough
 Function changeSpineBoneScale(Actor theActor, Float scaleValue)
@@ -801,8 +869,8 @@ Function changeSpineBoneScale(Actor theActor, Float scaleValue)
 	If scaleValue - currentScale > 0.001 || scaleValue - currentScale < -0.001
 		;Debug.Trace("SNU - Updating spine scale")
 		;Debug.Trace("SNU - Updating spine scale from: "+currentScale+" to: "+scaleValue)
-		XPMSELib.SetNodeScale(theActor, true, "NPC Spine2 [Spn2]", scaleValue, SNUSNU_KEY)
-		XPMSELib.SetNodeScale(theActor, true, "CME Spine2 [Spn2]", 1.0 / scaleValue, SNUSNU_KEY)
+		SetNodeScale(theActor, true, "NPC Spine2 [Spn2]", scaleValue, SNUSNU_KEY)
+		SetNodeScale(theActor, true, "CME Spine2 [Spn2]", 1.0 / scaleValue, SNUSNU_KEY)
 	EndIf
 	
 ;/TLALOC-ToDo- Is not working, probably because the passed value is invalid. Check if need to be converted to radians
@@ -825,51 +893,136 @@ Function changeForearmBoneScale(Actor theActor, Float scaleValue)
 	If scaleValue - currentScale > 0.001 || scaleValue - currentScale < -0.001
 		;Debug.Trace("SNU - Updating forearm scale")
 		;TLALOC- BodySlide doesn't have slides for forearms, so we change the bones instead
-		XPMSELib.SetNodeScale(theActor, true, "NPC L Forearm [LLar]", scaleValue, SNUSNU_KEY)
-		XPMSELib.SetNodeScale(theActor, true, "CME L Forearm [LLar]", 1.0 / scaleValue, SNUSNU_KEY)
-		XPMSELib.SetNodeScale(theActor, true, "NPC L Forearm [RLar]", scaleValue, SNUSNU_KEY)
+		SetNodeScale(theActor, true, "NPC L Forearm [LLar]", scaleValue, SNUSNU_KEY)
+		SetNodeScale(theActor, true, "CME L Forearm [LLar]", 1.0 / scaleValue, SNUSNU_KEY)
+		SetNodeScale(theActor, true, "NPC L Forearm [RLar]", scaleValue, SNUSNU_KEY)
 		
-		XPMSELib.SetNodeScale(theActor, true, "NPC R Forearm [RLar]", scaleValue, SNUSNU_KEY)
-		XPMSELib.SetNodeScale(theActor, true, "CME R Forearm [RLar]", 1.0 / scaleValue, SNUSNU_KEY)
+		SetNodeScale(theActor, true, "NPC R Forearm [RLar]", scaleValue, SNUSNU_KEY)
+		SetNodeScale(theActor, true, "CME R Forearm [RLar]", 1.0 / scaleValue, SNUSNU_KEY)
 		
-		XPMSELib.SetNodeScale(theActor, true, "NPC L ForearmTwist2 [LLt2]", scaleValue, SNUSNU_KEY)
-		XPMSELib.SetNodeScale(theActor, true, "NPC R ForearmTwist2 [RLt2]", scaleValue, SNUSNU_KEY)
+		SetNodeScale(theActor, true, "NPC L ForearmTwist2 [LLt2]", scaleValue, SNUSNU_KEY)
+		SetNodeScale(theActor, true, "NPC R ForearmTwist2 [RLt2]", scaleValue, SNUSNU_KEY)
 	EndIf
 EndFunction
 
 Function clearBoneScales(Actor theActor)
 	;Debug.Trace("SNU - clearBoneScales()")
-	XPMSELib.SetNodeScale(theActor, true, "NPC Spine2 [Spn2]", 1.0, SNUSNU_KEY)
-	XPMSELib.SetNodeScale(theActor, true, "CME Spine2 [Spn2]", 1.0, SNUSNU_KEY)
+	SetNodeScale(theActor, true, "NPC Spine2 [Spn2]", 1.0, SNUSNU_KEY)
+	SetNodeScale(theActor, true, "CME Spine2 [Spn2]", 1.0, SNUSNU_KEY)
 	
-	XPMSELib.SetNodeScale(theActor, true, "NPC L Clavicle [LClv]", 1.0, SNUSNU_KEY)
-	XPMSELib.SetNodeScale(theActor, true, "CME L Clavicle [LClv]", 1.0, SNUSNU_KEY)
-	XPMSELib.SetNodeScale(theActor, true, "NPC L Clavicle [RClv]", 1.0, SNUSNU_KEY)
+	SetNodeScale(theActor, true, "NPC L Clavicle [LClv]", 1.0, SNUSNU_KEY)
+	SetNodeScale(theActor, true, "CME L Clavicle [LClv]", 1.0, SNUSNU_KEY)
+	SetNodeScale(theActor, true, "NPC L Clavicle [RClv]", 1.0, SNUSNU_KEY)
 	
-	XPMSELib.SetNodeScale(theActor, true, "NPC R Clavicle [RClv]", 1.0, SNUSNU_KEY)
-	XPMSELib.SetNodeScale(theActor, true, "CME R Clavicle [RClv]", 1.0, SNUSNU_KEY)
+	SetNodeScale(theActor, true, "NPC R Clavicle [RClv]", 1.0, SNUSNU_KEY)
+	SetNodeScale(theActor, true, "CME R Clavicle [RClv]", 1.0, SNUSNU_KEY)
 	
-	XPMSELib.SetNodeScale(theActor, true, "NPC L Forearm [LLar]", 1.0, SNUSNU_KEY)
-	XPMSELib.SetNodeScale(theActor, true, "CME L Forearm [LLar]", 1.0, SNUSNU_KEY)
-	XPMSELib.SetNodeScale(theActor, true, "NPC L Forearm [RLar]", 1.0, SNUSNU_KEY)
+	SetNodeScale(theActor, true, "NPC L Forearm [LLar]", 1.0, SNUSNU_KEY)
+	SetNodeScale(theActor, true, "CME L Forearm [LLar]", 1.0, SNUSNU_KEY)
+	SetNodeScale(theActor, true, "NPC L Forearm [RLar]", 1.0, SNUSNU_KEY)
 	
-	XPMSELib.SetNodeScale(theActor, true, "NPC R Forearm [RLar]", 1.0, SNUSNU_KEY)
-	XPMSELib.SetNodeScale(theActor, true, "CME R Forearm [RLar]", 1.0, SNUSNU_KEY)
+	SetNodeScale(theActor, true, "NPC R Forearm [RLar]", 1.0, SNUSNU_KEY)
+	SetNodeScale(theActor, true, "CME R Forearm [RLar]", 1.0, SNUSNU_KEY)
 	
-	XPMSELib.SetNodeScale(theActor, true, "NPC L ForearmTwist2 [LLt2]", 1.0, SNUSNU_KEY)
-	XPMSELib.SetNodeScale(theActor, true, "NPC R ForearmTwist2 [RLt2]", 1.0, SNUSNU_KEY)
+	SetNodeScale(theActor, true, "NPC L ForearmTwist2 [LLt2]", 1.0, SNUSNU_KEY)
+	SetNodeScale(theActor, true, "NPC R ForearmTwist2 [RLt2]", 1.0, SNUSNU_KEY)
 EndFunction
 
+Function chooseBoobsPhysics(Int buildStage)
+	Int boobsLevel = 3
+	
+	If buildStage >= 3
+		;Bone Crusher
+		boobsLevel = 1
+	ElseIf buildStage == 2
+		boobsLevel = 2
+	EndIf
+	
+	;weightMorphs calculations
+	If boobsLevel > 1
+		If WMCM.WMorphs.Weight < -0.6 ;-0.7
+			;Boobs too small to have noticeable physics
+			boobsLevel = 1
+		ElseIf WMCM.WMorphs.Weight < 0.6 && boobsLevel > 2
+			;Was: WMCM.WMorphs.Weight < -0.25
+			;Boobs still too small to have full physics
+			boobsLevel = 2
+		ElseIf WMCM.WMorphs.Weight > 0.8
+			;Was WMCM.WMorphs.Weight > 0.4
+			;Boobs so big they need special physics treatment
+			;boobsLevel = 4
+			boobsLevel = 3
+		EndIf
+	EndIf
+	
+	updateBoobsPhysics(true, boobsLevel)
+EndFunction
+
+Function updateBoobsPhysics(Bool forceUpdate = false, Int newLevel = -1)
+	;TLALOC- Boobs physics only get updated once, unless a significant muscle change is made
+	If is3BAPhysicsLoaded && (firstUpdateForBoobs || forceUpdate)
+		Mus3BPhysicsManager PhysicsManager = Game.GetFormFromFile(0x0500084A, "3BBB.esp") As Mus3BPhysicsManager
+		Debug.Trace("SNU- Checking for boobs physics")
+		If PhysicsManager != none
+			;ToDo- Check if the SMP item is equiped to skip the breasts physics modification as this only works with CBPC
+			Int physicsLevel = PhysicsManager.getPhysicsLevel()
+			
+			If newLevel != -1
+				If forceUpdate && physicsLevel == newLevel
+					return
+				Else
+					physicsLevel = newLevel
+					PhysicsManager.setPhysicsLevel(physicsLevel)
+				EndIf
+			EndIf
+			
+			Debug.Trace("SNU- Physics level is "+physicsLevel)
+			If physicsLevel == 1
+				Debug.Notification("Switching to breasts physics level 1")
+				Debug.Trace("Switching to breasts physics level 1")
+				PhysicsManager.CBPCBreasts(PlayerRef, true)
+				PhysicsManager.CBPCBreastsSmall(PlayerRef)
+			ElseIf physicsLevel == 2
+				Debug.Notification("Switching to breasts physics level 2")
+				Debug.Trace("Switching to breasts physics level 2")
+				PhysicsManager.CBPCBreasts(PlayerRef, true)
+				PhysicsManager.CBPCBreastsMid(PlayerRef)
+			ElseIf physicsLevel == 3
+				Debug.Notification("Switching to breasts physics level 3")
+				Debug.Trace("Switching to breasts physics level 3")
+				PhysicsManager.CBPCBreasts(PlayerRef, true)
+				PhysicsManager.CBPCBreasts(PlayerRef)
+			ElseIf physicsLevel == 4
+				;ToDo- Change physics to SMP if body weight (from WeightMorphs) is big enough
+				;NOTE: As of right now, CBPC physics are more than enough to simulate big breasts Physics,
+				;      so there is no need for complicated SMP switching
+				
+				;Temporal code to keep physics going, this must be removed when proper switching to SMP is implemented (is a little more complex than this)
+				Debug.Notification("Switching to breasts physics level 3")
+				Debug.Trace("Switching to breasts physics level 3")
+				PhysicsManager.CBPCBreasts(PlayerRef, true)
+				PhysicsManager.CBPCBreasts(PlayerRef)
+			EndIf
+		Endif
+		
+		firstUpdateForBoobs = false
+	EndIf
+EndFunction
 
 ;TLALOC - This function controls how much cleavage effect should be removed from the current equiped
 ;       clothing depending on weight and muscle score.
 ;       NOTE: It is heavely linked with PSQ, therefore this will not work at all if PSQ is not installed
-Function removeCleavageEffect(Float cleavageAmount)
+;       ToDo- We can add new cleavage managmen mecanics in this mod but it might be out of its scope right now
+Function removeCleavageEffect(Float cleavageAmount, Bool forceRemoval = false)
+	If !hasCleavage && !cleavageRemoved
+		return
+	EndIf
+	
 	Float scoreReference = cleavageAmount
 	Float WMorphsWeight = 0.0
 	
-	;Debug.Trace("SNU - removeCleavageEffect("+cleavageAmount+")")
-;/	
+	Debug.Trace("SNU - removeCleavageEffect("+cleavageAmount+")")
+	
 	If isWeightMorphsLoaded
 		WMorphsWeight = WMCM.WMorphs.Weight
 	EndIf
@@ -878,6 +1031,7 @@ Function removeCleavageEffect(Float cleavageAmount)
 		scoreReference = Math.abs(WMorphsWeight)
 	EndIf
 	
+;/	
 	;TLALOC- Check if character actually has a piece of clothing with cleavage effect
 	If PSQM
 		If !PSQM.PSQ.cleavageMode
@@ -900,34 +1054,30 @@ Function removeCleavageEffect(Float cleavageAmount)
 	If scoreReference < 0
 		scoreReference = 0.0
 	EndIf
-	If scoreReference == 0 && cleavageRemoved
+	If scoreReference == 0 && !cleavageRemoved
 		return
 	EndIf
 	
-	;Debug.Trace("SNU - CleavageMorphValue="+scoreReference)
+	If forceRemoval
+		scoreReference = 0.0
+	EndIf
+	
+	Debug.Trace("SNU - CleavageMorphValue="+scoreReference)
 	
 	If scoreReference > 0
-		NiOverride.SetBodyMorph(PlayerRef, "BreastCleavage", "CleavageMorphs", -scoreReference * 0.6 )
-		NiOverride.SetBodyMorph(PlayerRef, "BreastFlatness", "CleavageMorphs", -scoreReference * 0.1 )
-		NiOverride.SetBodyMorph(PlayerRef, "BreastGravity", "CleavageMorphs", scoreReference * 0.3 )
-		NiOverride.SetBodyMorph(PlayerRef, "BreastPerkiness", "CleavageMorphs", scoreReference * 0.24 )
-		NiOverride.SetBodyMorph(PlayerRef, "BreastWidth", "CleavageMorphs", scoreReference * 0.4 )
-		NiOverride.SetBodyMorph(PlayerRef, "Breasts", "CleavageMorphs", -scoreReference * 0.4 )
-		NiOverride.SetBodyMorph(PlayerRef, "BreastsSSH", "CleavageMorphs", scoreReference * 0.18 )
-		NiOverride.SetBodyMorph(PlayerRef, "DoubleMelon", "CleavageMorphs", -scoreReference * 1.0 )
-		NiOverride.SetBodyMorph(PlayerRef, "NippleDown", "CleavageMorphs", -scoreReference * 0.2 )
-		cleavageRemoved = false
+		NiOverride.SetBodyMorph(PlayerRef, "BreastCleavage", "CleavageMorphs", -scoreReference * 1.0 )
+		NiOverride.SetBodyMorph(PlayerRef, "BreastsNewSH", "CleavageMorphs", scoreReference * 0.1 )
+		NiOverride.SetBodyMorph(PlayerRef, "BreastsPressed_v2", "CleavageMorphs", -scoreReference * 0.4 )
+		NiOverride.SetBodyMorph(PlayerRef, "BreastsTogether", "CleavageMorphs", -scoreReference * 0.8 )
+		NiOverride.SetBodyMorph(PlayerRef, "PushUp", "CleavageMorphs", -scoreReference * 0.7 )
+		cleavageRemoved = true
 	Else
 		NiOverride.ClearBodyMorph(PlayerRef, "BreastCleavage", "CleavageMorphs")
-		NiOverride.ClearBodyMorph(PlayerRef, "BreastFlatness", "CleavageMorphs")
-		NiOverride.ClearBodyMorph(PlayerRef, "BreastGravity", "CleavageMorphs")
-		NiOverride.ClearBodyMorph(PlayerRef, "BreastPerkiness", "CleavageMorphs")
-		NiOverride.ClearBodyMorph(PlayerRef, "BreastWidth", "CleavageMorphs")
-		NiOverride.ClearBodyMorph(PlayerRef, "Breasts", "CleavageMorphs")
-		NiOverride.ClearBodyMorph(PlayerRef, "BreastsSSH", "CleavageMorphs")
-		NiOverride.ClearBodyMorph(PlayerRef, "DoubleMelon", "CleavageMorphs")
-		NiOverride.ClearBodyMorph(PlayerRef, "NippleDown", "CleavageMorphs")
-		cleavageRemoved = true
+		NiOverride.ClearBodyMorph(PlayerRef, "BreastsNewSH", "CleavageMorphs")
+		NiOverride.ClearBodyMorph(PlayerRef, "BreastsPressed_v2", "CleavageMorphs")
+		NiOverride.ClearBodyMorph(PlayerRef, "BreastsTogether", "CleavageMorphs")
+		NiOverride.ClearBodyMorph(PlayerRef, "PushUp", "CleavageMorphs")
+		cleavageRemoved = false
 	EndIf
 EndFunction
 
@@ -942,6 +1092,8 @@ Function tempDebugSliders()
 	endWhile
 	Debug.Trace("SNU - SpineBoneScale = "+MultSpineBone)
 	Debug.Trace("SNU - ForearmBoneScale = "+MultForearmBone)
+	
+	Debug.Trace("SNU - Pushup Exceptions: "+PushupExceptions)
 EndFunction
 
 ;     Muscle build stages = 1=Civilian, 2=Athletic, 3=Bone Crusher, 4=Extra Bone Crusher
@@ -961,7 +1113,7 @@ Function checkBodyNormalsState()
 	
 	;Debug.Trace("SNU - muscleScore value from Snusnu is: "+muscleScore)
 	;Debug.Trace("SNU - normalsScore value from Snusnu is: "+normalsScore)
-;/	
+	
 	;TLALOC- Expand the range of the changes if muscleScore is below 0.25 (This logic will allow to have a extreme muscular definition 
 	;      even at that muscleScore, but only if score is high enough
 	If isWeightMorphsLoaded && WMCM.WMorphs.Weight < 0.3
@@ -974,9 +1126,9 @@ Function checkBodyNormalsState()
 		stage3Score = stage3Score + stage2Score
 		stage4Score = stage4Score + stage2Score
 		
-		;Debug.Trace("SNU - New change ranges are: stage2="+stage2Score+", stage3="+stage3Score+", stage4="+stage4Score)
+		Debug.Trace("SNU - New change ranges are: stage2="+stage2Score+", stage3="+stage3Score+", stage4="+stage4Score)
 	EndIf
-/;	
+	
 	;TLALOC - Logic to decide if the normals need to be changed
 	If normalsScore >= stage4Score
 		currentBuildStage = 4 ;Extra Bone Crusher
@@ -989,12 +1141,15 @@ Function checkBodyNormalsState()
 	Else
 		currentBuildStage = 1 ;Civilian
 	EndIf
-;/	
+	
+	;Rangos originales: 0.12-0.225, 0.225-0.30
 	If isWeightMorphsLoaded
-		If currentBuildStage >= 2 && WMCM.WMorphs.Weight >= 0.35
+		If currentBuildStage >= 2 && WMCM.WMorphs.Weight >= 0.25
 			currentBuildStage = 1
-		ElseIf currentBuildStage >= 3 && WMCM.WMorphs.Weight >= 0.30 && WMCM.WMorphs.Weight < 0.35
+		ElseIf currentBuildStage >= 3 && WMCM.WMorphs.Weight >= 0.175 && WMCM.WMorphs.Weight < 0.25
 			currentBuildStage = 2
+		ElseIf currentBuildStage >= 4 && WMCM.WMorphs.Weight >= 0.10 && WMCM.WMorphs.Weight < 0.175
+			currentBuildStage = 3
 		EndIf
 		
 		If WMCM.WMorphs.Weight < -0.5
@@ -1003,13 +1158,20 @@ Function checkBodyNormalsState()
 			currentSlimStage = 0
 		EndIf
 	EndIf
-/;	
+	
 	If StorageUtil.GetFloatValue(PlayerRef, "PRG_SeedsTotal") > 3000 && currentBuildStage != 1 ;Civilian normals are already the same as preg
 		currentPregStage = 1
 	Else
 		currentPregStage = 0
 	EndIf
 	
+	;TLALOC- For use with DAR
+	If (MuscleLevel.getValue() as Int) != currentBuildStage - 1
+		MuscleLevel.setValue(currentBuildStage - 1)
+	EndIf
+	
+	;TLALOC- Custom Boobs physics
+	chooseBoobsPhysics(currentBuildStage)
 	
 	;TLALOC - Start building the normals path string
 	If currentBuildStage == 1
@@ -1021,13 +1183,19 @@ Function checkBodyNormalsState()
 	ElseIf currentBuildStage == 4
 		tempNormalsPath = tempNormalsPath + buildCrusherString + "Extra"
 	EndIf
-	If currentSlimStage == 1
+	If currentSlimStage == 1 || usePecs
 		tempNormalsPath = tempNormalsPath + slimStageString
 	EndIf
 	If currentPregStage == 1
 		tempNormalsPath = tempNormalsPath + pregStageString
+	Else
+		;TLALOC- Special condition for weightMorphs
+		If isWeightMorphsLoaded
+			If currentBuildStage == 1 && WMCM.WMorphs.Weight > 0.5
+				tempNormalsPath = tempNormalsPath + "_FAT"
+			EndIf
+		EndIf
 	EndIf
-	
 	
 	tempNormalsPath = tempNormalsPath + ".dds"
 	;Debug.Trace("SNU - Normals path is now "+tempNormalsPath)
@@ -1040,8 +1208,26 @@ Function checkBodyNormalsState()
 		
 		Debug.Trace("SNU - Updating normals path to "+finalNormalsPath)
 		
+		;TLALOC- Experimental messed up hand textures fix
+		Bool hasHandFix = false
+		Armor handsArmor = PlayerRef.GetWornForm(0x00000008) as Armor
+		if !handsArmor
+			Debug.Trace("SNU - Attempting to apply hands fix!")
+			PlayerRef.equipItem(handsFix, true, true)
+			Utility.wait(0.2)
+			hasHandFix = true
+		endIf
+		
 		NiOverride.AddSkinOverrideString(PlayerRef, true, false, 0x04, 9, 1, finalNormalsPath, true)
 		NiOverride.AddSkinOverrideString(PlayerRef, true, true, 0x04, 9, 1, finalNormalsPath, true)
+		
+		;TLALOC- Experimental messed up hand textures fix
+		if hasHandFix
+			Debug.Trace("SNU - Finishing to apply hands fix!")
+			Utility.wait(0.2)
+			PlayerRef.unequipItemslot(33)
+			PlayerRef.removeitem(handsFix, 1, true)
+		endIf
 	EndIf
 EndFunction
 
@@ -1131,6 +1317,33 @@ Function RegisterEvents(Bool _enable)
 		RegisterForAnimationEvent(PlayerRef, "SoundPlay.NPCHumanWoodChopDistant")
 		RegisterForAnimationEvent(PlayerRef, "SoundPlay.NPCHumanPickAxe")
 		
+		;TLALOC- Bow charge and release
+		RegisterForAnimationEvent(PlayerRef, "bowDrawStart")
+		UnregisterForAnimationEvent(PlayerRef, "Bow_Release")
+		UnregisterForAnimationEvent(PlayerRef, "BowLowered")
+		RegisterForAnimationEvent(PlayerRef, "arrowRelease")
+		UnregisterForAnimationEvent(PlayerRef, "bowEnd")
+		RegisterForAnimationEvent(PlayerRef, "bowDrawn");Happens after doing a full charge
+		
+		;TLALOC- Blacksmith work
+		RegisterForAnimationEvent(PlayerRef, "SoundPlay.OBJBlacksmithForge")
+		RegisterForAnimationEvent(PlayerRef, "SoundPlay.NPCHumanBlacksmithForgeTake")
+		;RegisterForAnimationEvent(PlayerRef, "SoundPlay.NPCHumanBlacksmithForgeQuench")
+		;RegisterForAnimationEvent(PlayerRef, "soundPlay.NPCHumanBlacksmithForgeQuenchDrop")
+		RegisterForAnimationEvent(PlayerRef, "SoundPlay.NPCHumanBlacksmithHammer")
+		RegisterForAnimationEvent(PlayerRef, "SoundPlay.NPCHumanBlacksmithRepairHammer")
+		
+		UnregisterForAnimationEvent(PlayerRef, "SoundPlay.NPCHumanBlacksmithHammerDistant")
+		UnregisterForAnimationEvent(PlayerRef, "SoundPlay.NPCHumanBlacksmithRepairHammerDistant")
+		
+		;TLALOC- Experimental anim events!
+		;RegisterForAnimationEvent(PlayerRef, "XXX")
+		;RegisterForAnimationEvent(PlayerRef, "XXX")
+		;RegisterForAnimationEvent(PlayerRef, "XXX")
+		;RegisterForAnimationEvent(PlayerRef, "XXX")
+		;RegisterForAnimationEvent(PlayerRef, "XXX")
+		;RegisterForAnimationEvent(PlayerRef, "XXX")
+		
 		RegisterForSleep()
 		RegisterForSingleUpdate(10)
 	Else
@@ -1148,8 +1361,39 @@ Function RegisterEvents(Bool _enable)
 		UnregisterForAnimationEvent(PlayerRef, "SoundPlay.NPCHumanWoodChopDistant")
 		UnregisterForAnimationEvent(PlayerRef, "SoundPlay.NPCHumanPickAxe")
 		
+		UnregisterForAnimationEvent(PlayerRef, "bowDrawStart")
+		UnregisterForAnimationEvent(PlayerRef, "arrowRelease")
+		UnregisterForAnimationEvent(PlayerRef, "bowDrawn")
+		
+		UnregisterForAnimationEvent(PlayerRef, "SoundPlay.OBJBlacksmithForge")
+		UnregisterForAnimationEvent(PlayerRef, "SoundPlay.NPCHumanBlacksmithForgeTake")
+		UnregisterForAnimationEvent(PlayerRef, "SoundPlay.NPCHumanBlacksmithHammer")
+		UnregisterForAnimationEvent(PlayerRef, "SoundPlay.NPCHumanBlacksmithRepairHammer")
+		
 		UnRegisterForSleep()
 		UnregisterForUpdate()
+	EndIf
+EndFunction
+
+;ToDo- Add function to get custom initial muscleScore depending on Player's race
+;      Orc=max/2, Nord=max/3, WoodElf/Redguard/Khajiit/Imperial=max/4, HighElf/DarkElf/Breton/Argonian=0
+Function chooseScoreByRace()
+	String pcRace = PlayerRef.getRace().getName()
+	If pcRace == "Orc"
+		muscleScore = muscleScoreMax * 0.5
+		normalsScore = muscleScoreMax * 0.45
+	ElseIf pcRace == "Nord"
+		muscleScore = muscleScoreMax * 0.35
+		normalsScore = muscleScoreMax * 0.3
+	ElseIf pcRace == "Wood Elf" || pcRace == "Redguard"  || pcRace == "Khajiit"  || pcRace == "Imperial" 
+		muscleScore = muscleScoreMax * 0.25
+		normalsScore = muscleScoreMax * 0.2
+	ElseIf pcRace == "High Elf" || pcRace == "Dark Elf"  || pcRace == "Breton"  || pcRace == "Argonian" 
+		muscleScore = muscleScoreMax * 0.0
+		normalsScore = muscleScoreMax * 0.0
+	Else
+		muscleScore = muscleScoreMax * 0.35
+		normalsScore = muscleScoreMax * 0.3
 	EndIf
 EndFunction
 
@@ -1163,9 +1407,15 @@ Function ResetWeight(Bool _enable)
 	Speed = 0.0
 	storedMuscle = 0.0
 	lostMuscle = 0.0
-	muscleScore = 500.0
-	muscleScoreMax = 1000.0
-	normalsScore = 450.0
+	muscleScoreMax = 2000.0
+	If hardcoreMode
+		chooseScoreByRace()
+	Else
+		muscleScore = muscleScoreMax * 0.5
+		normalsScore = muscleScoreMax * 0.45
+	EndIf
+	
+	MuscleLevel.setValue(0)
 	
 	LastDegradationTime = 0.0
 	startSleepTime = 0.0
@@ -1180,13 +1430,17 @@ Function ResetWeight(Bool _enable)
 	If _enable
 		If PlayerRef.GetActorBase().GetSex() == 0
 			;Player is Male
-			;useWeightSlider = false
+			useWeightSlider = true
 			disableNormals = true
 		EndIf
 		UpdateEffects()
 		checkBodyNormalsState()
 		initDefaultSliders()
 		LastDegradationTime = GameDaysPassed.GetValue()
+		
+		If PlayerRef.getRace().getName() == "Werewolf"
+			isWerewolf = true
+		EndIf
 	Else
 		UpdateEffects(False)
 		NiOverride.RemoveAllReferenceSkinOverrides(PlayerRef)
@@ -1225,6 +1479,13 @@ Function ClearMorphs(Bool clearBones = true)
 			cbbeSELoop += 1
 		endWhile
 		
+		;CBBE 3BA Sliders
+		Int cbbe3BALoop = 0
+		while cbbe3BALoop < 40
+			clearSliderData(5, cbbe3BALoop)
+			cbbe3BALoop += 1
+		endWhile
+		
 		;Bone changes
 		If clearBones
 			clearBoneScales(PlayerRef)
@@ -1244,11 +1505,7 @@ Function initSliderArrays()
 	uunpSliders = new String[74]
 	bhunpSliders = new String[43]
 	cbbeSESliders = new String[27]
-	
-	cbbeValues = new Float[52]
-	uunpValues = new Float[74]
-	bhunpValues = new Float[43]
-	cbbeSEValues = new Float[27]
+	cbbe3BASliders = new String[40]
 	
 	cbbeSliders[0] = "Breasts"
 	cbbeSliders[1] = "BreastsSmall"
@@ -1450,208 +1707,158 @@ Function initSliderArrays()
 	cbbeSESliders[25] = "7B Lower"
 	cbbeSESliders[26] = "7B Upper"
 	
-	cbbeValues[0] = MultBreasts
-	cbbeValues[1] = MultBreastsSmall
-	cbbeValues[2] = MultBreastsSH
-	cbbeValues[3] = MultBreastsSSH
-	cbbeValues[4] = MultBreastsFantasy
-	cbbeValues[5] = MultDoubleMelon
-	cbbeValues[6] = MultBreastCleavage
-	cbbeValues[7] = MultBreastFlatness
-	cbbeValues[8] = MultBreastGravity
-	cbbeValues[9] = MultPushUp
-	cbbeValues[10] = MultBreastHeight
-	cbbeValues[11] = MultBreastPerkiness
-	cbbeValues[12] = MultBreastWidth
-	cbbeValues[13] = MultNippleDistance
-	cbbeValues[14] = MultNipplePerkiness
-	cbbeValues[15] = MultNippleLength
-	cbbeValues[16] = MultNippleSize
-	cbbeValues[17] = MultNippleAreola
-	cbbeValues[18] = MultNippleUp
-	cbbeValues[19] = MultNippleDown
-	cbbeValues[20] = MultNippleTip
-	cbbeValues[21] = MultArms
-	cbbeValues[22] = MultChubbyArms
-	cbbeValues[23] = MultShoulderSmooth
-	cbbeValues[24] = MultShoulderWidth
-	cbbeValues[25] = MultBelly
-	cbbeValues[26] = MultBigBelly
-	cbbeValues[27] = MultPregnancyBelly
-	cbbeValues[28] = MultTummyTuck
-	cbbeValues[29] = MultBigTorso
-	cbbeValues[30] = MultWaist
-	cbbeValues[31] = MultWideWaistLine
-	cbbeValues[32] = MultChubbyWaist
-	cbbeValues[33] = MultBack
-	cbbeValues[34] = MultButtCrack
-	cbbeValues[35] = MultButt
-	cbbeValues[36] = MultButtSmall
-	cbbeValues[37] = MultButtShape2
-	cbbeValues[38] = MultBigButt
-	cbbeValues[39] = MultChubbyButt
-	cbbeValues[40] = MultAppleCheeks
-	cbbeValues[41] = MultRoundAss
-	cbbeValues[42] = MultGroin
-	cbbeValues[43] = MultHipbone
-	cbbeValues[44] = MultHips
-	cbbeValues[45] = MultSlimThighs
-	cbbeValues[46] = MultThighs
-	cbbeValues[47] = MultChubbyLegs
-	cbbeValues[48] = MultLegs
-	cbbeValues[49] = MultKneeHeight
-	cbbeValues[50] = MultCalfSize
-	cbbeValues[51] = MultCalfSmooth
-
-	;TLALOC - UUNP sliders (74)
-	uunpValues[0] = Mult7BLow
-	uunpValues[1] = Mult7BHigh
-	uunpValues[2] = Mult7BBombshellLow
-	uunpValues[3] = Mult7BBombshellHigh
-	uunpValues[4] = Mult7BNaturalLow
-	uunpValues[5] = Mult7BNaturalHigh
-	uunpValues[6] = Mult7BCleavageLow
-	uunpValues[7] = Mult7BCleavageHigh
-	uunpValues[8] = Mult7BBCupLow
-	uunpValues[9] = Mult7BBCupHigh
-	uunpValues[10] = Mult7BUNPLow
-	uunpValues[11] = Mult7BUNPHigh
-	uunpValues[12] = Mult7BCHLow
-	uunpValues[13] = Mult7BCHHigh
-	uunpValues[14] = Mult7BOppaiLow
-	uunpValues[15] = Mult7BOppaiHigh
-	uunpValues[16] = MultUNPLow
-	uunpValues[17] = MultUNPHigh
-	uunpValues[18] = MultUNPPushupLow
-	uunpValues[19] = MultUNPPushupHigh
-	uunpValues[20] = MultUNPSkinnyLow
-	uunpValues[21] = MultUNPSkinnyHigh
-	uunpValues[22] = MultUNPPerkyLow
-	uunpValues[23] = MultUNPPerkyHigh
-	uunpValues[24] = MultUNPBLow
-	uunpValues[25] = MultUNPBHigh
-	uunpValues[26] = MultUNPBChapi
-	uunpValues[27] = MultUNPBOppaiv1
-	uunpValues[28] = MultUNPBOppaiv3Low
-	uunpValues[29] = MultUNPBOppaiv3High
-	uunpValues[30] = MultUNPetiteLow
-	uunpValues[31] = MultUNPetiteHigh
-	uunpValues[32] = MultUNPCLow
-	uunpValues[33] = MultUNPCHigh
-	uunpValues[34] = MultUNPCMLow
-	uunpValues[35] = MultUNPCMHigh
-	uunpValues[36] = MultUNPSHLow
-	uunpValues[37] = MultUNPSHHigh
-	uunpValues[38] = MultUNPKLow
-	uunpValues[39] = MultUNPKHigh
-	uunpValues[40] = MultUNPKBonusLow
-	uunpValues[41] = MultUNPKBonusHigh
-	uunpValues[42] = MultUN7BLow
-	uunpValues[43] = MultUN7BHigh
-	uunpValues[44] = MultUNPBBLow
-	uunpValues[45] = MultUNPBBHigh
-	uunpValues[46] = MultSeraphimLow
-	uunpValues[47] = MultSeraphimHigh
-	uunpValues[48] = MultDemonfetLow
-	uunpValues[49] = MultDemonfetHigh
-	uunpValues[50] = MultDreamGirlLow
-	uunpValues[51] = MultDreamGirlHigh
-	uunpValues[52] = MultTopModelLow
-	uunpValues[53] = MultTopModelHigh
-	uunpValues[54] = MultLeitoLow
-	uunpValues[55] = MultLeitoHigh
-	uunpValues[56] = MultUNPFLow
-	uunpValues[57] = MultUNPFHigh
-	uunpValues[58] = MultUNPFxLow
-	uunpValues[59] = MultUNPFxHigh
-	uunpValues[60] = MultCNHFLow
-	uunpValues[61] = MultCNHFHigh
-	uunpValues[62] = MultCNHFBonusLow
-	uunpValues[63] = MultCNHFBonusHigh
-	uunpValues[64] = MultMCBMLow
-	uunpValues[65] = MultMCBMHigh
-	uunpValues[66] = MultVenusLow
-	uunpValues[67] = MultVenusHigh
-	uunpValues[68] = MultZGGBR2Low
-	uunpValues[69] = MultZGGBR2High
-	uunpValues[70] = MultMangaLow
-	uunpValues[71] = MultMangaHigh
-	uunpValues[72] = MultCHSBHCLow
-	uunpValues[73] = MultCHSBHCHigh
-
-	;BHUNP Sliders (43)
-	bhunpValues[0] = MultBreastsTogether
-	bhunpValues[1] = MultBreastCenter
-	bhunpValues[2] = MultBreastCenterBig
-	bhunpValues[3] = MultTopSlope
-	bhunpValues[4] = MultBreastConverge
-	bhunpValues[5] = MultBreastsGone
-	bhunpValues[6] = MultBreastsPressed
-	bhunpValues[7] = MultNipplePuffyAreola
-	bhunpValues[8] = MultNipBGone
-	bhunpValues[9] = MultNippleInverted
-	bhunpValues[10] = MultChestDepth
-	bhunpValues[11] = MultChestWidth
-	bhunpValues[12] = MultRibsProminance
-	bhunpValues[13] = MultSternumDepth
-	bhunpValues[14] = MultSternumHeight
-	bhunpValues[15] = MultWaistHeight
-	bhunpValues[16] = MultBackArch
-	bhunpValues[17] = MultCrotchBack
-	bhunpValues[18] = MultLegsThin
-	bhunpValues[19] = MultKneeShape
-	bhunpValues[20] = MultKneeSlim
-	bhunpValues[21] = MultMuscleAbs
-	bhunpValues[22] = MultMuscleArms
-	bhunpValues[23] = MultMuscleButt
-	bhunpValues[24] = MultMuscleLegs
-	bhunpValues[25] = MultMusclePecs
-	bhunpValues[26] = MultHipForward
-	bhunpValues[27] = MultHipUpperWidth
-	bhunpValues[28] = MultForearmSize
-	bhunpValues[29] = MultShoulderTweak
-	bhunpValues[30] = MultBotePregnancy
-	bhunpValues[31] = MultBellyFatLower
-	bhunpValues[32] = MultBellyFatUpper
-	bhunpValues[33] = MultBellyObesity
-	bhunpValues[34] = MultBellyPressed
-	bhunpValues[35] = MultBellyLowerSwell1
-	bhunpValues[36] = MultBellyLowerSwell2
-	bhunpValues[37] = MultBellyLowerSwell3
-	bhunpValues[38] = MultBellyCenterProtrude
-	bhunpValues[39] = MultBellyCenterUpperProtrude
-	bhunpValues[40] = MultBellyBalls
-	bhunpValues[41] = MultAruru6DuckLow
-	bhunpValues[42] = MultAruru6DuckHigh
+	;/
+	cbbeSliders[0]  = "Breasts"
+	cbbeSliders[1]  = "BreastsSmall"
+	cbbeSESliders[0]  = "BreastsSmall2"
+	cbbeSESliders[1] = "BreastsNewSH"
+	cbbeSESliders[2] = "BreastsNewSHSymmetry"
+	cbbeSliders[4] = "BreastsFantasy"
+	cbbeSliders[5]  = "DoubleMelon"
+	bhunpSliders[0] = "BreastsTogether"/;
+	cbbe3BASliders[0] = "BreastsConverage_v2"
+	;/bhunpSliders[1] = "BreastCenter"
+	bhunpSliders[2] = "BreastCenterBig"
+	cbbeSESliders[3] = "BreastTopSlope"
+	cbbeSliders[6]  = "BreastCleavage"
+	cbbeSliders[7] = "BreastFlatness"
+	cbbeSESliders[4] = "BreastFlatness2"
+	bhunpSliders[5] = "BreastsGone"
+	cbbeSESliders[5] = "BreastGravity2"
+	cbbeSliders[9] = "PushUp"
+	cbbeSliders[10] = "BreastHeight"
+	cbbeSliders[11] = "BreastPerkiness"
+	cbbeSliders[12] = "BreastWidth"
+	cbbeSESliders[6] = "BreastSideShape"
+	cbbeSESliders[7] = "BreastUnderDepth"/;
+	cbbe3BASliders[1] = "BreastsPressed_v2"
 	
-	;CBBE SE Sliders(27)
-	cbbeSEValues[0] = MultBreastsSmall2
-	cbbeSEValues[1] = MultBreastsNewSH
-	cbbeSEValues[2] = MultBreastsNewSHSymmetry
-	cbbeSEValues[3] = MultBreastTopSlope
-	cbbeSEValues[4] = MultBreastFlatness2
-	cbbeSEValues[5] = MultBreastGravity2
-	cbbeSEValues[6] = MultBreastSideShape
-	cbbeSEValues[7] = MultBreastUnderDepth
-	cbbeSEValues[8] = MultAreolaSize
-	cbbeSEValues[9] = MultNippleManga
-	cbbeSEValues[10] = MultNipplePerkManga
-	cbbeSEValues[11] = MultNippleTipManga
-	cbbeSEValues[12] = MultNippleDip
-	cbbeSEValues[13] = MultNavelEven
-	cbbeSEValues[14] = MultButtClassic
-	cbbeSEValues[15] = MultButtDimples
-	cbbeSEValues[16] = MultButtUnderFold
-	cbbeSEValues[17] = MultHipCarved
-	cbbeSEValues[18] = MultLegShapeClassic
-	cbbeSEValues[19] = MultFeetFeminine
-	cbbeSEValues[20] = MultAnkleSize
-	cbbeSEValues[21] = MultWristSize
-	cbbeSEValues[22] = MultVanillaSSELo
-	cbbeSEValues[23] = MultVanillaSSEHi
-	cbbeSEValues[24] = MultOldBaseShape
-	cbbeSEValues[25] = Mult7BLower
-	cbbeSEValues[26] = Mult7BUpper
+	;cbbeSESliders[8] = "AreolaSize"
+	cbbe3BASliders[2] = "AreolaPull_v2"
+	;/cbbeSliders[18] = "NippleUp"
+	cbbeSliders[19] = "NippleDown"
+	cbbeSliders[16] = "NippleSize"
+	cbbeSliders[15] = "NippleLength"/;
+	cbbe3BASliders[3] = "NippleSquash1_v2"
+	cbbe3BASliders[4] = "NippleSquash2_v2"
+	;/cbbeSESliders[9] = "NippleManga"
+	cbbeSliders[14] = "NipplePerkiness"
+	cbbeSESliders[10] = "NipplePerkManga"/;
+	cbbe3BASliders[5] = "NipplePuffy_v2"
+	cbbe3BASliders[6] = "NippleShy_v2"
+	cbbe3BASliders[7] = "NippleThicc_v2"
+	cbbe3BASliders[8] = "NippleTube_v2"
+	cbbe3BASliders[9] = "NippleCrease_v2"
+	cbbe3BASliders[10] = "NippleCrumpled_v2"
+	cbbe3BASliders[11] = "NippleBump_v2"
+	cbbe3BASliders[12] = "NippleInvert_v2"
+	;/cbbeSliders[20] = "NippleTip"
+	cbbeSESliders[11] = "NippleTipManga"
+	cbbeSliders[13] = "NippleDistance"
+	cbbeSESliders[12] = "NippleDip"
+	bhunpSliders[8] = "NipBGone"/;
+	
+	;/bhunpSliders[10] = "ChestDepth"
+	bhunpSliders[11] = "ChestWidth"/;
+	cbbe3BASliders[13] = "Clavicle_v2"
+	;bhunpSliders[12] = "RibsProminance"
+	cbbe3BASliders[14] = "RibsMore_v2"
+	;/bhunpSliders[13] = "SternumDepth"
+	bhunpSliders[14] = "SternumHeight"
+	cbbeSliders[29] = "BigTorso"
+	cbbeSliders[33] = "Back"
+	bhunpSliders[16] = "BackArch"/;
+	cbbe3BASliders[15] = "BackValley_v2"
+	cbbe3BASliders[16] = "BackWing_v2"
+	;/cbbeSESliders[13] = "NavelEven"
+	
+	cbbeSliders[30] = "Waist"
+	bhunpSliders[15] = "WaistHeight"
+	cbbeSliders[31] = "WideWaistLine"
+	cbbeSliders[32] = "ChubbyWaist"
+	
+	cbbeSESliders[14] = "ButtClassic"
+	cbbeSliders[37] = "ButtShape2"
+	cbbeSliders[34] = "ButtCrack"
+	cbbeSliders[35] = "Butt"
+	cbbeSliders[38] = "BigButt"
+	cbbeSliders[36] = "ButtSmall"
+	cbbeSliders[39] = "ChubbyButt"
+	cbbeSliders[40] = "AppleCheeks"/;
+	cbbe3BASliders[17] = "ButtSaggy_v2"
+	cbbe3BASliders[18] = "ButtPressed_v2"
+	cbbe3BASliders[19] = "ButtNarrow_v2"
+	;/cbbeSESliders[15] = "ButtDimples"
+	cbbeSESliders[16] = "ButtUnderFold"
+	cbbeSliders[41] = "RoundAss"
+	bhunpSliders[17] = "CrotchBack"
+	cbbeSliders[42] = "Groin"
+	
+	cbbeSESliders[18] = "LegShapeClassic/;
+	cbbe3BASliders[20] = "7BLeg_v2"
+	;/bhunpSliders[18] = "LegsThin"
+	cbbeSliders[45] = "SlimThighs"
+	cbbeSliders[46] = "Thighs"/;
+	cbbe3BASliders[21] = "ThighOutsideThicc_v2"
+	cbbe3BASliders[22] = "ThighInsideThicc_v2"
+	cbbe3BASliders[23] = "ThighFBThicc_v2"
+	;/cbbeSliders[47] = "ChubbyLegs"
+	cbbeSliders[48] = "Legs"/;
+	cbbe3BASliders[24] = "LegSpread_v2"
+	;/cbbeSliders[49] = "KneeHeight"
+	bhunpSliders[19] = "KneeShape"/;
+	cbbe3BASliders[25] = "KneeTogether_v2"
+	;/cbbeSliders[50] = "CalfSize"
+	cbbeSliders[51] = "CalfSmooth"/;
+	cbbe3BASliders[26] = "CalfFBThicc_v2"
+	;cbbeSESliders[19] = "FeetFeminine"
+	
+	cbbe3BASliders[39] = "HipBone"
+	;/cbbeSliders[44] = "Hips"
+	bhunpSliders[26] = "HipForward"
+	bhunpSliders[27] = "HipUpperWidth"
+	cbbeSESliders[17] = "HipCarved"/;
+	cbbe3BASliders[31] = "HipNarrow_v2"
+	cbbe3BASliders[32] = "UNPHip_v2"
+	
+	;/cbbeSliders[21] = "Arms"
+	bhunpSliders[28] = "ForearmSize"
+	cbbeSliders[22] = "ChubbyArms"
+	cbbeSliders[23] = "ShoulderSmooth"
+	cbbeSliders[24] = "ShoulderWidth"
+	bhunpSliders[29] = "ShoulderTweak"/;
+	cbbe3BASliders[33] = "ArmpitShape_v2"
+	
+	;/cbbeSliders[25] = "Belly"
+	cbbeSliders[26] = "BigBelly"
+	cbbeSliders[27] = "PregnancyBelly"/;
+	cbbe3BASliders[34] = "BellyFrontUpFat_v2"
+	cbbe3BASliders[35] = "BellyFrontDownFat_v2"
+	cbbe3BASliders[36] = "BellySideUpFat_v2"
+	cbbe3BASliders[37] = "BellySideDownFat_v2"
+	cbbe3BASliders[38] = "BellyUnder_v2"
+	;/cbbeSliders[28] = "TummyTuck"
+	
+	
+	bhunpSliders[21] = "MuscleAbs"
+	bhunpSliders[22] = "MuscleArms"
+	bhunpSliders[23] = "MuscleButt"
+	bhunpSliders[24] = "MuscleLegs"
+	bhunpSliders[25] = "MusclePecs"/;
+	cbbe3BASliders[30] = "MuscleBack_v2"
+	cbbe3BASliders[27] = "MuscleMoreAbs_v2"
+	cbbe3BASliders[28] = "MuscleMoreArms_v2"
+	cbbe3BASliders[29] = "MuscleMoreLegs_v2"
+	
+	;/cbbe3BASliders[22]  = "7B Lower"
+	cbbe3BASliders[23]  = "7B Upper"
+	cbbe3BASliders[25]  = "VanillaSSELo"
+	cbbe3BASliders[24]  = "VanillaSSEHi"
+	cbbe3BASliders[26]  = "OldBaseShape"
+	
+	cbbe3BASliders[125] = "AnkleSize"
+	cbbe3BASliders[18] = "WristSize"
+	/;
 EndFunction
 
 Function clearSliderData(Int group, Int position)
@@ -1663,6 +1870,8 @@ Function clearSliderData(Int group, Int position)
 		NiOverride.ClearBodyMorph(PlayerRef, bhunpSliders[position], SNUSNU_KEY)
 	ElseIf group == 4
 		NiOverride.ClearBodyMorph(PlayerRef, cbbeSESliders[position], SNUSNU_KEY)
+	ElseIf group == 5
+		NiOverride.ClearBodyMorph(PlayerRef, cbbe3BASliders[position], SNUSNU_KEY)
 	EndIf
 EndFunction
 
@@ -1677,6 +1886,8 @@ String Function getSliderString(int newIndex)
 		return bhunpSliders[newIndex - 52 - 74]
 	ElseIf group == 4
 		return cbbeSESliders[newIndex - 52 - 74 - 43]
+	ElseIf group == 5
+		return cbbe3BASliders[newIndex - 52 - 74 - 43 - 27]
 	EndIf
 	
 	return ""
@@ -1693,12 +1904,14 @@ Float Function getSliderValue(int newIndex)
 		return bhunpValues[newIndex - 52 - 74]
 	ElseIf group == 4
 		return cbbeSEValues[newIndex - 52 - 74 - 43]
+	ElseIf group == 5
+		return cbbe3BAValues[newIndex - 52 - 74 - 43 - 27]
 	EndIf
 	
 	return 0.0
 EndFunction
 
-Function setSliderValue(Int position, Float value)
+Function setSliderValue(Int position, Float value, Bool updateWeightNow = true)
 	Int group = getGroupIndex(position)
 	
 	If group == 1
@@ -1709,20 +1922,37 @@ Function setSliderValue(Int position, Float value)
 		bhunpValues[position - 52 - 74] = value
 	ElseIf group == 4
 		cbbeSEValues[position - 52 - 74 - 43] = value
+	ElseIf group == 5
+		cbbe3BAValues[position - 52 - 74 - 43 - 27] = value
+	EndIf
+	
+	If value == 0.0
+		IntListRemove(PlayerRef, SNUSNU_KEY, position)
+	Else
+		IntListAdd(PlayerRef, SNUSNU_KEY, position, false)
 	EndIf
 	
 	If value == 0.0
 		Debug.Trace("SNU - Removing morph: "+getSliderString(position))
 		NiOverride.ClearBodyMorph(PlayerRef, getSliderString(position), SNUSNU_KEY)
 	EndIf
+	
+	If updateWeightNow
+		UpdateWeight()
+	EndIf
 EndFunction
 
 Int Function getGroupIndex(int newIndex)
 	Int group = 1
-	If newIndex > 51
-		group = 2
+	;ToDo- Check if those calculations are correct
+	If newIndex > 195
+		group = 5
+	ElseIf newIndex > 168
+		group = 4
 	ElseIf newIndex > 125
 		group = 3
+	ElseIf newIndex > 51
+		group = 2
 	EndIf
 	
 	return group
@@ -1730,7 +1960,271 @@ EndFunction
 
 Function initDefaultSliders()
 	;Debug.Trace("SNU - initDefaultSliders()")
+	
+	cbbeValues = new Float[52]
+	uunpValues = new Float[74]
+	bhunpValues = new Float[43]
+	cbbeSEValues = new Float[27]
+	cbbe3BAValues = new Float[40]
+	
+	;TLALOC- Arrays were turned into properties so we no longer need the individual value refs
+	cbbeValues[0] = 0.0 ;Breasts
+	cbbeValues[1] = 0.2 ;BreastsSmall
+	cbbeValues[2] = 0.0 ;BreastsSH
+	cbbeValues[3] = 0.0 ;BreastsSSH
+	cbbeValues[4] = 0.0 ;BreastsFantasy
+	cbbeValues[5] = 0.0 ;DoubleMelon
+	cbbeValues[6] = 0.0 ;BreastCleavage
+	cbbeValues[7] = 0.0 ;BreastFlatness
+	cbbeValues[8] = 0.0 ;BreastGravity
+	cbbeValues[9] = -0.1 ;PushUp
+	cbbeValues[10] = 1.1 ;BreastHeight
+	cbbeValues[11] = 0.0 ;BreastPerkiness
+	cbbeValues[12] = 0.6 ;BreastWidth
+	
+	cbbeValues[13] = 0.0 ;NippleDistance
+	cbbeValues[14] = 0.0 ;NipplePerkiness
+	cbbeValues[15] = 0.0 ;NippleLength
+	cbbeValues[16] = 0.0 ;NippleSize
+	cbbeValues[17] = 0.0 ;NippleAreola
+	cbbeValues[18] = -0.5 ;NippleUp
+	cbbeValues[19] = 1.0 ;NippleDown
+	cbbeValues[20] = 0.0 ;NippleTip
+	
+	cbbeValues[21] = 0.0 ;Arms
+	cbbeValues[22] = 0.6 ;ChubbyArms
+	cbbeValues[23] = 0.0 ;ShoulderSmooth
+	cbbeValues[24] = 0.0 ;ShoulderWidth
+	
+	cbbeValues[25] = 0.0 ;Belly
+	cbbeValues[26] = -0.3 ;BigBelly
+	cbbeValues[27] = 0.0 ;PregnancyBelly
+	cbbeValues[28] = 0.0 ;TummyTuck
+	
+	cbbeValues[29] = 0.0 ;BigTorso
+	cbbeValues[30] = 0.0 ;Waist
+	cbbeValues[31] = 0.0 ;WideWaistLine
+	cbbeValues[32] = 0.0 ;ChubbyWaist
+	cbbeValues[33] = 0.5 ;Back
+	
+	cbbeValues[34] = -0.3 ;ButtCrack
+	cbbeValues[35] = 0.5 ;Butt
+	cbbeValues[36] = 0.0 ;ButtSmall
+	cbbeValues[37] = 0.0 ;ButtShape2
+	cbbeValues[38] = 0.0 ;BigButt
+	cbbeValues[39] = 0.0 ;ChubbyButt
+	cbbeValues[40] = 0.0 ;AppleCheeks
+	cbbeValues[41] = 0.0 ;RoundAss
+	cbbeValues[42] = 0.0 ;Groin
+	
+	cbbeValues[43] = 0.0 ;Hipbone
+	cbbeValues[44] = 0.0 ;Hips
+	
+	cbbeValues[45] = 0.0 ;SlimThighs
+	cbbeValues[46] = 0.0 ;Thighs
+	cbbeValues[47] = 0.1 ;ChubbyLegs
+	cbbeValues[48] = 0.0 ;Legs
+	cbbeValues[49] = 0.0 ;KneeHeight
+	cbbeValues[50] = 0.0 ;CalfSize
+	cbbeValues[51] = -0.5 ;CalfSmooth
+
+	;UUNP sliders (74)
+	uunpValues[0] = 0.0 ;7BLow
+	uunpValues[1] = 0.0 ;7BHigh
+	uunpValues[2] = 0.0 ;7BBombshellLow
+	uunpValues[3] = 0.0 ;7BBombshellHigh
+	uunpValues[4] = 0.0 ;7BNaturalLow
+	uunpValues[5] = 0.0 ;7BNaturalHigh
+	uunpValues[6] = 0.0 ;7BCleavageLow
+	uunpValues[7] = 0.0 ;7BCleavageHigh
+	uunpValues[8] = 0.0 ;7BBCupLow
+	uunpValues[9] = 0.0 ;7BBCupHigh
+	uunpValues[10] = 0.0 ;7BUNPLow
+	uunpValues[11] = 0.0 ;7BUNPHigh
+	uunpValues[12] = 0.0 ;7BCHLow
+	uunpValues[13] = 0.0 ;7BCHHigh
+	uunpValues[14] = 0.0 ;7BOppaiLow
+	uunpValues[15] = 0.0 ;7BOppaiHigh
+	uunpValues[16] = 0.0 ;UNPLow
+	uunpValues[17] = 0.0 ;UNPHigh
+	uunpValues[18] = 0.0 ;UNPPushupLow
+	uunpValues[19] = 0.0 ;UNPPushupHigh
+	uunpValues[20] = 0.0 ;UNPSkinnyLow
+	uunpValues[21] = 0.0 ;UNPSkinnyHigh
+	uunpValues[22] = 0.0 ;UNPPerkyLow
+	uunpValues[23] = 0.0 ;UNPPerkyHigh
+	uunpValues[24] = 0.0 ;UNPBLow
+	uunpValues[25] = 0.0 ;UNPBHigh
+	uunpValues[26] = 0.0 ;UNPBChapi
+	uunpValues[27] = 0.0 ;UNPBOppaiv1
+	uunpValues[28] = 0.0 ;UNPBOppaiv3Low
+	uunpValues[29] = 0.0 ;UNPBOppaiv3High
+	uunpValues[30] = 0.0 ;UNPetiteLow
+	uunpValues[31] = 0.0 ;UNPetiteHigh
+	uunpValues[32] = 0.0 ;UNPCLow
+	uunpValues[33] = 0.0 ;UNPCHigh
+	uunpValues[34] = 0.0 ;UNPCMLow
+	uunpValues[35] = 0.0 ;UNPCMHigh
+	uunpValues[36] = 0.0 ;UNPSHLow
+	uunpValues[37] = 0.0 ;UNPSHHigh
+	uunpValues[38] = 0.0 ;UNPKLow
+	uunpValues[39] = 0.0 ;UNPKHigh
+	uunpValues[40] = 0.0 ;UNPKBonusLow
+	uunpValues[41] = 0.0 ;UNPKBonusHigh
+	uunpValues[42] = 0.0 ;UN7BLow
+	uunpValues[43] = 0.0 ;UN7BHigh
+	uunpValues[44] = 0.0 ;UNPBBLow
+	uunpValues[45] = 0.0 ;UNPBBHigh
+	uunpValues[46] = 0.0 ;SeraphimLow
+	uunpValues[47] = 0.0 ;SeraphimHigh
+	uunpValues[48] = 0.0 ;DemonfetLow
+	uunpValues[49] = 0.0 ;DemonfetHigh
+	uunpValues[50] = 0.0 ;DreamGirlLow
+	uunpValues[51] = 0.0 ;DreamGirlHigh
+	uunpValues[52] = 0.0 ;TopModelLow
+	uunpValues[53] = 0.0 ;TopModelHigh
+	uunpValues[54] = 0.0 ;LeitoLow
+	uunpValues[55] = 0.0 ;LeitoHigh
+	uunpValues[56] = 0.0 ;UNPFLow
+	uunpValues[57] = 0.0 ;UNPFHigh
+	uunpValues[58] = 0.0 ;UNPFxLow
+	uunpValues[59] = 0.0 ;UNPFxHigh
+	uunpValues[60] = 0.0 ;CNHFLow
+	uunpValues[61] = 0.0 ;CNHFHigh
+	uunpValues[62] = 0.0 ;CNHFBonusLow
+	uunpValues[63] = 0.0 ;CNHFBonusHigh
+	uunpValues[64] = 0.0 ;MCBMLow
+	uunpValues[65] = 0.0 ;MCBMHigh
+	uunpValues[66] = 0.0 ;VenusLow
+	uunpValues[67] = 0.0 ;VenusHigh
+	uunpValues[68] = 0.0 ;ZGGBR2Low
+	uunpValues[69] = 0.0 ;ZGGBR2High
+	uunpValues[70] = 0.0 ;MangaLow
+	uunpValues[71] = 0.0 ;MangaHigh
+	uunpValues[72] = 0.0 ;CHSBHCLow
+	uunpValues[73] = 0.0 ;CHSBHCHigh
+
+	;BHUNP Sliders (43)
+	bhunpValues[0] = 0.0 ;BreastsTogether
+	bhunpValues[1] = 1.0 ;BreastCenter
+	bhunpValues[2] = 0.0 ;BreastCenterBig
+	bhunpValues[3] = 0.0 ;TopSlope
+	bhunpValues[4] = 0.0 ;BreastConverge
+	bhunpValues[5] = 0.0 ;BreastsGone
+	bhunpValues[6] = 0.0 ;BreastsPressed
+	bhunpValues[7] = 0.0 ;NipplePuffyAreola
+	bhunpValues[8] = 0.0 ;NipBGone
+	bhunpValues[9] = 0.0 ;NippleInverted
+	bhunpValues[10] = 0.0 ;ChestDepth
+	bhunpValues[11] = 0.1 ;ChestWidth
+	bhunpValues[12] = 0.0 ;RibsProminance
+	bhunpValues[13] = 0.0 ;SternumDepth
+	bhunpValues[14] = 0.0 ;SternumHeight
+	bhunpValues[15] = 0.0 ;WaistHeight
+	bhunpValues[16] = 0.0 ;BackArch
+	bhunpValues[17] = 0.0 ;CrotchBack
+	bhunpValues[18] = 0.0 ;LegsThin
+	bhunpValues[19] = 0.0 ;KneeShape
+	bhunpValues[20] = 0.0 ;KneeSlim
+	bhunpValues[21] = 0.0 ;MuscleAbs
+	bhunpValues[22] = 1.0 ;MuscleArms
+	bhunpValues[23] = 0.0 ;MuscleButt
+	bhunpValues[24] = 1.0 ;MuscleLegs
+	bhunpValues[25] = 0.0 ;MusclePecs
+	bhunpValues[26] = 0.0 ;HipForward
+	bhunpValues[27] = 0.0 ;HipUpperWidth
+	bhunpValues[28] = 0.6 ;ForearmSize
+	bhunpValues[29] = 0.0 ;ShoulderTweak
+	bhunpValues[30] = 0.0 ;BotePregnancy
+	bhunpValues[31] = 0.0 ;BellyFatLower
+	bhunpValues[32] = 0.0 ;BellyFatUpper
+	bhunpValues[33] = 0.0 ;BellyObesity
+	bhunpValues[34] = 0.0 ;BellyPressed
+	bhunpValues[35] = 0.0 ;BellyLowerSwell1
+	bhunpValues[36] = 0.0 ;BellyLowerSwell2
+	bhunpValues[37] = 0.0 ;BellyLowerSwell3
+	bhunpValues[38] = 0.0 ;BellyCenterProtrude
+	bhunpValues[39] = 0.0 ;BellyCenterUpperProtrude
+	bhunpValues[40] = 0.0 ;BellyBalls
+	bhunpValues[41] = 0.0 ;Aruru6DuckLow
+	bhunpValues[42] = 0.0 ;Aruru6DuckHigh
+	
+	;CBBE SE Sliders(27)
+	cbbeSEValues[0] = 0.0 ;BreastsSmall2
+	cbbeSEValues[1] = 0.0 ;BreastsNewSH
+	cbbeSEValues[2] = 0.0 ;BreastsNewSHSymmetry
+	cbbeSEValues[3] = 0.6 ;BreastTopSlope
+	cbbeSEValues[4] = 0.0 ;BreastFlatness2
+	cbbeSEValues[5] = 0.0 ;BreastGravity2
+	cbbeSEValues[6] = -1.0 ;BreastSideShape
+	cbbeSEValues[7] = 0.0 ;BreastUnderDepth
+	cbbeSEValues[8] = 0.0 ;AreolaSize
+	cbbeSEValues[9] = 0.0 ;NippleManga
+	cbbeSEValues[10] = 0.0 ;NipplePerkManga
+	cbbeSEValues[11] = 0.0 ;NippleTipManga
+	cbbeSEValues[12] = 0.0 ;NippleDip
+	cbbeSEValues[13] = 0.0 ;NavelEven
+	cbbeSEValues[14] = 0.0 ;ButtClassic
+	cbbeSEValues[15] = 1.0 ;ButtDimples
+	cbbeSEValues[16] = 0.0 ;ButtUnderFold
+	cbbeSEValues[17] = 0.0 ;HipCarved
+	cbbeSEValues[18] = 0.0 ;LegShapeClassic
+	cbbeSEValues[19] = 0.0 ;FeetFeminine
+	cbbeSEValues[20] = 0.0 ;AnkleSize
+	cbbeSEValues[21] = 0.0 ;WristSize
+	cbbeSEValues[22] = 0.0 ;VanillaSSELo
+	cbbeSEValues[23] = 0.0 ;VanillaSSEHi
+	cbbeSEValues[24] = 0.0 ;OldBaseShape
+	cbbeSEValues[25] = 0.0 ;7BLower
+	cbbeSEValues[26] = 0.0 ;7BUpper
+	
+	;CBBE 3BA Sliders(40)
+	cbbe3BAValues[0] = 0.0 ;BreastsConverage_v2
+	cbbe3BAValues[1] = 0.0 ;BreastsPressed_v2
+	cbbe3BAValues[2] = 0.0 ;AreolaPull_v2
+	cbbe3BAValues[3] = 0.0 ;NippleSquash1_v2
+	cbbe3BAValues[4] = 0.0 ;NippleSquash2_v2
+	cbbe3BAValues[5] = 0.0 ;NipplePuffy_v2
+	cbbe3BAValues[6] = 0.0 ;NippleShy_v2
+	cbbe3BAValues[7] = 0.0 ;NippleThicc_v2
+	cbbe3BAValues[8] = 0.0 ;NippleTube_v2
+	cbbe3BAValues[9] = 0.0 ;NippleCrease_v2
+	cbbe3BAValues[10] = 0.0 ;NippleCrumpled_v2
+	cbbe3BAValues[11] = 0.0 ;NippleBump_v2
+	cbbe3BAValues[12] = 0.0 ;NippleInvert_v2
+	cbbe3BAValues[13] = 0.0 ;Clavicle_v2
+	cbbe3BAValues[14] = 0.0 ;RibsMore_v2
+	cbbe3BAValues[15] = 1.0 ;BackValley_v2
+	cbbe3BAValues[16] = 0.4 ;BackWing_v2
+	cbbe3BAValues[17] = 0.0 ;ButtSaggy_v2
+	cbbe3BAValues[18] = 0.0 ;ButtPressed_v2
+	cbbe3BAValues[19] = 0.8 ;ButtNarrow_v2
+	cbbe3BAValues[20] = 0.0 ;7BLeg_v2
+	cbbe3BAValues[21] = 0.3 ;0.1 ;ThighOutsideThicc_v2
+	cbbe3BAValues[22] = 0.0 ;ThighInsideThicc_v2
+	cbbe3BAValues[23] = 0.3 ;ThighFBThicc_v2
+	cbbe3BAValues[24] = 0.1 ;LegSpread_v2
+	cbbe3BAValues[25] = 0.0 ;KneeTogether_v2
+	cbbe3BAValues[26] = 0.0 ;CalfFBThicc_v2
+	cbbe3BAValues[27] = 0.8 ;MuscleMoreAbs_v2
+	cbbe3BAValues[28] = 0.5 ;MuscleMoreArms_v2
+	cbbe3BAValues[29] = 1.0 ;MuscleMoreLegs_v2
+	cbbe3BAValues[30] = 0.6 ;MuscleBack_v2
+	cbbe3BAValues[31] = -0.1 ;HipNarrow_v2
+	cbbe3BAValues[32] = 0.0 ;UNPHip_v2
+	cbbe3BAValues[33] = 0.0 ;ArmpitShape_v2
+	cbbe3BAValues[34] = 0.0 ;BellyFrontUpFat_v2
+	cbbe3BAValues[35] = 0.0 ;BellyFrontDownFat_v2
+	cbbe3BAValues[36] = 0.0 ;BellySideUpFat_v2
+	cbbe3BAValues[37] = 0.0 ;BellySideDownFat_v2
+	cbbe3BAValues[38] = 0.0 ;BellyUnder_v2
+	cbbe3BAValues[39] = 0.0 ;HipBone
+	
+	
+	;ToDo- Add conditions to choose the slider set depending on selected body
 	IntListClear(PlayerRef, SNUSNU_KEY)
+	
+	;/UUNP
 	IntListAdd(PlayerRef, SNUSNU_KEY, 117, false)
 	IntListAdd(PlayerRef, SNUSNU_KEY, 89, false)
 	IntListAdd(PlayerRef, SNUSNU_KEY, 47, false)
@@ -1763,6 +2257,189 @@ Function initDefaultSliders()
 	IntListAdd(PlayerRef, SNUSNU_KEY, 7, false)
 	IntListAdd(PlayerRef, SNUSNU_KEY, 12, false)
 	IntListAdd(PlayerRef, SNUSNU_KEY, 22, false)
+	/;
+	
+	IntListAdd(PlayerRef, SNUSNU_KEY, 33, false) ;Back
+	IntListAdd(PlayerRef, SNUSNU_KEY, 211, false) ;BackValley_v2
+	IntListAdd(PlayerRef, SNUSNU_KEY, 212, false) ;BackWing_v2
+	IntListAdd(PlayerRef, SNUSNU_KEY, 26, false) ;BigBelly
+	IntListAdd(PlayerRef, SNUSNU_KEY, 127, false) ;BreastCenter
+	IntListAdd(PlayerRef, SNUSNU_KEY, 10, false) ;BreastHeight
+	IntListAdd(PlayerRef, SNUSNU_KEY, 175, false) ;BreastSideShape
+	IntListAdd(PlayerRef, SNUSNU_KEY, 172, false) ;BreastTopSlope
+	IntListAdd(PlayerRef, SNUSNU_KEY, 12, false) ;BreastWidth
+	IntListAdd(PlayerRef, SNUSNU_KEY, 1, false) ;BreastsSmall
+	IntListAdd(PlayerRef, SNUSNU_KEY, 35, false) ;Butt
+	IntListAdd(PlayerRef, SNUSNU_KEY, 34, false) ;ButtCrack
+	IntListAdd(PlayerRef, SNUSNU_KEY, 184, false) ;ButtDimples
+	IntListAdd(PlayerRef, SNUSNU_KEY, 215, false) ;ButtNarrow_v2
+	IntListAdd(PlayerRef, SNUSNU_KEY, 51, false) ;CalfSmooth
+	IntListAdd(PlayerRef, SNUSNU_KEY, 137, false) ;ChestWidth
+	IntListAdd(PlayerRef, SNUSNU_KEY, 22, false) ;ChubbyArms
+	IntListAdd(PlayerRef, SNUSNU_KEY, 47, false) ;ChubbyLegs
+	IntListAdd(PlayerRef, SNUSNU_KEY, 154, false) ;ForearmSize
+	IntListAdd(PlayerRef, SNUSNU_KEY, 227, false) ;HipNarrow_v2
+	IntListAdd(PlayerRef, SNUSNU_KEY, 220, false) ;LegSpread_v2
+	IntListAdd(PlayerRef, SNUSNU_KEY, 148, false) ;MuscleArms
+	IntListAdd(PlayerRef, SNUSNU_KEY, 226, false) ;MuscleBack_v2
+	IntListAdd(PlayerRef, SNUSNU_KEY, 150, false) ;MuscleLegs
+	IntListAdd(PlayerRef, SNUSNU_KEY, 223, false) ;MuscleMoreAbs_v2
+	IntListAdd(PlayerRef, SNUSNU_KEY, 224, false) ;MuscleMoreArms_v2
+	IntListAdd(PlayerRef, SNUSNU_KEY, 225, false) ;MuscleMoreLegs_v2
+	IntListAdd(PlayerRef, SNUSNU_KEY, 19, false) ;NippleDown
+	IntListAdd(PlayerRef, SNUSNU_KEY, 18, false) ;NippleUp
+	IntListAdd(PlayerRef, SNUSNU_KEY, 9, false) ;PushUp
+	IntListAdd(PlayerRef, SNUSNU_KEY, 219, false) ;ThighFBThicc_v2
+	IntListAdd(PlayerRef, SNUSNU_KEY, 217, false) ;ThighOutsideThicc_v2
+EndFunction
+
+;profileID: 1=UUNP, 2=CBBE 3BA, 3=CBBE 3BA Pecs
+Function LoadDefaultProfile(Int profileID)
+	ClearMorphs(true)
+	IntListClear(PlayerRef, SNUSNU_KEY)
+	;setSliderValue(Int position, Float value, Bool updateWeightNow = true)
+	If profileID == 1 ;UUNP
+		;ToDo- Pending update values from old UUNP focused code
+		setSliderValue(117, 000, false)
+		setSliderValue(89, 000, false)
+		setSliderValue(47, 000, false)
+		setSliderValue(15, 000, false)
+		setSliderValue(50, 000, false)
+		setSliderValue(40, 000, false)
+		setSliderValue(38, 000, false)
+		setSliderValue(45, 000, false)
+		setSliderValue(51, 000, false)
+		setSliderValue(8, 000, false)
+		setSliderValue(33, 000, false)
+		setSliderValue(29, 000, false)
+		setSliderValue(35, 000, false)
+		setSliderValue(32, 000, false)
+		setSliderValue(23, 000, false)
+		setSliderValue(24, 000, false)
+		setSliderValue(31, 000, false)
+		setSliderValue(9, 000, false)
+		setSliderValue(3, 000, false)
+		setSliderValue(11, 000, false)
+		setSliderValue(13, 000, false)
+		setSliderValue(30, 000, false)
+		setSliderValue(37, 000, false)
+		setSliderValue(46, 000, false)
+		setSliderValue(4, 000, false)
+		setSliderValue(5, 000, false)
+		setSliderValue(18, 000, false)
+		setSliderValue(19, 000, false)
+		setSliderValue(10, 000, false)
+		setSliderValue(7, 000, false)
+		setSliderValue(12, 000, false)
+		setSliderValue(22, 000, false)
+		
+		MultSpineBone = 1.05
+		MultForearmBone = 1.05
+	ElseIf profileID == 2 ;CBBE 3BA
+		setSliderValue(33, 0.5, false) ;Back
+		setSliderValue(211, 1.0, false) ;BackValley_v2
+		setSliderValue(212, 0.4, false) ;BackWing_v2
+		setSliderValue(127, 1.0, false) ;BreastCenter
+		setSliderValue(10, 1.1, false) ;BreastHeight
+		setSliderValue(175, -1.0, false) ;BreastSideShape
+		setSliderValue(172, 0.6, false) ;BreastTopSlope
+		setSliderValue(12, 0.6, false) ;BreastWidth
+		setSliderValue(1, 0.2, false) ;BreastsSmall
+		setSliderValue(35, 0.5, false) ;Butt
+		setSliderValue(34, -0.3, false) ;ButtCrack
+		setSliderValue(184, 1.0, false) ;ButtDimples
+		setSliderValue(215, 0.8, false) ;ButtNarrow_v2
+		setSliderValue(51, -0.5, false) ;CalfSmooth
+		setSliderValue(137, 0.1, false) ;ChestWidth
+		setSliderValue(22, 0.6, false) ;ChubbyArms
+		setSliderValue(47, 0.1, false) ;ChubbyLegs
+		setSliderValue(154, 0.6, false) ;ForearmSize
+		setSliderValue(227, -0.1, false) ;HipNarrow_v2
+		setSliderValue(220, 0.1, false) ;LegSpread_v2
+		setSliderValue(148, 1.5, false) ;MuscleArms
+		setSliderValue(226, 0.6, false) ;MuscleBack_v2
+		setSliderValue(150, 1.0, false) ;MuscleLegs
+		setSliderValue(223, 1.0, false) ;MuscleMoreAbs_v2
+		setSliderValue(224, 0.5, false) ;MuscleMoreArms_v2
+		setSliderValue(225, 1.0, false) ;MuscleMoreLegs_v2
+		setSliderValue(19, 1.0, false) ;NippleDown
+		setSliderValue(18, -0.5, false) ;NippleUp
+		setSliderValue(9, -0.1, false) ;PushUp
+		setSliderValue(219, 0.3, false) ;ThighFBThicc_v2
+		setSliderValue(217, 0.3, false) ;ThighOutsideThicc_v2
+		setSliderValue(190, -1.0, false) ;WristSize
+		setSliderValue(189, -1.0, false) ;AnkleSize
+		setSliderValue(187, -0.6, false) ;LegShapeClassic
+		
+		MultSpineBone = 1.05
+		MultForearmBone = 1.0
+	Else ;CBBE 3BA Pecs
+		setSliderValue(33, 0.5, false) ;Back
+		setSliderValue(211, 1.0, false) ;BackValley_v2
+		setSliderValue(212, 0.4, false) ;BackWing_v2
+		setSliderValue(10, 1.1, false) ;BreastHeight
+		setSliderValue(175, -1.0, false) ;BreastSideShape
+		setSliderValue(172, -0.4, false) ;BreastTopSlope
+		setSliderValue(12, 0.6, false) ;BreastWidth
+		setSliderValue(1, 0.2, false) ;BreastsSmall
+		setSliderValue(35, 0.5, false) ;Butt
+		setSliderValue(34, -0.3, false) ;ButtCrack
+		setSliderValue(184, 1.0, false) ;ButtDimples
+		setSliderValue(215, 0.8, false) ;ButtNarrow_v2
+		setSliderValue(51, -0.5, false) ;CalfSmooth
+		setSliderValue(137, 0.1, false) ;ChestWidth
+		setSliderValue(22, 0.6, false) ;ChubbyArms
+		setSliderValue(47, 0.1, false) ;ChubbyLegs
+		setSliderValue(154, 0.6, false) ;ForearmSize
+		setSliderValue(227, -0.1, false) ;HipNarrow_v2
+		setSliderValue(220, 0.1, false) ;LegSpread_v2
+		setSliderValue(148, 1.5, false) ;MuscleArms
+		setSliderValue(226, 0.6, false) ;MuscleBack_v2
+		setSliderValue(150, 1.0, false) ;MuscleLegs
+		setSliderValue(223, 1.0, false) ;MuscleMoreAbs_v2
+		setSliderValue(224, 0.5, false) ;MuscleMoreArms_v2
+		setSliderValue(225, 1.0, false) ;MuscleMoreLegs_v2
+		setSliderValue(19, 1.0, false) ;NippleDown
+		setSliderValue(18, -0.5, false) ;NippleUp
+		setSliderValue(9, -0.1, false) ;PushUp
+		setSliderValue(219, 0.3, false) ;ThighFBThicc_v2
+		setSliderValue(217, 0.3, false) ;ThighOutsideThicc_v2
+		setSliderValue(190, -1.0, false) ;WristSize
+		setSliderValue(189, -1.0, false) ;AnkleSize
+		setSliderValue(187, -0.6, false) ;LegShapeClassic
+		
+		;Pecs Shape
+		setSliderValue(20, -0.2, false) ;NippleTip
+		setSliderValue(131, 0.4, false) ;BreastsGone
+		setSliderValue(126, 0.1, false) ;BreastsTogether
+		
+		
+		MultSpineBone = 1.05
+		MultForearmBone = 1.0
+	EndIf
+	
+	UpdateWeight()
+EndFunction
+
+Function ForceNewWeight(Float newScore = 500.0)
+	storedMuscle = 0.0
+	lostMuscle = 0.0
+	muscleScore = newScore
+	normalsScore = newScore * 0.9
+	Debug.Trace("SNU - Muscle score has been set to: "+muscleScore)
+	LastDegradationTime = 0.0
+	startSleepTime = 0.0
+	totalSleepTime = 0.0
+	justWakeUp = false
+
+	currentBuildStage = 1
+	currentPregStage = 0
+	currentSlimStage = 0
+	finalNormalsPath = "EMPTY"
+	
+	UpdateEffects()
+	checkBodyNormalsState()
+	LastDegradationTime = GameDaysPassed.GetValue()
 EndFunction
 
 Function initFNISanims()
@@ -1805,4 +2482,205 @@ EndFunction
 Function ReloadHotkeys()
 	UnregisterForAllKeys()
 	RegisterForKey(getInfoKey)
+	
+	;Experimental NPC muscle gain
+	RegisterForKey(37);K
+	
+	;Pushup exceptions management
+	RegisterForKey(38);L
+EndFunction
+
+Function SetNodeScale(Actor akActor, bool isFemale, string nodeName, float value, string modkey) global
+	If value != 1.0
+		NiOverride.AddNodeTransformScale(akActor, false, isFemale, nodeName, modkey, value)
+		NiOverride.AddNodeTransformScale(akActor, true, isFemale, nodeName, modkey, value)
+	Else
+		NiOverride.RemoveNodeTransformScale(akActor, false, isFemale, nodeName, modkey)
+		NiOverride.RemoveNodeTransformScale(akActor, true, isFemale, nodeName, modkey)
+	Endif
+	NiOverride.UpdateNodeTransform(akActor, false, isFemale, nodeName)
+	NiOverride.UpdateNodeTransform(akActor, true, isFemale, nodeName)
+EndFunction
+
+Function updateCarryWeight(Int stage = 4)
+	;/
+	------- REFERENCES
+	------- actualCarryWeight = PlayerRef.GetActorValue("CarryWeight")
+	------- PlayerRef.ModActorValue("CarryWeight", -modWeight)
+	
+	Int currentStage = carryWeightBoost / currentExtraCarryWeight
+	/;
+	
+	;/ ----------- LOGIC ----------- 
+	carryWeightBoost is the maximum carry weight we can get, and what we actually get depends on the
+	muscle score. 
+	
+	To avoid constantly changing the carry weight, we divide the muscleScore in stages.
+	From 0 to 20% of maximumMuscleScore, carryWeight should be 0
+	From 20 to 40%, carryWeight should be 25% of carryWeightBoost
+	From 40 to 60%, carryWeight should be 50% of carryWeightBoost
+	From 60 to 80%, carryWeight should be 75% of carryWeightBoost
+	From 80% and up, carryWeight should be 100% of carryWeightBoost
+	
+	If the user changes the value of carryWeightBoost, we shoud recalculate the ranges and reapply the
+	correct boost to carry weight if necessary
+	
+	There is a couple of values we need to calculate always
+	- Muscle score percent: should be muscleScore divided by muscleScoreMax. Result should be between 0 and 1
+	  musclePercent = muscleScore/muscleScoreMax
+	- Carry weight percent: Same calculation: currentExtraCarryWeight divided by carryWeightBoost. Result should be between 0 and 1
+	  carryWeightPercent = currentExtraCarryWeight/carryWeightBoost
+	  
+	But first we need to know what value currentExtraCarryWeight should actually be. For that we just
+	- carryWeightBoost*0.75 = 75%
+	- carryWeightBoost*0.5 = 50%
+	- carryWeightBoost*0.25 = 25%
+	
+	
+	EVERY TIME WE WANT TO UPDATE THE CARRY WEIGHT, we get the musclePercent value, then the carryWeightPercent,
+	and check if we are out of range. If we are, we update the carryWeight accordingly
+	/;
+	
+	If carryWeightBoost > 0.0
+		currentExtraCarryWeight = carryWeightBoost
+		PlayerRef.ModActorValue("CarryWeight", currentExtraCarryWeight)
+	ElseIf currentExtraCarryWeight > 0.0
+		PlayerRef.ModActorValue("CarryWeight", -currentExtraCarryWeight)
+		currentExtraCarryWeight = 0.0
+	EndIf
+EndFunction
+
+Function addWerewolfBuild()
+	Debug.Trace("SNU - addWerewolfBuild()")
+	;Werewolf characters should have a lean, muscular build, so that means:
+	;   added muscle mass (take from stored) and updated body weight
+	;	(should be around 20% chubbiness) after transformation.
+	
+	totalSleepTime = GameDaysPassed.GetValue() - startSleepTime
+	justWakeUp = true
+	updateMuscleScore(muscleScoreMax * 0.05) ;Add 5% extra muscle
+	
+	If WMCM.WMorphs.Weight <= 0.065 ;0.155
+		WMCM.WMorphs.ChangeWeight(0.01, true)
+	ElseIf WMCM.WMorphs.Weight >= 0.085 ;0.22
+		WMCM.WMorphs.ChangeWeight(-0.01, true)
+	EndIf
+EndFunction
+
+;TLALOC- NPC Related functions
+Function applyNPCMuscle(Float howMuch)
+	Debug.Trace("SNU - applyNPCMuscle("+howMuch+")")
+	;Get a NPC on target
+	Actor crosshairActor = Game.GetCurrentCrosshairRef() as Actor
+	If crosshairActor && !crosshairActor.isdead()
+		If StorageUtil.GetIntValue(crosshairActor, "hasMuscle", 0) == 0 && howMuch > 0.0
+			Debug.Trace("SNU - Actor on crosshair is "+crosshairActor.GetBaseObject().getName())
+			howMuch = howMuch / muscleScoreMax
+			If crosshairActor.GetActorBase().GetSex() == 1
+				Debug.Trace("SNU - Actor is Female")
+				;Morphs for females
+				Int totalSliders = IntListCount(PlayerRef, SNUSNU_KEY)
+				Int slidersLoop = 0
+				while slidersLoop < totalSliders
+					Int currentSliderIndex = IntListGet(PlayerRef, SNUSNU_KEY, slidersLoop)
+					NiOverride.SetBodyMorph(crosshairActor, getSliderString(currentSliderIndex), SNUSNU_KEY, howMuch * getSliderValue(currentSliderIndex))
+					slidersLoop += 1
+				endWhile
+				
+				;TLALOC- Apply bone changes
+				changeSpineBoneScale(crosshairActor, howMuch * Math.abs( 1.0 - MultSpineBone ))
+				changeForearmBoneScale(crosshairActor, howMuch * Math.abs( 1.0 - MultForearmBone ))
+				
+				;Muscle Normals!
+				SnusnuMusclePowerNPCScript.forceSwitchMuscleNormals(crosshairActor, howMuch*100)
+				
+				NiOverride.UpdateModelWeight(crosshairActor)
+			Else
+				;Pending morphs for males
+			EndIf
+			
+			If crosshairActor.GetBaseObject().getName() != ""
+				Debug.Trace("SNU - Actor is not generic. Adding to list.")
+				StorageUtil.SetIntValue(crosshairActor, "hasMuscle", (howMuch * 100) as int)
+				StorageUtil.FormListAdd(none, "MUSCLE_NPCS", crosshairActor, false)
+				;StorageUtil.FloatListAdd(none, "MUSCLE_NPCS_SCORE", howMuch, true)
+			EndIf
+		Else
+			NiOverride.RemoveAllReferenceSkinOverrides(crosshairActor);For the custom normals
+			NiOverride.RemoveAllReferenceNodeOverrides(crosshairActor);For the custom normals
+			NiOverride.RemoveSkinOverride(crosshairActor, true, false, 0x04, 9, 1)
+			
+			NiOverride.ClearMorphs(crosshairActor)
+			clearBoneScales(crosshairActor)
+			NiOverride.UpdateModelWeight(crosshairActor)
+			
+			crosshairActor.QueueNiNodeUpdate()
+			
+			Int actorIndex = StorageUtil.FormListFind(none, "MUSCLE_NPCS", crosshairActor)
+			
+			StorageUtil.SetIntValue(crosshairActor, "hasMuscle", 0)
+			StorageUtil.FormListRemove(none, "MUSCLE_NPCS", crosshairActor, true)
+			;StorageUtil.floatListRemoveAt(none, "MUSCLE_NPCS_SCORE", actorIndex)
+			StorageUtil.FloatListClear(none, "MUSCLE_NPCS_SCORE")
+		EndIf
+	ElseIf crosshairActor == none
+		;Debug.Notification("No NPC found")
+		;Debug.Notification("Refreshing NPC muscle")
+		Debug.Trace("SNU - Refreshing NPC muscle")
+		Int totalNPCs = FormListCount(none, "MUSCLE_NPCS")
+		Debug.Trace("SNU - Total muscle NPCs: "+totalNPCs)
+		Int npcsLoop = 0
+		while npcsLoop < totalNPCs
+			Actor currentActor = FormListGet(none, "MUSCLE_NPCS", npcsLoop) as Actor
+			Float muscleScoreNPC = StorageUtil.GetIntValue(currentActor, "hasMuscle", 0) / 100
+			;/
+			If muscleScoreNPC == 0.0
+				muscleScoreNPC = floatListGet(none, "MUSCLE_NPCS_SCORE", npcsLoop)
+			EndIf /;
+			Debug.Trace("SNU - Checking muscle on actor: "+currentActor.GetBaseObject().getName()+", Score: "+muscleScoreNPC)
+			
+			If currentActor.GetBaseObject().getName() == ""
+				Debug.Trace("SNU - Found invalid actor. Removing from list")
+				
+				StorageUtil.SetIntValue(currentActor, "hasMuscle", 0)
+				If !StorageUtil.FormListRemoveAt(none, "MUSCLE_NPCS", npcsLoop)
+					Debug.Trace("SNU - ERROR! Actor could not be removed!!")
+					npcsLoop += 1
+				Else
+					StorageUtil.floatListRemoveAt(none, "MUSCLE_NPCS_SCORE", npcsLoop)
+				EndIf
+			Else
+				If muscleScoreNPC == 0.0
+					muscleScoreNPC = 0.3
+					;StorageUtil.FloatListAdd(none, "MUSCLE_NPCS_SCORE", muscleScoreNPC, true)
+					StorageUtil.SetIntValue(currentActor, "hasMuscle", (muscleScoreNPC * 100) as int)
+				EndIf
+				If currentActor && currentActor.is3dloaded() && muscleScoreNPC != 0
+					String skinOverride = NiOverride.GetSkinOverrideString(currentActor, true, false, 0x04, 9, 1)
+					Debug.Notification("Restoring normals to "+currentActor.GetBaseObject().getName())
+					Debug.Trace("SNU - Restoring normals to "+currentActor.GetBaseObject().getName()+": "+skinOverride)
+					If skinOverride == ""
+						SnusnuMusclePowerNPCScript.forceSwitchMuscleNormals(currentActor, muscleScoreNPC*100)
+					Else
+						NiOverride.AddSkinOverrideString(currentActor, true, false, 0x04, 9, 1, skinOverride, true)
+					EndIf
+					NiOverride.ApplySkinOverrides(currentActor)
+				EndIf
+				npcsLoop += 1
+			EndIf
+		endWhile
+	EndIf
+EndFunction
+
+Function addPushupException()
+	Armor mainArmor = PlayerRef.GetWornForm(0x00000004) as Armor
+	If mainArmor
+		If PushupExceptions.find(mainArmor) != -1
+			PushupExceptions.RemoveAddedForm(mainArmor)
+			Debug.Notification("Item "+mainArmor.getName()+" has been removed")
+		Else
+			PushupExceptions.AddForm(mainArmor)
+			Debug.Notification("Item "+mainArmor.getName()+" has been added")
+		EndIf
+	EndIf
 EndFunction

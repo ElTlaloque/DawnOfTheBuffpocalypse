@@ -278,7 +278,7 @@ Function clearMuscleMorphs(Actor buffTarget)
 	UpdateModelWeight(buffTarget)
 EndFunction
 
-Int Function switchMuscleNormals(Actor buffTarget, Int currentStage, Float newWeight)
+Int Function switchMuscleNormals(Actor buffTarget, Int currentStage, Float newWeight) Global
 	Int newStage = currentStage
 
 	If currentStage == 1 && newWeight >= 30.0 && newWeight < 55.0
@@ -298,11 +298,37 @@ Int Function switchMuscleNormals(Actor buffTarget, Int currentStage, Float newWe
 	return newStage
 EndFunction
 
-Function applyMuscleNormals(Actor buffTarget, int stage)
+Int Function forceSwitchMuscleNormals(Actor buffTarget, Float newWeight) Global
+	Int newStage = 1
+
+	If newWeight >= 50.0 && newWeight < 70.0
+		newStage = 2
+	ElseIf newWeight >= 70.0 && newWeight < 85.0
+		newStage = 3
+	ElseIf newWeight >= 85.0
+		newStage = 4
+	EndIf
+	
+	Debug.Trace("SNU - Going to switch normals? newStage="+newStage+", newWeight="+newWeight)
+	;If newStage > 1
+		applyMuscleNormals(buffTarget, newStage)
+	;/Else
+		;TLALOC- For some reason normals still get fucked up on NPCs sometimes so we need to regenerate their textures
+		RemoveAllReferenceSkinOverrides(buffTarget);For the custom normals
+		RemoveAllReferenceNodeOverrides(buffTarget);For the custom normals
+		RemoveSkinOverride(buffTarget, true, false, 0x04, 9, 1)
+	EndIf
+	/;
+	return newStage
+EndFunction
+
+Function applyMuscleNormals(Actor buffTarget, int stage) Global
 	String tempNormalsPath = "textures\\Snusnu\\Normals\\"
 	;Debug.Trace("SNU - Normals path is now "+tempNormalsPath)
 	
-	If stage == 2
+	If stage == 1
+		tempNormalsPath = "textures\\actors\\character\\female\\femalebody_1_msn"
+	ElseIf stage == 2
 		tempNormalsPath = tempNormalsPath + "athletic"
 	ElseIf stage == 3
 		tempNormalsPath = tempNormalsPath + "boneCrusher"
@@ -314,6 +340,7 @@ Function applyMuscleNormals(Actor buffTarget, int stage)
 	
 	tempNormalsPath = tempNormalsPath + ".dds"
 	
+	Debug.Trace("SNU - Normals path is now "+tempNormalsPath)
 	AddSkinOverrideString(buffTarget, true, false, 0x04, 9, 1, tempNormalsPath, true)
 EndFunction
 

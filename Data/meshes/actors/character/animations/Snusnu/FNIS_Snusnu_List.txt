@@ -1,0 +1,11 @@
+Version V1.0
+
+AAprefix snu
+AAset _mt 1
+AAset _mtx 1
+AAset _mtidle 1
+AAset _sneakidle 1
+AAset _sneakmt 1
+AAset _sprint 1
+
+b -a Snu_idle1 snu_FMG_idle.hkx

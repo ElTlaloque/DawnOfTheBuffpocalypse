@@ -84,7 +84,7 @@ Int Property selectedBody = 0 Auto ;0=UUNP, 1=CBBE SE, 2=Vanilla
 Bool Property isWeightMorphsLoaded Auto
 Bool Property removeWeightMorphs = true Auto
 ;PlayerSuccubusMenu PSQM
-WeightMorphsMCM WMCM
+;WeightMorphsMCM WMCM
 
 Bool Property is3BAPhysicsLoaded Auto
 
@@ -190,9 +190,6 @@ Event OnPlayerLoadGame()
 		EndIf
 		
 		isWeightMorphsLoaded = (Game.GetModByName("WeightMorphs.esp") != 255)
-		If isWeightMorphsLoaded
-			WMCM = Game.GetFormFromFile(0x05000888, "WeightMorphs.esp") As WeightMorphsMCM
-		EndIf
 		
 		If Game.GetModByName("PSQ PlayerSuccubusQuest.esm") != 255
 			;PSQM = Game.GetFormFromFile(0x04000D63, "PSQ PlayerSuccubusQuest.esm") As PlayerSuccubusMenu
@@ -632,6 +629,7 @@ Event OnKeyDown(Int KeyCode)
 		
 		;WeightMorphs info
 		If isWeightMorphsLoaded
+			WeightMorphsMCM WMCM = Game.GetFormFromFile(0x05000888, "WeightMorphs.esp") As WeightMorphsMCM
 			Debug.Notification("WeightMorphs Weight="+WMCM.WMorphs.Weight)
 		EndIf
 		
@@ -651,15 +649,18 @@ Event OnKeyDown(Int KeyCode)
 EndEvent
 
 Float Function getfightingMuscle()
-	Int PlayerSex = PlayerRef.GetActorBase().GetSex()
 	Float fightingMuscle = muscleScore / muscleScoreMax
 		
 	; Female
-	If PlayerSex == 1	&& isWeightMorphsLoaded && WMCM.WMorphs.Weight > 0.2 ;There will be always at least 20% muscularity
-		;TLALOC- If getting chubbier, muscle mass gets smaller (This is to avoid overly big arms and thighs on bigger muscleScore)
-		;Debug.Trace("SNU - fightingMuscle="+fightingMuscle)
-		fightingMuscle = fightingMuscle * ( 1.2 - WMCM.WMorphs.Weight )
-		;Debug.Trace("SNU - chubbyMuscle="+fightingMuscle)
+	If isWeightMorphsLoaded
+		WeightMorphsMCM WMCM = Game.GetFormFromFile(0x05000888, "WeightMorphs.esp") As WeightMorphsMCM
+		Int PlayerSex = PlayerRef.GetActorBase().GetSex()
+		If PlayerSex == 1 && WMCM.WMorphs.Weight > 0.2 ;There will be always at least 20% muscularity
+			;TLALOC- If getting chubbier, muscle mass gets smaller (This is to avoid overly big arms and thighs on bigger muscleScore)
+			;Debug.Trace("SNU - fightingMuscle="+fightingMuscle)
+			fightingMuscle = fightingMuscle * ( 1.2 - WMCM.WMorphs.Weight )
+			;Debug.Trace("SNU - chubbyMuscle="+fightingMuscle)
+		EndIf
 	EndIf
 ;/	
 	;TLALOC- Disguise form should not be too muscular
@@ -747,9 +748,12 @@ Function UpdateWeight(Bool applyNow = True)
 					NiOverride.SetBodyMorph(PlayerRef, "BreastsLowHDT", SNUSNU_KEY, fightingMuscle * -0.5)
 					
 					;WeightMorphs;
-					If isWeightMorphsLoaded && WMCM.WMorphs.Weight >= 0.0
-						NiOverride.SetBodyMorph(PlayerRef, "BodyHighHDT", SNUSNU_KEY, WMCM.WMorphs.Weight * 0.5);0.8
-						;NiOverride.SetBodyMorph(PlayerRef, "BodyVeryHighHDT", SNUSNU_KEY, fightingMuscle * 0.4)
+					If isWeightMorphsLoaded 
+						WeightMorphsMCM WMCM = Game.GetFormFromFile(0x05000888, "WeightMorphs.esp") As WeightMorphsMCM
+						If WMCM.WMorphs.Weight >= 0.0
+							NiOverride.SetBodyMorph(PlayerRef, "BodyHighHDT", SNUSNU_KEY, WMCM.WMorphs.Weight * 0.5);0.8
+							;NiOverride.SetBodyMorph(PlayerRef, "BodyVeryHighHDT", SNUSNU_KEY, fightingMuscle * 0.4)
+						EndIf
 					EndIf
 					;TLALOC- Werewolf body morph --------------------------------------------------------------------
 				EndIf
@@ -804,6 +808,7 @@ Function updateMuscleScore(float incValue)
 		
 		;TLALOC- If Weight is too low muscle can't grow much due to lack of carbs
 		If isWeightMorphsLoaded
+			WeightMorphsMCM WMCM = Game.GetFormFromFile(0x05000888, "WeightMorphs.esp") As WeightMorphsMCM
 			If WMCM.WMorphs.Weight < malnourishmentValue
 				If !malnourishmentWarning
 					Debug.Notification("I can barely develop any muscle mass with this diet!")
@@ -939,19 +944,22 @@ Function chooseBoobsPhysics(Int buildStage)
 	EndIf
 	
 	;weightMorphs calculations
-	If boobsLevel > 1
-		If WMCM.WMorphs.Weight < -0.6 ;-0.7
-			;Boobs too small to have noticeable physics
-			boobsLevel = 1
-		ElseIf WMCM.WMorphs.Weight < 0.6 && boobsLevel > 2
-			;Was: WMCM.WMorphs.Weight < -0.25
-			;Boobs still too small to have full physics
-			boobsLevel = 2
-		ElseIf WMCM.WMorphs.Weight > 0.8
-			;Was WMCM.WMorphs.Weight > 0.4
-			;Boobs so big they need special physics treatment
-			;boobsLevel = 4
-			boobsLevel = 3
+	If isWeightMorphsLoaded
+		WeightMorphsMCM WMCM = Game.GetFormFromFile(0x05000888, "WeightMorphs.esp") As WeightMorphsMCM
+		If boobsLevel > 1
+			If WMCM.WMorphs.Weight < -0.6 ;-0.7
+				;Boobs too small to have noticeable physics
+				boobsLevel = 1
+			ElseIf WMCM.WMorphs.Weight < 0.6 && boobsLevel > 2
+				;Was: WMCM.WMorphs.Weight < -0.25
+				;Boobs still too small to have full physics
+				boobsLevel = 2
+			ElseIf WMCM.WMorphs.Weight > 0.8
+				;Was WMCM.WMorphs.Weight > 0.4
+				;Boobs so big they need special physics treatment
+				;boobsLevel = 4
+				boobsLevel = 3
+			EndIf
 		EndIf
 	EndIf
 	
@@ -1024,6 +1032,7 @@ Function removeCleavageEffect(Float cleavageAmount, Bool forceRemoval = false)
 	Debug.Trace("SNU - removeCleavageEffect("+cleavageAmount+")")
 	
 	If isWeightMorphsLoaded
+		WeightMorphsMCM WMCM = Game.GetFormFromFile(0x05000888, "WeightMorphs.esp") As WeightMorphsMCM
 		WMorphsWeight = WMCM.WMorphs.Weight
 	EndIf
 	
@@ -1116,17 +1125,20 @@ Function checkBodyNormalsState()
 	
 	;TLALOC- Expand the range of the changes if muscleScore is below 0.25 (This logic will allow to have a extreme muscular definition 
 	;      even at that muscleScore, but only if score is high enough
-	If isWeightMorphsLoaded && WMCM.WMorphs.Weight < 0.3
-		Float changeDelta = (muscleScoreMax * 0.3)
-		Float changeFactor = (WMCM.WMorphs.Weight * changeDelta)
-		stage2Score = stage2Score + changeFactor
-		stage3Score = (muscleScoreMax * 0.2) + (Math.abs(changeFactor) / 4)
-		stage4Score = stage3Score * 2
-		
-		stage3Score = stage3Score + stage2Score
-		stage4Score = stage4Score + stage2Score
-		
-		Debug.Trace("SNU - New change ranges are: stage2="+stage2Score+", stage3="+stage3Score+", stage4="+stage4Score)
+	If isWeightMorphsLoaded 
+		WeightMorphsMCM WMCM = Game.GetFormFromFile(0x05000888, "WeightMorphs.esp") As WeightMorphsMCM
+		If WMCM.WMorphs.Weight < 0.3
+			Float changeDelta = (muscleScoreMax * 0.3)
+			Float changeFactor = (WMCM.WMorphs.Weight * changeDelta)
+			stage2Score = stage2Score + changeFactor
+			stage3Score = (muscleScoreMax * 0.2) + (Math.abs(changeFactor) / 4)
+			stage4Score = stage3Score * 2
+			
+			stage3Score = stage3Score + stage2Score
+			stage4Score = stage4Score + stage2Score
+			
+			Debug.Trace("SNU - New change ranges are: stage2="+stage2Score+", stage3="+stage3Score+", stage4="+stage4Score)
+		EndIf
 	EndIf
 	
 	;TLALOC - Logic to decide if the normals need to be changed
@@ -1144,6 +1156,7 @@ Function checkBodyNormalsState()
 	
 	;Rangos originales: 0.12-0.225, 0.225-0.30
 	If isWeightMorphsLoaded
+		WeightMorphsMCM WMCM = Game.GetFormFromFile(0x05000888, "WeightMorphs.esp") As WeightMorphsMCM
 		If currentBuildStage >= 2 && WMCM.WMorphs.Weight >= 0.25
 			currentBuildStage = 1
 		ElseIf currentBuildStage >= 3 && WMCM.WMorphs.Weight >= 0.175 && WMCM.WMorphs.Weight < 0.25
@@ -1191,6 +1204,7 @@ Function checkBodyNormalsState()
 	Else
 		;TLALOC- Special condition for weightMorphs
 		If isWeightMorphsLoaded
+			WeightMorphsMCM WMCM = Game.GetFormFromFile(0x05000888, "WeightMorphs.esp") As WeightMorphsMCM
 			If currentBuildStage == 1 && WMCM.WMorphs.Weight > 0.5
 				tempNormalsPath = tempNormalsPath + "_FAT"
 			EndIf
@@ -2560,10 +2574,13 @@ Function addWerewolfBuild()
 	justWakeUp = true
 	updateMuscleScore(muscleScoreMax * 0.05) ;Add 5% extra muscle
 	
-	If WMCM.WMorphs.Weight <= 0.065 ;0.155
-		WMCM.WMorphs.ChangeWeight(0.01, true)
-	ElseIf WMCM.WMorphs.Weight >= 0.085 ;0.22
-		WMCM.WMorphs.ChangeWeight(-0.01, true)
+	If isWeightMorphsLoaded
+		WeightMorphsMCM WMCM = Game.GetFormFromFile(0x05000888, "WeightMorphs.esp") As WeightMorphsMCM
+		If WMCM.WMorphs.Weight <= 0.065 ;0.155
+			WMCM.WMorphs.ChangeWeight(0.01, true)
+		ElseIf WMCM.WMorphs.Weight >= 0.085 ;0.22
+			WMCM.WMorphs.ChangeWeight(-0.01, true)
+		EndIf
 	EndIf
 EndFunction
 

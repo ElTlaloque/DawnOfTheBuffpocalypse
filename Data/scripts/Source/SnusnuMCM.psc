@@ -40,6 +40,13 @@ Int _myMalnourishment
 Int _myPushupException
 Int _myNPCMuscleScore
 
+Int _mySaveOptions
+Int _myLoadOptions
+Int _mySaveMorphs
+Int _myLoadMorphs
+Int _mySaveMorphsProfile
+Int _myLoadMorphsProfile
+
 Int[] cbbeSliders
 Int[] uunpSliders
 Int[] bhunpSliders
@@ -63,7 +70,7 @@ Int _myMultSamson
 Int selectedDefaultMorphs = 1
 
 Event OnConfigInit()
-	Pages = new String[6]
+	Pages = new String[7]
 	Pages[0] = "$SNUSNU_OPTIONS"
 	If snusnuMain.selectedBody == 0 ;UUNP/BHUNP
 		Pages[1] = "$SNUSNU_MORPHS_CBBE"
@@ -77,10 +84,12 @@ Event OnConfigInit()
 	
 	If snusnuMain.selectedBody != 2
 		Pages[4] = "$SNUSNU_MORPHS_MALE"
-		Pages[5] = "$SNUSNU_INFO"
+		Pages[5] = "SAVE & LOAD"
+		Pages[6] = "$SNUSNU_INFO"
 	Else
 		Pages[1] = "$SNUSNU_MORPHS_MALE"
-		Pages[2] = "$SNUSNU_INFO"
+		Pages[2] = "SAVE & LOAD"
+		Pages[3] = "$SNUSNU_INFO"
 	EndIf
 	
 	cbbeSliders = new Int[52]
@@ -148,7 +157,7 @@ Event OnPageReset(String a_page)
 		_myStamina = AddSliderOption("$SNUSNU_STAMINA", snusnuMain.Stamina, "{0}")
 		_mySpeed = AddSliderOption("$SNUSNU_SPEED", snusnuMain.Speed, "{0}")
 		_myCombatProficiency = AddSliderOption("$SNUSNU_COMBAT", snusnuMain.combatProficiency, "{0}")
-		_myBoostCarryWeight = AddSliderOption("Boost carry weight", snusnuMain.carryWeightBoost, "{2}")
+		_myBoostCarryWeight = AddSliderOption("Boost carry weight", snusnuMain.carryWeightBoost, "{2}") ;ToDo- WE NEED TO FIX THIS OPTION ASAP
 		_myMaxWeight = AddSliderOption("$SNUSNU_MAXWEIGHT", snusnuMain.muscleScoreMax, "{2}")
 		AddEmptyOption()
 		AddEmptyOption()
@@ -168,11 +177,12 @@ Event OnPageReset(String a_page)
 		
 		_myZeroSliders = AddToggleOption("Zero all sliders", False)
 		_myApplyDefault = AddToggleOption("Default slider values", False)
-		_myPushupException = AddToggleOption("Add push-up exception", False)
+		;_myPushupException = AddToggleOption("Add push-up exception", False)
 		If snusnuMain.isWeightMorphsLoaded
 			_myMalnourishment = AddSliderOption("Malnourishment", snusnuMain.malnourishmentValue, "{2}")
 			AddEmptyOption()
 		EndIf
+		AddEmptyOption()
 		AddEmptyOption()
 		AddEmptyOption()
 		AddEmptyOption()
@@ -423,6 +433,17 @@ Event OnPageReset(String a_page)
 		_myMultSpineBone = AddSliderOption("Upper Spine", snusnuMain.MultSpineBone, "{3}")
 		_myMultForearmBone = AddSliderOption("Forearms", snusnuMain.MultForearmBone, "{3}")
 	ElseIf ((a_page == Pages[5] && snusnuMain.selectedBody != 2) || (a_page == Pages[2] && snusnuMain.selectedBody == 2))
+		_mySaveOptions = AddToggleOption("Save Settings", False)
+		_myLoadOptions = AddToggleOption("Load Settings", False)
+		AddEmptyOption()
+		AddEmptyOption()
+		_mySaveMorphs = AddToggleOption("Save Morphs", False)
+		_myLoadMorphs = AddToggleOption("Load Morphs", False)
+		AddEmptyOption()
+		AddEmptyOption()
+		_mySaveMorphsProfile = AddToggleOption("Save Morphs Profile", False)
+		_myLoadMorphsProfile = AddToggleOption("Load Morphs Profile", False)
+	ElseIf ((a_page == Pages[6] && snusnuMain.selectedBody != 2) || (a_page == Pages[3] && snusnuMain.selectedBody == 2))
 		SetCursorFillMode(LEFT_TO_RIGHT)
 		AddHeaderOption("Mod Version: " + snusnuMain.GetVersion())
 		AddEmptyOption()
@@ -510,6 +531,20 @@ Event OnOptionHighlight(Int a_option)
 		SetInfoText("At which WeightMorphs weigh value would the character be considered malnourished. Being malnourished greately reduces the muscle gain rate.")
 	ElseIf a_option == _myPushupException
 		SetInfoText("Add current equiped gear to push-up exceptions list.")
+	
+	;LOAD AND SAVE
+	ElseIf a_option == _mySaveOptions
+		SetInfoText("Save settings to an external file.")
+	ElseIf a_option == _myLoadOptions
+		SetInfoText("Load settings from an external file.")
+	ElseIf a_option == _mySaveMorphs
+		SetInfoText("Save all morphs to an external file.")
+	ElseIf a_option == _myLoadMorphs
+		SetInfoText("Load all morphs to an external file.")
+	ElseIf a_option == _mySaveMorphsProfile
+		SetInfoText("Save morphs to an specific profile file.")
+	ElseIf a_option == _myLoadMorphsProfile
+		SetInfoText("Load morphs from an specific profile file.")
 	EndIf
 EndEvent
 
@@ -599,6 +634,76 @@ Event OnOptionSelect(Int a_option)
 			EndIf
 			ShowMessage(Msg, False)
 		EndIf
+	
+	;SAVE AND LOAD
+	ElseIf a_option == _mySaveOptions
+		bool allowSave = true
+		
+		if JsonUtil.JsonExists("SnusnuSettings")
+			if !ShowMessage("WARNING: Saved user settings already present. Do you want to override them?", true)
+				allowSave = false
+			endIf
+		endIf
+		
+		if allowSave
+			Self.SetOptionFlags(_mySaveOptions, Self.OPTION_FLAG_DISABLED, True)
+			Self.SetOptionFlags(_myLoadOptions, Self.OPTION_FLAG_DISABLED, True)
+			
+			Self.SetOptionFlags(_mySaveMorphs, Self.OPTION_FLAG_DISABLED, True)
+			Self.SetOptionFlags(_myLoadMorphs, Self.OPTION_FLAG_DISABLED, True)
+			
+			Self.SetOptionFlags(_mySaveMorphsProfile, Self.OPTION_FLAG_DISABLED, True)
+			Self.SetOptionFlags(_myLoadMorphsProfile, Self.OPTION_FLAG_DISABLED, True)
+			if saveSettings()
+				ShowMessage("Settings have been saved successfully", false)
+				ForcePageReset()
+			else
+				ShowMessage("ERROR: settings could not be saved properly", false)
+			endIf
+			Self.SetOptionFlags(_mySaveOptions, Self.OPTION_FLAG_NONE, True)
+			Self.SetOptionFlags(_myLoadOptions, Self.OPTION_FLAG_NONE, True)
+			
+			Self.SetOptionFlags(_mySaveMorphs, Self.OPTION_FLAG_NONE, True)
+			Self.SetOptionFlags(_myLoadMorphs, Self.OPTION_FLAG_NONE, True)
+			
+			Self.SetOptionFlags(_mySaveMorphsProfile, Self.OPTION_FLAG_NONE, True)
+			Self.SetOptionFlags(_myLoadMorphsProfile, Self.OPTION_FLAG_NONE, True)
+		endIf
+	ElseIf a_option == _myLoadOptions
+		if ShowMessage("Do you want to load previously saved settings?\n\nWARNING: All your current settings will be overriden.", true)
+			Self.SetOptionFlags(_mySaveOptions, Self.OPTION_FLAG_DISABLED, True)
+			Self.SetOptionFlags(_myLoadOptions, Self.OPTION_FLAG_DISABLED, True)
+			
+			Self.SetOptionFlags(_mySaveMorphs, Self.OPTION_FLAG_DISABLED, True)
+			Self.SetOptionFlags(_myLoadMorphs, Self.OPTION_FLAG_DISABLED, True)
+			
+			Self.SetOptionFlags(_mySaveMorphsProfile, Self.OPTION_FLAG_DISABLED, True)
+			Self.SetOptionFlags(_myLoadMorphsProfile, Self.OPTION_FLAG_DISABLED, True)
+			
+			
+			if loadSettings()
+				ShowMessage("All settings have been loaded successfully", false)
+				ForcePageReset()
+			else
+				ShowMessage("ERROR: settings could not be loaded", false)
+			endIf
+			Self.SetOptionFlags(_mySaveOptions, Self.OPTION_FLAG_NONE, True)
+			Self.SetOptionFlags(_myLoadOptions, Self.OPTION_FLAG_NONE, True)
+			
+			Self.SetOptionFlags(_mySaveMorphs, Self.OPTION_FLAG_NONE, True)
+			Self.SetOptionFlags(_myLoadMorphs, Self.OPTION_FLAG_NONE, True)
+			
+			Self.SetOptionFlags(_mySaveMorphsProfile, Self.OPTION_FLAG_NONE, True)
+			Self.SetOptionFlags(_myLoadMorphsProfile, Self.OPTION_FLAG_NONE, True)
+		endIf
+	ElseIf a_option == _mySaveMorphs
+		
+	ElseIf a_option == _myLoadMorphs
+		
+	ElseIf a_option == _mySaveMorphsProfile
+		
+	ElseIf a_option == _myLoadMorphsProfile
+		
 	EndIf
 EndEvent
 
@@ -1232,6 +1337,70 @@ Function initStringArrays()
 	cbbe3BAStrings[39] = "HipBone"
 EndFunction
 
+;SAVE & LOAD
+Bool Function saveSettings()
+	String fileName = "SnusnuSettings"
+		
+	JsonUtil.SetIntValue(fileName, "Enabled", snusnuMain.Enabled as Int)
+	JsonUtil.SetIntValue(fileName, "hardcoreMode", snusnuMain.hardcoreMode as Int)
+	JsonUtil.SetIntValue(fileName, "selectedBody", snusnuMain.selectedBody)
+	JsonUtil.SetIntValue(fileName, "disableNormals", snusnuMain.disableNormals as Int)
+	JsonUtil.SetFloatValue(fileName, "Stamina", snusnuMain.Stamina)
+	JsonUtil.SetFloatValue(fileName, "Speed", snusnuMain.Speed)
+	JsonUtil.SetFloatValue(fileName, "combatProficiency", snusnuMain.combatProficiency)
+	JsonUtil.SetFloatValue(fileName, "carryWeightBoost", snusnuMain.carryWeightBoost)
+	JsonUtil.SetFloatValue(fileName, "muscleScoreMax", snusnuMain.muscleScoreMax)
+	JsonUtil.SetFloatValue(fileName, "MultLoss", snusnuMain.MultLoss)
+	JsonUtil.SetFloatValue(fileName, "MultGainFight", snusnuMain.MultGainFight)
+	JsonUtil.SetFloatValue(fileName, "MultGainArmor", snusnuMain.MultGainArmor)
+	JsonUtil.SetFloatValue(fileName, "MultGainMisc", snusnuMain.MultGainMisc)
+	JsonUtil.SetFloatValue(fileName, "malnourishmentValue", snusnuMain.malnourishmentValue)
+	JsonUtil.SetIntValue(fileName, "tfAnimation", snusnuMain.tfAnimation as Int)
+	JsonUtil.SetIntValue(fileName, "tfAnimationNPC", snusnuMain.tfAnimationNPC as Int)
+	JsonUtil.SetIntValue(fileName, "useAltAnims", snusnuMain.useAltAnims as Int)
+	JsonUtil.SetIntValue(fileName, "useAltAnimsNPC", snusnuMain.useAltAnimsNPC as Int)
+	JsonUtil.SetIntValue(fileName, "changeHeadPart", snusnuMain.changeHeadPart as Int)
+	JsonUtil.SetIntValue(fileName, "playTFSound", snusnuMain.playTFSound as Int)
+	JsonUtil.SetIntValue(fileName, "removeWeightMorphs", snusnuMain.removeWeightMorphs as Int)
+	JsonUtil.SetIntValue(fileName, "getInfoKey", snusnuMain.getInfoKey)
+	JsonUtil.SetFloatValue(fileName, "npcMuscleScore", snusnuMain.npcMuscleScore)
+	
+	Return JsonUtil.Save(fileName, False)
+EndFunction
+
+bool Function loadSettings()
+	String fileName = "SnusnuSettings"
+	
+	if JsonUtil.JsonExists(fileName)
+		;NEEDS PROPER HANDLING!! ----> snusnuMain.Enabled = JsonUtil.GetIntValue(fileName, "Enabled", snusnuMain.Enabled as Int)
+		;NEEDS PROPER HANDLING!! ----> snusnuMain.hardcoreMode = JsonUtil.GetIntValue(fileName, "hardcoreMode", snusnuMain.hardcoreMode as Int)
+		;NEEDS PROPER HANDLING!! ----> snusnuMain.selectedBody = JsonUtil.GetIntValue(fileName, "selectedBody", snusnuMain.selectedBody)
+		;NEEDS PROPER HANDLING!! ----> snusnuMain.disableNormals = JsonUtil.GetIntValue(fileName, "disableNormals", snusnuMain.disableNormals as Int)
+		;NEEDS PROPER HANDLING!! ----> snusnuMain.Stamina = JsonUtil.GetFloatValue(fileName, "Stamina", snusnuMain.Stamina)
+		;NEEDS PROPER HANDLING!! ----> snusnuMain.Speed = JsonUtil.GetFloatValue(fileName, "Speed", snusnuMain.Speed)
+		;NEEDS PROPER HANDLING!! ----> snusnuMain.combatProficiency = JsonUtil.GetFloatValue(fileName, "combatProficiency", snusnuMain.combatProficiency)
+		;NEEDS PROPER HANDLING!! ----> snusnuMain.carryWeightBoost = JsonUtil.GetFloatValue(fileName, "carryWeightBoost", snusnuMain.carryWeightBoost)
+		;NEEDS PROPER HANDLING!! ----> snusnuMain.muscleScoreMax = JsonUtil.GetFloatValue(fileName, "muscleScoreMax", snusnuMain.muscleScoreMax)
+		snusnuMain.MultLoss = JsonUtil.GetFloatValue(fileName, "MultLoss", snusnuMain.MultLoss)
+		snusnuMain.MultGainFight = JsonUtil.GetFloatValue(fileName, "MultGainFight", snusnuMain.MultGainFight)
+		snusnuMain.MultGainArmor = JsonUtil.GetFloatValue(fileName, "MultGainArmor", snusnuMain.MultGainArmor)
+		snusnuMain.MultGainMisc = JsonUtil.GetFloatValue(fileName, "MultGainMisc", snusnuMain.MultGainMisc)
+		snusnuMain.malnourishmentValue = JsonUtil.GetFloatValue(fileName, "malnourishmentValue", snusnuMain.malnourishmentValue)
+		snusnuMain.tfAnimation = JsonUtil.GetIntValue(fileName, "tfAnimation", snusnuMain.tfAnimation as Int)
+		snusnuMain.tfAnimationNPC = JsonUtil.GetIntValue(fileName, "tfAnimationNPC", snusnuMain.tfAnimationNPC as Int)
+		snusnuMain.useAltAnims = JsonUtil.GetIntValue(fileName, "useAltAnims", snusnuMain.useAltAnims as Int)
+		snusnuMain.useAltAnimsNPC = JsonUtil.GetIntValue(fileName, "useAltAnimsNPC", snusnuMain.useAltAnimsNPC as Int)
+		snusnuMain.changeHeadPart = JsonUtil.GetIntValue(fileName, "changeHeadPart", snusnuMain.changeHeadPart as Int)
+		snusnuMain.playTFSound = JsonUtil.GetIntValue(fileName, "playTFSound", snusnuMain.playTFSound as Int)
+		snusnuMain.removeWeightMorphs = JsonUtil.GetIntValue(fileName, "removeWeightMorphs", snusnuMain.removeWeightMorphs as Int)
+		snusnuMain.getInfoKey = JsonUtil.GetIntValue(fileName, "getInfoKey", snusnuMain.getInfoKey)
+		snusnuMain.npcMuscleScore = JsonUtil.GetFloatValue(fileName, "npcMuscleScore", snusnuMain.npcMuscleScore)
+		
+		return true
+	EndIf
+	
+	return false
+EndFunction
 
 State InstalledBody
 	Event OnMenuOpenST()

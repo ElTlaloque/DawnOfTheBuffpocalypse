@@ -157,7 +157,7 @@ Event OnPageReset(String a_page)
 		_myStamina = AddSliderOption("$SNUSNU_STAMINA", snusnuMain.Stamina, "{0}")
 		_mySpeed = AddSliderOption("$SNUSNU_SPEED", snusnuMain.Speed, "{0}")
 		_myCombatProficiency = AddSliderOption("$SNUSNU_COMBAT", snusnuMain.combatProficiency, "{0}")
-		_myBoostCarryWeight = AddSliderOption("Boost carry weight", snusnuMain.carryWeightBoost, "{2}") ;ToDo- WE NEED TO FIX THIS OPTION ASAP
+		_myBoostCarryWeight = AddSliderOption("Boost carry weight", snusnuMain.carryWeightBoost, "{0}") ;ToDo- WE NEED TO FIX THIS OPTION ASAP
 		_myMaxWeight = AddSliderOption("$SNUSNU_MAXWEIGHT", snusnuMain.muscleScoreMax, "{2}")
 		AddEmptyOption()
 		AddEmptyOption()
@@ -433,14 +433,14 @@ Event OnPageReset(String a_page)
 		_myMultSpineBone = AddSliderOption("Upper Spine", snusnuMain.MultSpineBone, "{3}")
 		_myMultForearmBone = AddSliderOption("Forearms", snusnuMain.MultForearmBone, "{3}")
 	ElseIf ((a_page == Pages[5] && snusnuMain.selectedBody != 2) || (a_page == Pages[2] && snusnuMain.selectedBody == 2))
+		SetCursorFillMode(TOP_TO_BOTTOM)
 		_mySaveOptions = AddToggleOption("Save Settings", False)
 		_myLoadOptions = AddToggleOption("Load Settings", False)
 		AddEmptyOption()
 		AddEmptyOption()
 		_mySaveMorphs = AddToggleOption("Save Morphs", False)
 		_myLoadMorphs = AddToggleOption("Load Morphs", False)
-		AddEmptyOption()
-		AddEmptyOption()
+		SetCursorPosition(1)
 		_mySaveMorphsProfile = AddToggleOption("Save Morphs Profile", False)
 		_myLoadMorphsProfile = AddToggleOption("Load Morphs Profile", False)
 	ElseIf ((a_page == Pages[6] && snusnuMain.selectedBody != 2) || (a_page == Pages[3] && snusnuMain.selectedBody == 2))
@@ -502,7 +502,7 @@ Event OnOptionHighlight(Int a_option)
 	ElseIf a_option == _myMultGainMisc
 		SetInfoText("Multiplier for how much muscle is gained by other miscellaneous actions (Swimming, Wood chopping and Mining). 2 means you will get twice as much, while 0.5 will give you only half of default value")
 	ElseIf a_option == _myBoostCarryWeight
-		SetInfoText("How much to boost carry weight by getting more muscular")
+		SetInfoText("Maximum carry weight boost by getting more muscular. It will change depending on Muscle Score.")
 	ElseIf a_option == _mytfAnimation
 		SetInfoText("$SNUSNU_USETFANIM_DESC")
 	ElseIf a_option == _mytfAnimationNPC
@@ -551,28 +551,10 @@ EndEvent
 Event OnOptionSelect(Int a_option)
 	If a_option == _myEnabled
 		snusnuMain.Enabled = !snusnuMain.Enabled
-		SetToggleOptionValue(a_option, snusnuMain.Enabled)
-		
-		If snusnuMain.Enabled && ShowMessage("Enable Hardcore Mode?\n\nIn Hardcore Mode your initial muscle score will be set depending on your race\n(Orc: 50%, Nord: 35%, WoodElf/Redguard/Khajiit/Imperial: 25%, HighElf/DarkElf/Breton/Argonian: 0%),\nand it also restricts the usage of armor and weapons depending on your muscle score.", true, "Activate", "Don't")
-			snusnuMain.hardcoreMode = true
-			SetToggleOptionValue(_myHardcoreMode, snusnuMain.hardcoreMode)
-		EndIf
-		
-		snusnuMain.initSliderArrays()
-		snusnuMain.ResetWeight(snusnuMain.Enabled)
-		snusnuMain.RegisterEvents(snusnuMain.Enabled)
-		SetTextOptionValue(_myFightingScore, snusnuMain.getMuscleValuePercent(snusnuMain.muscleScore)+"%")
-		SetTextOptionValue(_myStoredScore, snusnuMain.getMuscleValuePercent(snusnuMain.storedMuscle)+"%")
-		;SetToggleOptionValue(_myUseWeightSlider, snusnuMain.useWeightSlider)
-		SetToggleOptionValue(_myDisableNormals, snusnuMain.disableNormals)
-		SetSliderOptionValue(_myMaxWeight, snusnuMain.muscleScoreMax, "{2}")
+		applyEnabledOption(true)
 	ElseIf a_option == _myHardcoreMode
 		snusnuMain.hardcoreMode = !snusnuMain.hardcoreMode
-		SetToggleOptionValue(a_option, snusnuMain.hardcoreMode)
-		
-		If !snusnuMain.hardcoreMode
-			snusnuMain.cleanupHardcoreMode()
-		EndIf
+		applyHardcoreOption()
 	ElseIf a_option == _mytfAnimation
 		snusnuMain.tfAnimation = !snusnuMain.tfAnimation
 		SetToggleOptionValue(a_option, snusnuMain.tfAnimation)
@@ -599,14 +581,7 @@ Event OnOptionSelect(Int a_option)
 		SetToggleOptionValue(a_option, snusnuMain.useWeightSlider)
 	ElseIf a_option == _myDisableNormals
 		snusnuMain.disableNormals = !snusnuMain.disableNormals
-		
-		If snusnuMain.disableNormals
-			NiOverride.RemoveAllReferenceSkinOverrides(PlayerRef)
-		Else
-			snusnuMain.checkBodyNormalsState()
-		EndIf
-		
-		SetToggleOptionValue(a_option, snusnuMain.disableNormals)
+		applyNormalsOption()
 	ElseIf a_option == _myZeroSliders
 		snusnuMain.ClearMorphs()
 		SetToggleOptionValue(a_option, true)
@@ -697,9 +672,53 @@ Event OnOptionSelect(Int a_option)
 			Self.SetOptionFlags(_myLoadMorphsProfile, Self.OPTION_FLAG_NONE, True)
 		endIf
 	ElseIf a_option == _mySaveMorphs
+		Self.SetOptionFlags(_mySaveOptions, Self.OPTION_FLAG_DISABLED, True)
+		Self.SetOptionFlags(_myLoadOptions, Self.OPTION_FLAG_DISABLED, True)
 		
+		Self.SetOptionFlags(_mySaveMorphs, Self.OPTION_FLAG_DISABLED, True)
+		Self.SetOptionFlags(_myLoadMorphs, Self.OPTION_FLAG_DISABLED, True)
+		
+		Self.SetOptionFlags(_mySaveMorphsProfile, Self.OPTION_FLAG_DISABLED, True)
+		Self.SetOptionFlags(_myLoadMorphsProfile, Self.OPTION_FLAG_DISABLED, True)
+		ShowMessage("Saving all morph values", false)
+		If snusnuMain.saveAllMorphs()
+			ShowMessage("Morphs have been saved successfully", false)
+		Else
+			ShowMessage("ERROR! Morph values could not be saved!!", false)
+		EndIf
+		ForcePageReset()
+		Self.SetOptionFlags(_mySaveOptions, Self.OPTION_FLAG_NONE, True)
+		Self.SetOptionFlags(_myLoadOptions, Self.OPTION_FLAG_NONE, True)
+		
+		Self.SetOptionFlags(_mySaveMorphs, Self.OPTION_FLAG_NONE, True)
+		Self.SetOptionFlags(_myLoadMorphs, Self.OPTION_FLAG_NONE, True)
+		
+		Self.SetOptionFlags(_mySaveMorphsProfile, Self.OPTION_FLAG_NONE, True)
+		Self.SetOptionFlags(_myLoadMorphsProfile, Self.OPTION_FLAG_NONE, True)
 	ElseIf a_option == _myLoadMorphs
+		Self.SetOptionFlags(_mySaveOptions, Self.OPTION_FLAG_DISABLED, True)
+		Self.SetOptionFlags(_myLoadOptions, Self.OPTION_FLAG_DISABLED, True)
 		
+		Self.SetOptionFlags(_mySaveMorphs, Self.OPTION_FLAG_DISABLED, True)
+		Self.SetOptionFlags(_myLoadMorphs, Self.OPTION_FLAG_DISABLED, True)
+		
+		Self.SetOptionFlags(_mySaveMorphsProfile, Self.OPTION_FLAG_DISABLED, True)
+		Self.SetOptionFlags(_myLoadMorphsProfile, Self.OPTION_FLAG_DISABLED, True)
+		ShowMessage("Loading all morph values", false)
+		If snusnuMain.loadAllMorphs()
+			ShowMessage("Morphs have been loaded successfully", false)
+		Else
+			ShowMessage("ERROR! Morph values could not be loaded!!", false)
+		EndIf
+		ForcePageReset()
+		Self.SetOptionFlags(_mySaveOptions, Self.OPTION_FLAG_NONE, True)
+		Self.SetOptionFlags(_myLoadOptions, Self.OPTION_FLAG_NONE, True)
+		
+		Self.SetOptionFlags(_mySaveMorphs, Self.OPTION_FLAG_NONE, True)
+		Self.SetOptionFlags(_myLoadMorphs, Self.OPTION_FLAG_NONE, True)
+		
+		Self.SetOptionFlags(_mySaveMorphsProfile, Self.OPTION_FLAG_NONE, True)
+		Self.SetOptionFlags(_myLoadMorphsProfile, Self.OPTION_FLAG_NONE, True)
 	ElseIf a_option == _mySaveMorphsProfile
 		
 	ElseIf a_option == _myLoadMorphsProfile
@@ -879,39 +898,23 @@ Event OnOptionSliderAccept(Int a_option, Float a_value)
 		snusnuMain.MultGainMisc = a_value
 		SetSliderOptionValue(a_option, snusnuMain.MultGainMisc, "{2}")
 	ElseIf a_option == _myBoostCarryWeight
-		snusnuMain.carryWeightBoost = a_value
-		snusnuMain.updateCarryWeight()
-		SetSliderOptionValue(a_option, snusnuMain.carryWeightBoost, "{2}")
+		If snusnuMain.carryWeightBoost != a_value
+			applyCarryWeightValue(a_value)
+		EndIf
 	ElseIf a_option == _myStamina
-		snusnuMain.Stamina = a_value
-		SetSliderOptionValue(a_option, snusnuMain.Stamina, "{0}")
-		snusnuMain.UpdateEffects()
+		applyStaminaValue(a_value)
 	ElseIf a_option == _mySpeed
-		snusnuMain.Speed = a_value
-		SetSliderOptionValue(a_option, snusnuMain.Speed, "{0}")
-		snusnuMain.UpdateEffects()
+		applySpeedValue(a_value)
 	ElseIf a_option == _myCombatProficiency
-		snusnuMain.combatProficiency = a_value
-		SetSliderOptionValue(a_option, snusnuMain.combatProficiency, "{0}")
-		snusnuMain.UpdateEffects()
+		applyProficiencyValue(a_value)
 	ElseIf a_option == _myMaxWeight
-		Float difference = a_value / snusnuMain.muscleScoreMax
-		snusnuMain.muscleScoreMax = a_value
-		SetSliderOptionValue(a_option, snusnuMain.muscleScoreMax, "{2}")
-		;If snusnuMain.muscleScoreMax < snusnuMain.muscleScore
-			;snusnuMain.updateMuscleScore(0)
-			snusnuMain.recalculateAllMuscleVars(difference)
-			snusnuMain.UpdateWeight()
-			snusnuMain.UpdateEffects()
-			;SetTextOptionValue(_myFightingScore, snusnuMain.getMuscleValuePercent(snusnuMain.muscleScore)+"%")
-		;EndIf
+		applymuscleScoreMaxValue(a_value)
 	ElseIf a_option == _myFoceScore
 		snusnuMain.ForceNewWeight(a_value)
 		SetSliderOptionValue(a_option, a_value, "{3}")
 	ElseIf a_option == _myNPCMuscleScore
-		snusnuMain.npcMuscleScore = (a_value/100)*snusnuMain.muscleScoreMax
-		Debug.Notification("New npcMuscleScore value is "+snusnuMain.npcMuscleScore)
-		SetSliderOptionValue(a_option, a_value, "{0}%")
+		applyNPCMuscleValue((a_value/100)*snusnuMain.muscleScoreMax)
+		SetSliderOptionValue(_myNPCMuscleScore, a_value, "{0}%")
 	ElseIf a_option == _myMalnourishment	
 		snusnuMain.malnourishmentValue = a_value
 		SetSliderOptionValue(a_option, snusnuMain.malnourishmentValue, "{2}")
@@ -1025,7 +1028,7 @@ Event OnKeyMapChangeST(Int KeyCode, String ConflictControl, String ConflictName)
 	snusnuMain.ReloadHotkeys()
 EndEvent
 
-Bool function KeyConflict(Int KeyCode, String ConflictControl, String ConflictName)
+Bool Function KeyConflict(Int KeyCode, String ConflictControl, String ConflictName)
 	Bool Continue = True
 	If ConflictControl != ""
 		String Msg
@@ -1372,15 +1375,38 @@ bool Function loadSettings()
 	String fileName = "SnusnuSettings"
 	
 	if JsonUtil.JsonExists(fileName)
-		;NEEDS PROPER HANDLING!! ----> snusnuMain.Enabled = JsonUtil.GetIntValue(fileName, "Enabled", snusnuMain.Enabled as Int)
-		;NEEDS PROPER HANDLING!! ----> snusnuMain.hardcoreMode = JsonUtil.GetIntValue(fileName, "hardcoreMode", snusnuMain.hardcoreMode as Int)
-		;NEEDS PROPER HANDLING!! ----> snusnuMain.selectedBody = JsonUtil.GetIntValue(fileName, "selectedBody", snusnuMain.selectedBody)
-		;NEEDS PROPER HANDLING!! ----> snusnuMain.disableNormals = JsonUtil.GetIntValue(fileName, "disableNormals", snusnuMain.disableNormals as Int)
-		;NEEDS PROPER HANDLING!! ----> snusnuMain.Stamina = JsonUtil.GetFloatValue(fileName, "Stamina", snusnuMain.Stamina)
-		;NEEDS PROPER HANDLING!! ----> snusnuMain.Speed = JsonUtil.GetFloatValue(fileName, "Speed", snusnuMain.Speed)
-		;NEEDS PROPER HANDLING!! ----> snusnuMain.combatProficiency = JsonUtil.GetFloatValue(fileName, "combatProficiency", snusnuMain.combatProficiency)
-		;NEEDS PROPER HANDLING!! ----> snusnuMain.carryWeightBoost = JsonUtil.GetFloatValue(fileName, "carryWeightBoost", snusnuMain.carryWeightBoost)
-		;NEEDS PROPER HANDLING!! ----> snusnuMain.muscleScoreMax = JsonUtil.GetFloatValue(fileName, "muscleScoreMax", snusnuMain.muscleScoreMax)
+		If snusnuMain.Enabled != JsonUtil.GetIntValue(fileName, "Enabled", snusnuMain.Enabled as Int)
+			snusnuMain.Enabled = JsonUtil.GetIntValue(fileName, "Enabled", snusnuMain.Enabled as Int)
+			applyEnabledOption(false)
+		EndIf
+		If snusnuMain.hardcoreMode != JsonUtil.GetIntValue(fileName, "hardcoreMode", snusnuMain.hardcoreMode as Int)
+			snusnuMain.hardcoreMode = JsonUtil.GetIntValue(fileName, "hardcoreMode", snusnuMain.hardcoreMode as Int)
+			applyHardcoreOption()
+		EndIf
+		If snusnuMain.selectedBody != JsonUtil.GetIntValue(fileName, "selectedBody", snusnuMain.selectedBody)
+			snusnuMain.selectedBody = JsonUtil.GetIntValue(fileName, "selectedBody", snusnuMain.selectedBody)
+			applyBodyOption()
+		EndIf
+		If snusnuMain.disableNormals != JsonUtil.GetIntValue(fileName, "disableNormals", snusnuMain.disableNormals as Int)
+			snusnuMain.disableNormals = JsonUtil.GetIntValue(fileName, "disableNormals", snusnuMain.disableNormals as Int)
+			applyNormalsOption()
+		EndIf
+		If snusnuMain.Stamina != JsonUtil.GetFloatValue(fileName, "Stamina", snusnuMain.Stamina)
+			applyStaminaValue(JsonUtil.GetFloatValue(fileName, "Stamina", snusnuMain.Stamina))
+		EndIf
+		If snusnuMain.Speed != JsonUtil.GetFloatValue(fileName, "Speed", snusnuMain.Speed)
+			applySpeedValue(JsonUtil.GetFloatValue(fileName, "Speed", snusnuMain.Speed))
+		EndIf
+		If snusnuMain.combatProficiency != JsonUtil.GetFloatValue(fileName, "combatProficiency", snusnuMain.combatProficiency)
+			applyProficiencyValue(JsonUtil.GetFloatValue(fileName, "combatProficiency", snusnuMain.combatProficiency))
+		EndIf
+		If snusnuMain.carryWeightBoost != JsonUtil.GetFloatValue(fileName, "carryWeightBoost", snusnuMain.carryWeightBoost)
+			applyCarryWeightValue(JsonUtil.GetFloatValue(fileName, "carryWeightBoost", snusnuMain.carryWeightBoost))
+		EndIf
+		If snusnuMain.muscleScoreMax != JsonUtil.GetFloatValue(fileName, "muscleScoreMax", snusnuMain.muscleScoreMax)
+			applymuscleScoreMaxValue(JsonUtil.GetFloatValue(fileName, "muscleScoreMax", snusnuMain.muscleScoreMax))
+		EndIf
+		
 		snusnuMain.MultLoss = JsonUtil.GetFloatValue(fileName, "MultLoss", snusnuMain.MultLoss)
 		snusnuMain.MultGainFight = JsonUtil.GetFloatValue(fileName, "MultGainFight", snusnuMain.MultGainFight)
 		snusnuMain.MultGainArmor = JsonUtil.GetFloatValue(fileName, "MultGainArmor", snusnuMain.MultGainArmor)
@@ -1393,8 +1419,14 @@ bool Function loadSettings()
 		snusnuMain.changeHeadPart = JsonUtil.GetIntValue(fileName, "changeHeadPart", snusnuMain.changeHeadPart as Int)
 		snusnuMain.playTFSound = JsonUtil.GetIntValue(fileName, "playTFSound", snusnuMain.playTFSound as Int)
 		snusnuMain.removeWeightMorphs = JsonUtil.GetIntValue(fileName, "removeWeightMorphs", snusnuMain.removeWeightMorphs as Int)
-		snusnuMain.getInfoKey = JsonUtil.GetIntValue(fileName, "getInfoKey", snusnuMain.getInfoKey)
-		snusnuMain.npcMuscleScore = JsonUtil.GetFloatValue(fileName, "npcMuscleScore", snusnuMain.npcMuscleScore)
+		
+		If snusnuMain.getInfoKey != JsonUtil.GetIntValue(fileName, "getInfoKey", snusnuMain.getInfoKey)
+			snusnuMain.getInfoKey = JsonUtil.GetIntValue(fileName, "getInfoKey", snusnuMain.getInfoKey)
+			SetKeyMapOptionValueST(snusnuMain.getInfoKey)
+		EndIf
+		If snusnuMain.npcMuscleScore != JsonUtil.GetFloatValue(fileName, "npcMuscleScore", snusnuMain.npcMuscleScore)
+			applyNPCMuscleValue(JsonUtil.GetFloatValue(fileName, "npcMuscleScore", snusnuMain.npcMuscleScore))
+		EndIf
 		
 		return true
 	EndIf
@@ -1419,16 +1451,7 @@ State InstalledBody
 		Option[2] = "Vanilla"
 		snusnuMain.selectedBody = i
 		SetMenuOptionValueST(Option[i])
-		
-		if snusnuMain.selectedBody == 2
-			snusnuMain.useWeightSlider = true
-		Else
-			snusnuMain.useWeightSlider = false
-		EndIf
-		
-		String Msg
-		Msg = "Please exit this menu and enter again for the changes to be correctly applied."
-		ShowMessage(Msg, False)
+		applyBodyOption()
 	EndEvent
 	Event OnHighlightST()
 		If snusnuMain.selectedBody == 0
@@ -1481,3 +1504,98 @@ State LoadDefaults
 		EndIf
 	EndEvent
 EndState
+
+
+;-------------------------------------------------------------------------------------
+;TLALOC- New structure to avoid reusing code on loading values from Json
+;-------------------------------------------------------------------------------------
+
+Function applyEnabledOption(Bool askHardcore)
+	SetToggleOptionValue(_myEnabled, snusnuMain.Enabled)
+	
+	If snusnuMain.Enabled && askHardcore && ShowMessage("Enable Hardcore Mode?\n\nIn Hardcore Mode your initial muscle score will be set depending on your race\n(Orc: 50%, Nord: 35%, WoodElf/Redguard/Khajiit/Imperial: 25%, HighElf/DarkElf/Breton/Argonian: 0%),\nand it also restricts the usage of armor and weapons depending on your muscle score.", true, "Activate", "Don't")
+		snusnuMain.hardcoreMode = true
+		SetToggleOptionValue(_myHardcoreMode, snusnuMain.hardcoreMode)
+	EndIf
+	
+	snusnuMain.initSliderArrays()
+	snusnuMain.ResetWeight(snusnuMain.Enabled)
+	snusnuMain.RegisterEvents(snusnuMain.Enabled)
+	SetTextOptionValue(_myFightingScore, snusnuMain.getMuscleValuePercent(snusnuMain.muscleScore)+"%")
+	SetTextOptionValue(_myStoredScore, snusnuMain.getMuscleValuePercent(snusnuMain.storedMuscle)+"%")
+	;SetToggleOptionValue(_myUseWeightSlider, snusnuMain.useWeightSlider)
+	SetToggleOptionValue(_myDisableNormals, snusnuMain.disableNormals)
+	SetSliderOptionValue(_myMaxWeight, snusnuMain.muscleScoreMax, "{2}")
+EndFunction
+
+Function applyHardcoreOption()
+	SetToggleOptionValue(_myHardcoreMode, snusnuMain.hardcoreMode)
+	
+	If !snusnuMain.hardcoreMode
+		snusnuMain.cleanupHardcoreMode()
+	EndIf
+EndFunction
+
+Function applyBodyOption()
+	if snusnuMain.selectedBody == 2
+		snusnuMain.useWeightSlider = true
+	Else
+		snusnuMain.useWeightSlider = false
+	EndIf
+	
+	String Msg
+	Msg = "Please exit this menu and enter again for the changes to be correctly applied."
+	ShowMessage(Msg, False)
+EndFunction
+
+Function applyNormalsOption()
+	SetToggleOptionValue(_myDisableNormals, snusnuMain.disableNormals)
+
+	If snusnuMain.disableNormals
+		NiOverride.RemoveAllReferenceSkinOverrides(PlayerRef)
+	Else
+		snusnuMain.checkBodyNormalsState()
+	EndIf
+EndFunction
+
+Function applyStaminaValue(Float theValue)
+	snusnuMain.Stamina = theValue
+	SetSliderOptionValue(_myStamina, snusnuMain.Stamina, "{0}")
+	snusnuMain.UpdateEffects()
+EndFunction
+
+Function applySpeedValue(Float theValue)
+	snusnuMain.Speed = theValue
+	SetSliderOptionValue(_mySpeed, snusnuMain.Speed, "{0}")
+	snusnuMain.UpdateEffects()
+EndFunction
+
+Function applyProficiencyValue(Float theValue)
+	snusnuMain.combatProficiency = theValue
+	SetSliderOptionValue(_myCombatProficiency, snusnuMain.combatProficiency, "{0}")
+	snusnuMain.UpdateEffects()
+EndFunction
+
+Function applyCarryWeightValue(Float theValue)
+	snusnuMain.carryWeightBoost = theValue
+	SetSliderOptionValue(_myBoostCarryWeight, snusnuMain.carryWeightBoost, "{0}")
+	snusnuMain.updateCarryWeight()
+EndFunction
+
+Function applymuscleScoreMaxValue(Float theValue)
+	Float difference = theValue / snusnuMain.muscleScoreMax
+	snusnuMain.muscleScoreMax = theValue
+	SetSliderOptionValue(_myMaxWeight, snusnuMain.muscleScoreMax, "{2}")
+	;If snusnuMain.muscleScoreMax < snusnuMain.muscleScore
+		;snusnuMain.updateMuscleScore(0)
+		snusnuMain.recalculateAllMuscleVars(difference)
+		snusnuMain.UpdateWeight()
+		snusnuMain.UpdateEffects()
+		;SetTextOptionValue(_myFightingScore, snusnuMain.getMuscleValuePercent(snusnuMain.muscleScore)+"%")
+	;EndIf
+EndFunction
+
+Function applyNPCMuscleValue(Float theValue)
+	snusnuMain.npcMuscleScore = theValue
+	Debug.Notification("NPC Muscle has been set to "+snusnuMain.npcMuscleScore)
+EndFunction

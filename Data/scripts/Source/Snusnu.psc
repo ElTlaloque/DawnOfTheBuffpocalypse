@@ -102,7 +102,7 @@ HeadPart Property MuscleHead  Auto
 HeadPart Property originalHead Auto
 Sound Property snusnuTFSound  Auto  
 
-;Experimental custom NPC muscle. For now we just apply a fixed value
+;Experimental custom NPC muscle.
 Float Property npcMuscleScore = 500.0 Auto
 
 ;TLALOC- Body management stuff
@@ -212,9 +212,9 @@ Event OnPlayerLoadGame()
 		finalNormalsPath = "EMPTY"
 		checkBodyNormalsState()
 		
-		;TLALOC-ToDo- Add MCM option to choose a different key
 		RegisterForKey(getInfoKey)
 		
+		;TLALOC-ToDo- Add MCM option to choose a different key
 		;Experimental NPC muscle gain
 		RegisterForKey(37);K
 		
@@ -292,6 +292,12 @@ Event OnUpdate()
 				Debug.Trace("SNU -             finalDegradation="+totalDegradation)
 			EndIf
 			updateMuscleScore(totalDegradation)
+			
+			If justWakeUp
+				;ToDo- We might need to find a way to update the carry way in a non intrusive way without having to 
+				;      rely on specific events like sleep or eat.
+				updateCarryWeight()
+			EndIf
 			justWakeUp = false
 			;Debug.Trace("SNU - DegradationTimer="+DegradationTimer)
 			LastDegradationTime = GameDaysPassed.GetValue()
@@ -632,7 +638,9 @@ Event OnKeyDown(Int KeyCode)
 			WeightMorphsMCM WMCM = Game.GetFormFromFile(0x05000888, "WeightMorphs.esp") As WeightMorphsMCM
 			Debug.Notification("WeightMorphs Weight="+WMCM.WMorphs.Weight)
 		EndIf
-		
+		If carryWeightBoost != 0.0
+			Debug.Notification("ExtraCarryWeight="+currentExtraCarryWeight)
+		EndIf
 		Debug.Notification("muscleScore="+getMuscleValuePercent(muscleScore)+"%, normalsScore="+getMuscleValuePercent(normalsScore)+"%")
 		Debug.Notification("lostMuscle="+getMuscleValuePercent(lostMuscle)+"%, storedMuscle="+getMuscleValuePercent(storedMuscle)+"%")
 		
@@ -967,6 +975,9 @@ Function chooseBoobsPhysics(Int buildStage)
 EndFunction
 
 Function updateBoobsPhysics(Bool forceUpdate = false, Int newLevel = -1)
+	;TLALOC- FOR NOW THIS FUNCTIONALITY IS NOT TO BE INCLUDED IN THE RELEASE VERSION OF THIS MOD
+	return
+
 	;TLALOC- Boobs physics only get updated once, unless a significant muscle change is made
 	If is3BAPhysicsLoaded && (firstUpdateForBoobs || forceUpdate)
 		Mus3BPhysicsManager PhysicsManager = Game.GetFormFromFile(0x0500084A, "3BBB.esp") As Mus3BPhysicsManager
@@ -1022,6 +1033,11 @@ EndFunction
 ;       NOTE: It is heavely linked with PSQ, therefore this will not work at all if PSQ is not installed
 ;       ToDo- We can add new cleavage managmen mecanics in this mod but it might be out of its scope right now
 Function removeCleavageEffect(Float cleavageAmount, Bool forceRemoval = false)
+	;TLALOC- FOR NOW THIS FUNCTIONALITY IS NOT TO BE INCLUDED IN THE RELEASE VERSION OF THIS MOD
+	return
+	
+	
+	
 	If !hasCleavage && !cleavageRemoved
 		return
 	EndIf
@@ -1389,7 +1405,7 @@ Function RegisterEvents(Bool _enable)
 	EndIf
 EndFunction
 
-;ToDo- Add function to get custom initial muscleScore depending on Player's race
+;Get custom initial muscleScore depending on Player's race
 ;      Orc=max/2, Nord=max/3, WoodElf/Redguard/Khajiit/Imperial=max/4, HighElf/DarkElf/Breton/Argonian=0
 Function chooseScoreByRace()
 	String pcRace = PlayerRef.getRace().getName()
@@ -2451,6 +2467,7 @@ Function ForceNewWeight(Float newScore = 500.0)
 	currentSlimStage = 0
 	finalNormalsPath = "EMPTY"
 	
+	updateCarryWeight()
 	UpdateEffects()
 	checkBodyNormalsState()
 	LastDegradationTime = GameDaysPassed.GetValue()
@@ -2516,52 +2533,84 @@ Function SetNodeScale(Actor akActor, bool isFemale, string nodeName, float value
 	NiOverride.UpdateNodeTransform(akActor, true, isFemale, nodeName)
 EndFunction
 
-Function updateCarryWeight(Int stage = 4)
-	;/
-	------- REFERENCES
-	------- actualCarryWeight = PlayerRef.GetActorValue("CarryWeight")
-	------- PlayerRef.ModActorValue("CarryWeight", -modWeight)
-	
-	Int currentStage = carryWeightBoost / currentExtraCarryWeight
-	/;
-	
-	;/ ----------- LOGIC ----------- 
-	carryWeightBoost is the maximum carry weight we can get, and what we actually get depends on the
-	muscle score. 
-	
-	To avoid constantly changing the carry weight, we divide the muscleScore in stages.
-	From 0 to 20% of maximumMuscleScore, carryWeight should be 0
-	From 20 to 40%, carryWeight should be 25% of carryWeightBoost
-	From 40 to 60%, carryWeight should be 50% of carryWeightBoost
-	From 60 to 80%, carryWeight should be 75% of carryWeightBoost
-	From 80% and up, carryWeight should be 100% of carryWeightBoost
-	
-	If the user changes the value of carryWeightBoost, we shoud recalculate the ranges and reapply the
-	correct boost to carry weight if necessary
-	
-	There is a couple of values we need to calculate always
-	- Muscle score percent: should be muscleScore divided by muscleScoreMax. Result should be between 0 and 1
-	  musclePercent = muscleScore/muscleScoreMax
-	- Carry weight percent: Same calculation: currentExtraCarryWeight divided by carryWeightBoost. Result should be between 0 and 1
-	  carryWeightPercent = currentExtraCarryWeight/carryWeightBoost
-	  
-	But first we need to know what value currentExtraCarryWeight should actually be. For that we just
-	- carryWeightBoost*0.75 = 75%
-	- carryWeightBoost*0.5 = 50%
-	- carryWeightBoost*0.25 = 25%
-	
-	
-	EVERY TIME WE WANT TO UPDATE THE CARRY WEIGHT, we get the musclePercent value, then the carryWeightPercent,
-	and check if we are out of range. If we are, we update the carryWeight accordingly
-	/;
-	
+Function updateCarryWeight()
 	If carryWeightBoost > 0.0
-		currentExtraCarryWeight = carryWeightBoost
-		PlayerRef.ModActorValue("CarryWeight", currentExtraCarryWeight)
+		Float tempCarryWeight = getCarryWeightPercent()
+		If tempCarryWeight != currentExtraCarryWeight
+			If tempCarryWeight == 0.0
+				If currentExtraCarryWeight > 0.0
+					PlayerRef.ModActorValue("CarryWeight", -currentExtraCarryWeight)
+					currentExtraCarryWeight = 0.0
+				EndIf
+			Else
+				;IMPORTANT! We need to always remove the previous CarryWeight modification before applying the new changes, 
+				;           because otherwise the new changes will be applied on top of the previous value
+				PlayerRef.ModActorValue("CarryWeight", -currentExtraCarryWeight)
+				currentExtraCarryWeight = tempCarryWeight
+				PlayerRef.ModActorValue("CarryWeight", currentExtraCarryWeight)
+			EndIf
+		EndIf
 	ElseIf currentExtraCarryWeight > 0.0
 		PlayerRef.ModActorValue("CarryWeight", -currentExtraCarryWeight)
 		currentExtraCarryWeight = 0.0
 	EndIf
+EndFunction
+
+;/
+------- REFERENCES
+------- actualCarryWeight = PlayerRef.GetActorValue("CarryWeight")
+------- PlayerRef.ModActorValue("CarryWeight", -modWeight)
+
+Int currentStage = carryWeightBoost / currentExtraCarryWeight
+/;
+
+;/ ----------- LOGIC ----------- 
+carryWeightBoost is the maximum carry weight we can get, and what we actually get depends on the
+muscle score. 
+
+To avoid constantly changing the carry weight, we divide the muscleScore in stages.
+From 0 to 20% of maximumMuscleScore, carryWeight should be 0
+From 20 to 40%, carryWeight should be 25% of carryWeightBoost
+From 40 to 60%, carryWeight should be 50% of carryWeightBoost
+From 60 to 80%, carryWeight should be 75% of carryWeightBoost
+From 80% and up, carryWeight should be 100% of carryWeightBoost
+
+If the user changes the value of carryWeightBoost, we shoud recalculate the ranges and reapply the
+correct boost to carry weight if necessary
+
+There is a couple of values we need to calculate always
+- Muscle score percent: should be muscleScore divided by muscleScoreMax. Result should be between 0 and 1
+  musclePercent = muscleScore/muscleScoreMax
+- Carry weight percent: Same calculation: currentExtraCarryWeight divided by carryWeightBoost. Result should be between 0 and 1
+  carryWeightPercent = currentExtraCarryWeight/carryWeightBoost
+  
+But first we need to know what value currentExtraCarryWeight should actually be. For that we just
+- carryWeightBoost*0.75 = 75%
+- carryWeightBoost*0.5 = 50%
+- carryWeightBoost*0.25 = 25%
+
+
+EVERY TIME WE WANT TO UPDATE THE CARRY WEIGHT, we get the musclePercent value, then the carryWeightPercent,
+and check if we are out of range. If we are, we update the carryWeight accordingly
+/;
+Float Function getCarryWeightPercent()
+	Float newCarryWeight
+	Float musclePercent = muscleScore/muscleScoreMax
+	
+	If musclePercent < 0.2
+		newCarryWeight = 0.0
+	ElseIf musclePercent < 0.4
+		newCarryWeight = carryWeightBoost*0.25
+	ElseIf musclePercent < 0.6
+		newCarryWeight = carryWeightBoost*0.5
+	ElseIf musclePercent < 0.8
+		newCarryWeight = carryWeightBoost*0.75
+	Else
+		newCarryWeight = carryWeightBoost
+	EndIf
+	
+	Debug.Trace("SNU - musclePercent="+musclePercent+", newCarryWeight="+newCarryWeight)
+	return newCarryWeight
 EndFunction
 
 Function addWerewolfBuild()
@@ -2700,4 +2749,92 @@ Function addPushupException()
 			Debug.Notification("Item "+mainArmor.getName()+" has been added")
 		EndIf
 	EndIf
+EndFunction
+
+Bool Function saveAllMorphs()
+	int[] tempMorphsArray = IntListToArray(PlayerRef, SNUSNU_KEY)
+	If !JsonUtil.IntListCopy("SnusnuMainMorphs", SNUSNU_KEY, tempMorphsArray)
+		Debug.Trace("SNU - ERROR: Morphs array could not be saved!!")
+		Return false
+	Else
+		JsonUtil.Save("SnusnuMainMorphs", False)
+	EndIf
+	
+	
+	If !JsonUtil.FloatListCopy("SnusnuCBBEMorphs", SNUSNU_KEY, cbbeValues)
+		Debug.Trace("SNU - ERROR: CBBE array could not be saved!!")
+		Return false
+	Else
+		JsonUtil.Save("SnusnuCBBEMorphs", False)
+	EndIf
+	If !JsonUtil.FloatListCopy("SnusnuUUNPMorphs", SNUSNU_KEY, uunpValues)
+		Debug.Trace("SNU - ERROR: UUNP array could not be saved!!")
+		Return false
+	Else
+		JsonUtil.Save("SnusnuUUNPMorphs", False)
+	EndIf
+	If !JsonUtil.FloatListCopy("SnusnuBHUNPMorphs", SNUSNU_KEY, bhunpValues)
+		Debug.Trace("SNU - ERROR: BHUNP array could not be saved!!")
+		Return false
+	Else
+		JsonUtil.Save("SnusnuBHUNPMorphs", False)
+	EndIf
+	If !JsonUtil.FloatListCopy("SnusnuCBBESEMorphs", SNUSNU_KEY, cbbeSEValues)
+		Debug.Trace("SNU - ERROR: CBBESE array could not be saved!!")
+		Return false
+	Else
+		JsonUtil.Save("SnusnuCBBESEMorphs", False)
+	EndIf
+	If !JsonUtil.FloatListCopy("Snusnu3BAMorphs", SNUSNU_KEY, cbbe3BAValues)
+		Debug.Trace("SNU - ERROR: 3BA array could not be saved!!")
+		Return false
+	Else
+		JsonUtil.Save("Snusnu3BAMorphs", False)
+	EndIf
+	
+	Return true
+EndFunction
+
+Bool Function loadAllMorphs()
+	If JsonUtil.Load("SnusnuMainMorphs") && JsonUtil.IsGood("SnusnuMainMorphs")
+		int[] tempMorphsArray = JsonUtil.IntListToArray("SnusnuMainMorphs", SNUSNU_KEY)
+		If !IntListCopy(PlayerRef, SNUSNU_KEY, tempMorphsArray)
+			Debug.Trace("SNU - ERROR: Morphs array could not be loaded!!")
+			Return false
+		EndIf
+	EndIf
+	
+	
+	If JsonUtil.Load("SnusnuCBBEMorphs") && JsonUtil.IsGood("SnusnuCBBEMorphs")
+		cbbeValues = JsonUtil.FloatListToArray("SnusnuCBBEMorphs", SNUSNU_KEY)
+	Else
+		Debug.Trace("SNU - ERROR: CBBE array could not be loaded!!")
+		Return false
+	EndIf
+	If JsonUtil.Load("SnusnuUUNPMorphs") && JsonUtil.IsGood("SnusnuUUNPMorphs")
+		uunpValues = JsonUtil.FloatListToArray("SnusnuUUNPMorphs", SNUSNU_KEY)
+	Else
+		Debug.Trace("SNU - ERROR: UUNP array could not be loaded!!")
+		Return false
+	EndIf
+	If JsonUtil.Load("SnusnuBHUNPMorphs") && JsonUtil.IsGood("SnusnuBHUNPMorphs")
+		bhunpValues = JsonUtil.FloatListToArray("SnusnuBHUNPMorphs", SNUSNU_KEY)
+	Else
+		Debug.Trace("SNU - ERROR: BHUNP array could not be loaded!!")
+		Return false
+	EndIf
+	If JsonUtil.Load("SnusnuCBBESEMorphs") && JsonUtil.IsGood("SnusnuCBBESEMorphs")
+		cbbeSEValues = JsonUtil.FloatListToArray("SnusnuCBBESEMorphs", SNUSNU_KEY)
+	Else
+		Debug.Trace("SNU - ERROR: CBBE SE array could not be loaded!!")
+		Return false
+	EndIf
+	If JsonUtil.Load("Snusnu3BAMorphs") && JsonUtil.IsGood("Snusnu3BAMorphs")
+		cbbe3BAValues = JsonUtil.FloatListToArray("Snusnu3BAMorphs", SNUSNU_KEY)
+	Else
+		Debug.Trace("SNU - ERROR: 3BA array could not be loaded!!")
+		Return false
+	EndIf
+	
+	Return true
 EndFunction

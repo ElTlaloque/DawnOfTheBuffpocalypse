@@ -144,12 +144,16 @@ Float[] Property cbbeSEValues Auto
 Float[] Property cbbe3BAValues Auto
 
 ;Bone related sliders
+;XPMSEE Has 129 different bones. Not sure if all of them can be interacted with
 Float Property MultSpineBone = 1.05 Auto
 Float Property MultForearmBone = 1.05 Auto
+Float[] Property bonesValues Auto
 
 ; Male morphs
+;HIMBO has 126 morphs
 Float Property MultSamuel = 1.0 Auto
 Float Property MultSamson = 0.0 Auto
+Float[] Property maleValues Auto
 
 
 Int Function GetVersion()
@@ -569,7 +573,7 @@ Event OnAnimationEvent(ObjectReference akSource, string asEventName)
 			;bowDrawTime = GameDaysPassed.GetValue()
 			
 		ElseIf asEventName == "bowDrawn" || asEventName == "arrowRelease" ;&& bowDrawTime != 0.0
-			;TLALOC- This event will trigger when the bow if in "full charge", so there is no need to get the "charge time" 
+			;TLALOC- This event will trigger when the bow is in "full charge", so there is no need to get the "charge time" 
 			;        as it will be always the same
 			
 			;bowDrawTime = GameDaysPassed.GetValue() - bowDrawTime
@@ -683,16 +687,8 @@ Float Function getMuscleValuePercent(Float theValue)
 	return (theValue / muscleScoreMax) * 100
 EndFunction
 
-Float Function getSpineSize()
-	Float fightingMuscle = muscleScore / muscleScoreMax
-;/	
-	;TLALOC- Disguise form should not be too muscular
-	If fightingMuscle > 0.5 && PlayerRef.hasSpell(PSQM.PSQ.PSQDisguiseCastSpell)
-		;fightingMuscle = fightingMuscle / 2.0
-		fightingMuscle = 0.5
-	EndIf
-/;	
-	return fightingMuscle
+Float Function getBoneSize(Float baseModifier, Float boneModifier)
+	return baseModifier * Math.abs( 1.0 - boneModifier )
 EndFunction
 
 Function UpdateWeight(Bool applyNow = True)
@@ -716,8 +712,8 @@ Function UpdateWeight(Bool applyNow = True)
 				EndIf
 				
 				;TLALOC- Apply bone changes
-				changeSpineBoneScale(PlayerRef, getSpineSize() * Math.abs( 1.0 - MultSpineBone ))
-				changeForearmBoneScale(PlayerRef, getSpineSize() * Math.abs( 1.0 - MultForearmBone ))
+				changeSpineBoneScale(PlayerRef, getBoneSize(muscleScore / muscleScoreMax, bonesValues[0]))
+				changeForearmBoneScale(PlayerRef, getBoneSize(muscleScore / muscleScoreMax, bonesValues[1]))
 				
 				;TLALOC- Custom Boobs physics
 				updateBoobsPhysics()
@@ -743,8 +739,8 @@ Function UpdateWeight(Bool applyNow = True)
 					endWhile
 					
 					;TLALOC- Apply bone changes
-					changeSpineBoneScale(PlayerRef, getSpineSize() * Math.abs( 1.0 - MultSpineBone ))
-					changeForearmBoneScale(PlayerRef, getSpineSize() * Math.abs( 1.0 - MultForearmBone ))
+					changeSpineBoneScale(PlayerRef, getBoneSize(muscleScore / muscleScoreMax, bonesValues[0]))
+					changeForearmBoneScale(PlayerRef, getBoneSize(muscleScore / muscleScoreMax, bonesValues[1]))
 					
 					;TLALOC- Werewolf body morph --------------------------------------------------------------------
 					
@@ -770,13 +766,13 @@ Function UpdateWeight(Bool applyNow = True)
 				updateBoobsPhysics()
 			; Male
 			ElseIf PlayerSex == 0
-				If MultSamuel != 0.0
-					NiOverride.SetBodyMorph(PlayerRef, "Samuel", SNUSNU_KEY, fightingMuscle * MultSamuel)
+				If maleValues[0] != 0.0
+					NiOverride.SetBodyMorph(PlayerRef, "Samuel", SNUSNU_KEY, fightingMuscle * maleValues[0])
 				Else
 					NiOverride.ClearBodyMorph(PlayerRef, "Samuel", SNUSNU_KEY)
 				EndIf
-				If MultSamson != 0.0
-					NiOverride.SetBodyMorph(PlayerRef, "Samson", SNUSNU_KEY, fightingMuscle * MultSamson)
+				If maleValues[1] != 0.0
+					NiOverride.SetBodyMorph(PlayerRef, "Samson", SNUSNU_KEY, fightingMuscle * maleValues[1])
 				Else
 					NiOverride.ClearBodyMorph(PlayerRef, "Samson", SNUSNU_KEY)
 				EndIf
@@ -1115,8 +1111,8 @@ Function tempDebugSliders()
 		Debug.Trace("SNU -     currentSlider="+currentSliderIndex+", sliderString="+getSliderString(currentSliderIndex)+", sliderValue="+getSliderValue(currentSliderIndex))
 		slidersLoop += 1
 	endWhile
-	Debug.Trace("SNU - SpineBoneScale = "+MultSpineBone)
-	Debug.Trace("SNU - ForearmBoneScale = "+MultForearmBone)
+	Debug.Trace("SNU - SpineBoneScale = "+bonesValues[0])
+	Debug.Trace("SNU - ForearmBoneScale = "+bonesValues[1])
 	
 	Debug.Trace("SNU - Pushup Exceptions: "+PushupExceptions)
 EndFunction
@@ -1958,13 +1954,11 @@ Function setSliderValue(Int position, Float value, Bool updateWeightNow = true)
 	
 	If value == 0.0
 		IntListRemove(PlayerRef, SNUSNU_KEY, position)
-	Else
-		IntListAdd(PlayerRef, SNUSNU_KEY, position, false)
-	EndIf
-	
-	If value == 0.0
+		
 		Debug.Trace("SNU - Removing morph: "+getSliderString(position))
 		NiOverride.ClearBodyMorph(PlayerRef, getSliderString(position), SNUSNU_KEY)
+	Else
+		IntListAdd(PlayerRef, SNUSNU_KEY, position, false)
 	EndIf
 	
 	If updateWeightNow
@@ -1996,6 +1990,10 @@ Function initDefaultSliders()
 	bhunpValues = new Float[43]
 	cbbeSEValues = new Float[27]
 	cbbe3BAValues = new Float[40]
+	
+	bonesValues = new Float[2]
+	maleValues = new Float[2]
+	
 	
 	;TLALOC- Arrays were turned into properties so we no longer need the individual value refs
 	cbbeValues[0] = 0.0 ;Breasts
@@ -2250,6 +2248,13 @@ Function initDefaultSliders()
 	cbbe3BAValues[38] = 0.0 ;BellyUnder_v2
 	cbbe3BAValues[39] = 0.0 ;HipBone
 	
+	;Male and Unisex Bone sliders
+	bonesValues[0] = 1.05 ;MultSpineBone
+	bonesValues[0] = 1.0 ;MultForearmBone
+	
+	maleValues[0] = 1.0 ;MultSamuel
+	maleValues[0] = 0.0 ;MultSamson
+	
 	
 	;ToDo- Add conditions to choose the slider set depending on selected body
 	IntListClear(PlayerRef, SNUSNU_KEY)
@@ -2363,8 +2368,8 @@ Function LoadDefaultProfile(Int profileID)
 		setSliderValue(12, 000, false)
 		setSliderValue(22, 000, false)
 		
-		MultSpineBone = 1.05
-		MultForearmBone = 1.05
+		bonesValues[0] = 1.05 ;MultSpineBone
+		bonesValues[1] = 1.05 ;MultForearmBone
 	ElseIf profileID == 2 ;CBBE 3BA
 		setSliderValue(33, 0.5, false) ;Back
 		setSliderValue(211, 1.0, false) ;BackValley_v2
@@ -2401,8 +2406,8 @@ Function LoadDefaultProfile(Int profileID)
 		setSliderValue(189, -1.0, false) ;AnkleSize
 		setSliderValue(187, -0.6, false) ;LegShapeClassic
 		
-		MultSpineBone = 1.05
-		MultForearmBone = 1.0
+		bonesValues[0] = 1.05 ;MultSpineBone
+		bonesValues[1] = 1.0 ;MultForearmBone
 	Else ;CBBE 3BA Pecs
 		setSliderValue(33, 0.5, false) ;Back
 		setSliderValue(211, 1.0, false) ;BackValley_v2
@@ -2444,8 +2449,8 @@ Function LoadDefaultProfile(Int profileID)
 		setSliderValue(126, 0.1, false) ;BreastsTogether
 		
 		
-		MultSpineBone = 1.05
-		MultForearmBone = 1.0
+		bonesValues[0] = 1.05 ;MultSpineBone
+		bonesValues[1] = 1.0 ;MultForearmBone
 	EndIf
 	
 	UpdateWeight()
@@ -2654,8 +2659,8 @@ Function applyNPCMuscle(Float howMuch)
 				endWhile
 				
 				;TLALOC- Apply bone changes
-				changeSpineBoneScale(crosshairActor, howMuch * Math.abs( 1.0 - MultSpineBone ))
-				changeForearmBoneScale(crosshairActor, howMuch * Math.abs( 1.0 - MultForearmBone ))
+				changeSpineBoneScale(crosshairActor, getBoneSize(howMuch, bonesValues[0]))
+				changeForearmBoneScale(crosshairActor, getBoneSize(howMuch, bonesValues[1]))
 				
 				;Muscle Normals!
 				SnusnuMusclePowerNPCScript.forceSwitchMuscleNormals(crosshairActor, howMuch*100)
@@ -2751,88 +2756,75 @@ Function addPushupException()
 	EndIf
 EndFunction
 
-Bool Function saveAllMorphs()
+Bool Function saveAllMorphs(String profileName = "")
+	String fileName = "SnusnuMorphs"
+	If profileName != ""
+		fileName = profileName
+	EndIf
+	
 	int[] tempMorphsArray = IntListToArray(PlayerRef, SNUSNU_KEY)
-	If !JsonUtil.IntListCopy("SnusnuMainMorphs", SNUSNU_KEY, tempMorphsArray)
+	If !JsonUtil.IntListCopy(fileName, "MainMorphs", tempMorphsArray)
 		Debug.Trace("SNU - ERROR: Morphs array could not be saved!!")
 		Return false
-	Else
-		JsonUtil.Save("SnusnuMainMorphs", False)
 	EndIf
 	
-	
-	If !JsonUtil.FloatListCopy("SnusnuCBBEMorphs", SNUSNU_KEY, cbbeValues)
+	If !JsonUtil.FloatListCopy(fileName, "CBBEMorphs", cbbeValues)
 		Debug.Trace("SNU - ERROR: CBBE array could not be saved!!")
 		Return false
-	Else
-		JsonUtil.Save("SnusnuCBBEMorphs", False)
 	EndIf
-	If !JsonUtil.FloatListCopy("SnusnuUUNPMorphs", SNUSNU_KEY, uunpValues)
+	If !JsonUtil.FloatListCopy(fileName, "UUNPMorphs", uunpValues)
 		Debug.Trace("SNU - ERROR: UUNP array could not be saved!!")
 		Return false
-	Else
-		JsonUtil.Save("SnusnuUUNPMorphs", False)
 	EndIf
-	If !JsonUtil.FloatListCopy("SnusnuBHUNPMorphs", SNUSNU_KEY, bhunpValues)
+	If !JsonUtil.FloatListCopy(fileName, "BHUNPMorphs", bhunpValues)
 		Debug.Trace("SNU - ERROR: BHUNP array could not be saved!!")
 		Return false
-	Else
-		JsonUtil.Save("SnusnuBHUNPMorphs", False)
 	EndIf
-	If !JsonUtil.FloatListCopy("SnusnuCBBESEMorphs", SNUSNU_KEY, cbbeSEValues)
+	If !JsonUtil.FloatListCopy(fileName, "CBBESEMorphs", cbbeSEValues)
 		Debug.Trace("SNU - ERROR: CBBESE array could not be saved!!")
 		Return false
-	Else
-		JsonUtil.Save("SnusnuCBBESEMorphs", False)
 	EndIf
-	If !JsonUtil.FloatListCopy("Snusnu3BAMorphs", SNUSNU_KEY, cbbe3BAValues)
+	If !JsonUtil.FloatListCopy(fileName, "3BAMorphs", cbbe3BAValues)
 		Debug.Trace("SNU - ERROR: 3BA array could not be saved!!")
 		Return false
-	Else
-		JsonUtil.Save("Snusnu3BAMorphs", False)
 	EndIf
 	
+	If !JsonUtil.FloatListCopy(fileName, "BoneMorphs", bonesValues)
+		Debug.Trace("SNU - ERROR: Bone array could not be saved!!")
+		Return false
+	EndIf
+	If !JsonUtil.FloatListCopy(fileName, "MaleMorphs", maleValues)
+		Debug.Trace("SNU - ERROR: Male array could not be saved!!")
+		Return false
+	EndIf
+	
+	JsonUtil.Save(fileName, False)
 	Return true
 EndFunction
 
-Bool Function loadAllMorphs()
-	If JsonUtil.Load("SnusnuMainMorphs") && JsonUtil.IsGood("SnusnuMainMorphs")
-		int[] tempMorphsArray = JsonUtil.IntListToArray("SnusnuMainMorphs", SNUSNU_KEY)
+Bool Function loadAllMorphs(String profileName = "")
+	String fileName = "SnusnuMorphs"
+	If profileName != ""
+		fileName = profileName
+	EndIf
+	
+	If JsonUtil.Load(fileName) && JsonUtil.IsGood(fileName)
+		int[] tempMorphsArray = JsonUtil.IntListToArray(fileName, "MainMorphs")
 		If !IntListCopy(PlayerRef, SNUSNU_KEY, tempMorphsArray)
 			Debug.Trace("SNU - ERROR: Morphs array could not be loaded!!")
 			Return false
 		EndIf
-	EndIf
-	
-	
-	If JsonUtil.Load("SnusnuCBBEMorphs") && JsonUtil.IsGood("SnusnuCBBEMorphs")
-		cbbeValues = JsonUtil.FloatListToArray("SnusnuCBBEMorphs", SNUSNU_KEY)
+		
+		cbbeValues = JsonUtil.FloatListToArray(fileName, "CBBEMorphs")
+		uunpValues = JsonUtil.FloatListToArray(fileName, "UUNPMorphs")
+		bhunpValues = JsonUtil.FloatListToArray(fileName, "BHUNPMorphs")
+		cbbeSEValues = JsonUtil.FloatListToArray(fileName, "CBBESEMorphs")
+		cbbe3BAValues = JsonUtil.FloatListToArray(fileName, "3BAMorphs")
+		
+		bonesValues = JsonUtil.FloatListToArray(fileName, "BoneMorphs")
+		maleValues = JsonUtil.FloatListToArray(fileName, "MaleMorphs")
 	Else
-		Debug.Trace("SNU - ERROR: CBBE array could not be loaded!!")
-		Return false
-	EndIf
-	If JsonUtil.Load("SnusnuUUNPMorphs") && JsonUtil.IsGood("SnusnuUUNPMorphs")
-		uunpValues = JsonUtil.FloatListToArray("SnusnuUUNPMorphs", SNUSNU_KEY)
-	Else
-		Debug.Trace("SNU - ERROR: UUNP array could not be loaded!!")
-		Return false
-	EndIf
-	If JsonUtil.Load("SnusnuBHUNPMorphs") && JsonUtil.IsGood("SnusnuBHUNPMorphs")
-		bhunpValues = JsonUtil.FloatListToArray("SnusnuBHUNPMorphs", SNUSNU_KEY)
-	Else
-		Debug.Trace("SNU - ERROR: BHUNP array could not be loaded!!")
-		Return false
-	EndIf
-	If JsonUtil.Load("SnusnuCBBESEMorphs") && JsonUtil.IsGood("SnusnuCBBESEMorphs")
-		cbbeSEValues = JsonUtil.FloatListToArray("SnusnuCBBESEMorphs", SNUSNU_KEY)
-	Else
-		Debug.Trace("SNU - ERROR: CBBE SE array could not be loaded!!")
-		Return false
-	EndIf
-	If JsonUtil.Load("Snusnu3BAMorphs") && JsonUtil.IsGood("Snusnu3BAMorphs")
-		cbbe3BAValues = JsonUtil.FloatListToArray("Snusnu3BAMorphs", SNUSNU_KEY)
-	Else
-		Debug.Trace("SNU - ERROR: 3BA array could not be loaded!!")
+		Debug.Trace("SNU - ERROR: Morphs array could not be loaded!!")
 		Return false
 	EndIf
 	

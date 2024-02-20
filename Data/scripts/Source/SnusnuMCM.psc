@@ -47,6 +47,8 @@ Int _myLoadMorphs
 Int _mySaveMorphsProfile
 Int _myLoadMorphsProfile
 
+String[] savedProfilesList
+
 Int[] cbbeSliders
 Int[] uunpSliders
 Int[] bhunpSliders
@@ -423,26 +425,31 @@ Event OnPageReset(String a_page)
 		AddHeaderOption("$SNUSNU_MORPHS_MALE")
 		AddEmptyOption()
 		
-		_myMultSamuel = AddSliderOption("Samuel", snusnuMain.MultSamuel, "{2}")
-		_myMultSamson = AddSliderOption("Samson", snusnuMain.MultSamson, "{2}")
+		_myMultSamuel = AddSliderOption("Samuel", snusnuMain.maleValues[0], "{2}")
+		_myMultSamson = AddSliderOption("Samson", snusnuMain.maleValues[1], "{2}")
 		
 		AddEmptyOption()
 		AddEmptyOption()
 		AddHeaderOption("$SNUSNU_MORPHS_BONES")
 		AddEmptyOption()
-		_myMultSpineBone = AddSliderOption("Upper Spine", snusnuMain.MultSpineBone, "{3}")
-		_myMultForearmBone = AddSliderOption("Forearms", snusnuMain.MultForearmBone, "{3}")
+		_myMultSpineBone = AddSliderOption("Upper Spine", snusnuMain.bonesValues[0], "{3}")
+		_myMultForearmBone = AddSliderOption("Forearms", snusnuMain.bonesValues[1], "{3}")
 	ElseIf ((a_page == Pages[5] && snusnuMain.selectedBody != 2) || (a_page == Pages[2] && snusnuMain.selectedBody == 2))
 		SetCursorFillMode(TOP_TO_BOTTOM)
 		_mySaveOptions = AddToggleOption("Save Settings", False)
 		_myLoadOptions = AddToggleOption("Load Settings", False)
 		AddEmptyOption()
-		AddEmptyOption()
+		;AddEmptyOption()
 		_mySaveMorphs = AddToggleOption("Save Morphs", False)
 		_myLoadMorphs = AddToggleOption("Load Morphs", False)
 		SetCursorPosition(1)
-		_mySaveMorphsProfile = AddToggleOption("Save Morphs Profile", False)
-		_myLoadMorphsProfile = AddToggleOption("Load Morphs Profile", False)
+		_mySaveMorphsProfile = AddInputOption("Save Morphs Profile", "Default")
+		
+		If LoadSavedProfiles()
+			_myLoadMorphsProfile = AddMenuOption("Load Morphs Profile", savedProfilesList[0])
+		Else
+			_myLoadMorphsProfile = AddMenuOption("Load Morphs Profile", "EMPTY", OPTION_FLAG_DISABLED)
+		EndIf
 	ElseIf ((a_page == Pages[6] && snusnuMain.selectedBody != 2) || (a_page == Pages[3] && snusnuMain.selectedBody == 2))
 		SetCursorFillMode(LEFT_TO_RIGHT)
 		AddHeaderOption("Mod Version: " + snusnuMain.GetVersion())
@@ -672,57 +679,9 @@ Event OnOptionSelect(Int a_option)
 			Self.SetOptionFlags(_myLoadMorphsProfile, Self.OPTION_FLAG_NONE, True)
 		endIf
 	ElseIf a_option == _mySaveMorphs
-		Self.SetOptionFlags(_mySaveOptions, Self.OPTION_FLAG_DISABLED, True)
-		Self.SetOptionFlags(_myLoadOptions, Self.OPTION_FLAG_DISABLED, True)
-		
-		Self.SetOptionFlags(_mySaveMorphs, Self.OPTION_FLAG_DISABLED, True)
-		Self.SetOptionFlags(_myLoadMorphs, Self.OPTION_FLAG_DISABLED, True)
-		
-		Self.SetOptionFlags(_mySaveMorphsProfile, Self.OPTION_FLAG_DISABLED, True)
-		Self.SetOptionFlags(_myLoadMorphsProfile, Self.OPTION_FLAG_DISABLED, True)
-		ShowMessage("Saving all morph values", false)
-		If snusnuMain.saveAllMorphs()
-			ShowMessage("Morphs have been saved successfully", false)
-		Else
-			ShowMessage("ERROR! Morph values could not be saved!!", false)
-		EndIf
-		ForcePageReset()
-		Self.SetOptionFlags(_mySaveOptions, Self.OPTION_FLAG_NONE, True)
-		Self.SetOptionFlags(_myLoadOptions, Self.OPTION_FLAG_NONE, True)
-		
-		Self.SetOptionFlags(_mySaveMorphs, Self.OPTION_FLAG_NONE, True)
-		Self.SetOptionFlags(_myLoadMorphs, Self.OPTION_FLAG_NONE, True)
-		
-		Self.SetOptionFlags(_mySaveMorphsProfile, Self.OPTION_FLAG_NONE, True)
-		Self.SetOptionFlags(_myLoadMorphsProfile, Self.OPTION_FLAG_NONE, True)
+		applySaveMorphs()
 	ElseIf a_option == _myLoadMorphs
-		Self.SetOptionFlags(_mySaveOptions, Self.OPTION_FLAG_DISABLED, True)
-		Self.SetOptionFlags(_myLoadOptions, Self.OPTION_FLAG_DISABLED, True)
-		
-		Self.SetOptionFlags(_mySaveMorphs, Self.OPTION_FLAG_DISABLED, True)
-		Self.SetOptionFlags(_myLoadMorphs, Self.OPTION_FLAG_DISABLED, True)
-		
-		Self.SetOptionFlags(_mySaveMorphsProfile, Self.OPTION_FLAG_DISABLED, True)
-		Self.SetOptionFlags(_myLoadMorphsProfile, Self.OPTION_FLAG_DISABLED, True)
-		ShowMessage("Loading all morph values", false)
-		If snusnuMain.loadAllMorphs()
-			ShowMessage("Morphs have been loaded successfully", false)
-		Else
-			ShowMessage("ERROR! Morph values could not be loaded!!", false)
-		EndIf
-		ForcePageReset()
-		Self.SetOptionFlags(_mySaveOptions, Self.OPTION_FLAG_NONE, True)
-		Self.SetOptionFlags(_myLoadOptions, Self.OPTION_FLAG_NONE, True)
-		
-		Self.SetOptionFlags(_mySaveMorphs, Self.OPTION_FLAG_NONE, True)
-		Self.SetOptionFlags(_myLoadMorphs, Self.OPTION_FLAG_NONE, True)
-		
-		Self.SetOptionFlags(_mySaveMorphsProfile, Self.OPTION_FLAG_NONE, True)
-		Self.SetOptionFlags(_myLoadMorphsProfile, Self.OPTION_FLAG_NONE, True)
-	ElseIf a_option == _mySaveMorphsProfile
-		
-	ElseIf a_option == _myLoadMorphsProfile
-		
+		applyLoadMorphs()
 	EndIf
 EndEvent
 
@@ -790,23 +749,23 @@ Event OnOptionSliderOpen(Int a_option)
 	
 	;MALE SLIDERS - UNUSED FOR NOW
 	ElseIf a_option == _myMultSamuel
-		SetSliderDialogStartValue(snusnuMain.MultSamuel)
+		SetSliderDialogStartValue(snusnuMain.maleValues[0])
 		SetSliderDialogDefaultValue(0.0)
 		SetSliderDialogRange(-1.0, 1.0)
 		SetSliderDialogInterval(0.01)
 	ElseIf a_option == _myMultSamson
-		SetSliderDialogStartValue(snusnuMain.MultSamson)
+		SetSliderDialogStartValue(snusnuMain.maleValues[1])
 		SetSliderDialogDefaultValue(0.0)
 		SetSliderDialogRange(-1.0, 1.0)
 		SetSliderDialogInterval(0.01)
 			
 	ElseIf a_option == _myMultSpineBone
-		SetSliderDialogStartValue(snusnuMain.MultSpineBone)
+		SetSliderDialogStartValue(snusnuMain.bonesValues[0])
 		SetSliderDialogDefaultValue(1.0)
 		SetSliderDialogRange(1.0, 2.0)
 		SetSliderDialogInterval(0.001)
 	ElseIf a_option == _myMultForearmBone
-		SetSliderDialogStartValue(snusnuMain.MultForearmBone)
+		SetSliderDialogStartValue(snusnuMain.bonesValues[1])
 		SetSliderDialogDefaultValue(1.0)
 		SetSliderDialogRange(1.0, 2.0)
 		SetSliderDialogInterval(0.001)
@@ -921,23 +880,23 @@ Event OnOptionSliderAccept(Int a_option, Float a_value)
 		
 	;MALE SLIDERS - UNUSED FOR NOW
 	ElseIf a_option == _myMultSamuel
-		snusnuMain.MultSamuel = a_value
-		SetSliderOptionValue(a_option, snusnuMain.MultSamuel, "{2}")
+		snusnuMain.maleValues[0] = a_value
+		SetSliderOptionValue(a_option, snusnuMain.maleValues[0], "{2}")
 		snusnuMain.UpdateWeight()
 	ElseIf a_option == _myMultSamson
-		snusnuMain.MultSamson = a_value
-		SetSliderOptionValue(a_option, snusnuMain.MultSamson, "{2}")
+		snusnuMain.maleValues[1] = a_value
+		SetSliderOptionValue(a_option, snusnuMain.maleValues[1], "{2}")
 		snusnuMain.UpdateWeight()
 		
 	;GENERIC BONES MORPHS
 	ElseIf a_option == _myMultSpineBone
-		snusnuMain.MultSpineBone = a_value
-		SetSliderOptionValue(a_option, snusnuMain.MultSpineBone, "{3}")
+		snusnuMain.bonesValues[0] = a_value
+		SetSliderOptionValue(a_option, snusnuMain.bonesValues[0], "{3}")
 		;TLALOC-ToDo: Do we need to add this to an array?
 		snusnuMain.UpdateWeight()
 	ElseIf a_option == _myMultForearmBone
-		snusnuMain.MultForearmBone = a_value
-		SetSliderOptionValue(a_option, snusnuMain.MultForearmBone, "{3}")
+		snusnuMain.bonesValues[1] = a_value
+		SetSliderOptionValue(a_option, snusnuMain.bonesValues[1], "{3}")
 		;TLALOC-ToDo: Do we need to add this to an array?
 		snusnuMain.UpdateWeight()
 		
@@ -1434,6 +1393,48 @@ bool Function loadSettings()
 	return false
 EndFunction
 
+Bool Function LoadSavedProfiles()
+	Debug.Trace("SNU- Searching for current profile files")
+	savedProfilesList = MiscUtil.FilesInFolder("./Data/SKSE/Plugins/StorageUtilData/SnuSnuProfiles", "json")
+	If savedProfilesList.length > 0
+		Debug.Trace(" ")
+		Debug.Trace("SNU- Detected files in SnusnuProfiles directory: ")
+		Debug.Trace(savedProfilesList)
+		Debug.Trace(" ")
+		Return true
+	Else
+		Return false
+	EndIf
+EndFunction
+
+Event OnOptionInputOpen(Int Option)
+	If Option == _mySaveMorphsProfile
+		SetInputDialogStartText("Default")
+	EndIf
+EndEvent
+
+Event OnOptionInputAccept(int option, string value)
+	If Option == _mySaveMorphsProfile
+		SetInputOptionValue(_mySaveMorphsProfile, value)
+		applySaveMorphs("SnuSnuProfiles/"+value)
+    EndIf 
+EndEvent
+
+Event OnOptionMenuOpen(int Option)
+	If Option == _myLoadMorphsProfile
+		SetMenuDialogOptions(savedProfilesList)
+		SetMenuDialogStartIndex(0)
+		SetMenuDialogDefaultIndex(0)
+	EndIf
+EndEvent
+
+Event OnOptionMenuAccept(int option, int index)
+	If option == _myLoadMorphsProfile
+		SetMenuOptionValue(_myLoadMorphsProfile, savedProfilesList[index])
+		applyLoadMorphs("SnuSnuProfiles/"+savedProfilesList[index])
+	EndIf
+EndEvent
+
 State InstalledBody
 	Event OnMenuOpenST()
 		String[] Option = New String[3]
@@ -1598,4 +1599,56 @@ EndFunction
 Function applyNPCMuscleValue(Float theValue)
 	snusnuMain.npcMuscleScore = theValue
 	Debug.Notification("NPC Muscle has been set to "+snusnuMain.npcMuscleScore)
+EndFunction
+
+Function applySaveMorphs(String profileName = "")
+	Self.SetOptionFlags(_mySaveOptions, Self.OPTION_FLAG_DISABLED, True)
+	Self.SetOptionFlags(_myLoadOptions, Self.OPTION_FLAG_DISABLED, True)
+	
+	Self.SetOptionFlags(_mySaveMorphs, Self.OPTION_FLAG_DISABLED, True)
+	Self.SetOptionFlags(_myLoadMorphs, Self.OPTION_FLAG_DISABLED, True)
+	
+	Self.SetOptionFlags(_mySaveMorphsProfile, Self.OPTION_FLAG_DISABLED, True)
+	Self.SetOptionFlags(_myLoadMorphsProfile, Self.OPTION_FLAG_DISABLED, True)
+	ShowMessage("Saving morph values", false)
+	If snusnuMain.saveAllMorphs(profileName)
+		ShowMessage("Morphs have been saved successfully", false)
+	Else
+		ShowMessage("ERROR! Morph values could not be saved!!", false)
+	EndIf
+	ForcePageReset()
+	Self.SetOptionFlags(_mySaveOptions, Self.OPTION_FLAG_NONE, True)
+	Self.SetOptionFlags(_myLoadOptions, Self.OPTION_FLAG_NONE, True)
+	
+	Self.SetOptionFlags(_mySaveMorphs, Self.OPTION_FLAG_NONE, True)
+	Self.SetOptionFlags(_myLoadMorphs, Self.OPTION_FLAG_NONE, True)
+	
+	Self.SetOptionFlags(_mySaveMorphsProfile, Self.OPTION_FLAG_NONE, True)
+	Self.SetOptionFlags(_myLoadMorphsProfile, Self.OPTION_FLAG_NONE, True)
+EndFunction
+
+Function applyLoadMorphs(String profileName = "")
+	Self.SetOptionFlags(_mySaveOptions, Self.OPTION_FLAG_DISABLED, True)
+	Self.SetOptionFlags(_myLoadOptions, Self.OPTION_FLAG_DISABLED, True)
+	
+	Self.SetOptionFlags(_mySaveMorphs, Self.OPTION_FLAG_DISABLED, True)
+	Self.SetOptionFlags(_myLoadMorphs, Self.OPTION_FLAG_DISABLED, True)
+	
+	Self.SetOptionFlags(_mySaveMorphsProfile, Self.OPTION_FLAG_DISABLED, True)
+	Self.SetOptionFlags(_myLoadMorphsProfile, Self.OPTION_FLAG_DISABLED, True)
+	ShowMessage("Loading morph values", false)
+	If snusnuMain.loadAllMorphs(profileName)
+		ShowMessage("Morphs have been loaded successfully", false)
+	Else
+		ShowMessage("ERROR! Morph values could not be loaded!!", false)
+	EndIf
+	ForcePageReset()
+	Self.SetOptionFlags(_mySaveOptions, Self.OPTION_FLAG_NONE, True)
+	Self.SetOptionFlags(_myLoadOptions, Self.OPTION_FLAG_NONE, True)
+	
+	Self.SetOptionFlags(_mySaveMorphs, Self.OPTION_FLAG_NONE, True)
+	Self.SetOptionFlags(_myLoadMorphs, Self.OPTION_FLAG_NONE, True)
+	
+	Self.SetOptionFlags(_mySaveMorphsProfile, Self.OPTION_FLAG_NONE, True)
+	Self.SetOptionFlags(_myLoadMorphsProfile, Self.OPTION_FLAG_NONE, True)
 EndFunction

@@ -124,10 +124,6 @@ event OnEffectStart(Actor akTarget, Actor akCaster)
 			switchMuscleNormals(akTarget, 4, 100 )
 		EndIf
 		
-		;If snusnuMain.useAltAnims
-		;	snusnuMain.setMuscleAnimations(akTarget)
-		;EndIf
-		
 		;Ultra punching strength
 		akTarget.AddItem(snusnuMain.FistsOfRage, 1, True)
 		akTarget.EquipItem(snusnuMain.FistsOfRage, True, True)
@@ -159,6 +155,11 @@ event OnEffectStart(Actor akTarget, Actor akCaster)
 			EndIf
 		EndIf
 /;
+		
+		If snusnuMain.useAltAnims
+			snusnuMain.updateAnimations(4)
+		EndIf
+
 		;TLALOC- Instad of changing the full body with BodyChange, we use our own muscular head with the appropiate HDT preset
 		If snusnuMain.changeHeadPart
 			ActorBase akTargetBase = akTarget.getActorBase()
@@ -169,10 +170,6 @@ event OnEffectStart(Actor akTarget, Actor akCaster)
 			akTarget.ChangeHeadPart(snusnuMain.MuscleHead)
 			akTarget.RegenerateHead()
 		EndIf
-		
-		;TLALOC- New features!
-		;TLALOC- For use with DAR
-		snusnuMain.MuscleLevel.setValue(4)
 		
 		If (snusnuMain.heavyItemsEquiped > 0 || snusnuMain.lightItemsEquiped > 0) && snusnuMain.PlayerRef.GetActorValue("CarryWeight") < -100
 			Debug.Trace("SNU - All heavy items were removed. Restoring carryWeight")
@@ -218,11 +215,10 @@ event OnEffectFinish(Actor akTarget, Actor akCaster)
 	RemoveAllReferenceSkinOverrides(akTarget);For the custom normals
 	;RemoveSkinOverride(akTarget, true, false, 0x04, 9, 1)
 	
-	;/
 	If snusnuMain.useAltAnims
-		snusnuMain.setMuscleAnimations(akTarget, true)
+		;We need to check for the actual muscle level which is already done in checkBodyNormalsState()
+		snusnuMain.checkBodyNormalsState()
 	EndIf
-	/;
 	
 	akTarget.RemoveItem(snusnuMain.FistsOfRage, akTarget.GetItemCount(snusnuMain.FistsOfRage), True)
 	
@@ -238,10 +234,6 @@ event OnEffectFinish(Actor akTarget, Actor akCaster)
 	EndIf
 	
 	Game.SetGameSettingFloat("fJumpHeightMin", 76.0)
-	
-	;TLALOC- New features!
-	;TLALOC- For use with DAR
-	snusnuMain.MuscleLevel.setValue(1)
 	
 	If snusnuMain.heavyItemsEquiped > 0 || snusnuMain.lightItemsEquiped > 0
 		snusnuMain.actualCarryWeight = snusnuMain.PlayerRef.GetActorValue("CarryWeight")

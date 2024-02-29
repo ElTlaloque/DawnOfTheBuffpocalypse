@@ -29,6 +29,7 @@ SPELL Property DecreaseCombat  Auto
 
 GlobalVariable Property GameDaysPassed  Auto  
 GlobalVariable Property MuscleLevel  Auto  
+GlobalVariable Property muscleAnimsLevel  Auto  
 
 Bool Property Enabled = False Auto
 Bool Property useWeightSlider = False Auto
@@ -78,6 +79,7 @@ Armor Property handsFix Auto
 Bool effectsChanged = False
 
 Int Property getInfoKey = 52 Auto ;Period
+Int Property npcMuscleKey = 37 Auto ;K
 Int Property selectedBody = 0 Auto ;0=UUNP, 1=CBBE SE, 2=Vanilla
 
 ;TLALOC- WeightMorphs related values
@@ -86,6 +88,7 @@ Bool Property removeWeightMorphs = true Auto
 ;PlayerSuccubusMenu PSQM
 ;WeightMorphsMCM WMCM
 
+Bool Property useDynamicPhysics = true Auto
 Bool Property is3BAPhysicsLoaded Auto
 
 ;TLALOC- TF related stuff
@@ -120,6 +123,7 @@ int Property heavyItemsEquiped = 0 Auto
 Keyword property daggerKeyword auto
 
 Bool Property isWerewolf = false Auto
+Float Property addWerewolfStrength = 0.05 Auto
 
 ;TLALOC- Custom animations
 int Property snuModID Auto
@@ -130,6 +134,10 @@ int Property snuSneakBase Auto
 int Property snuSneakIdleBase Auto
 int Property snuSprintBase Auto
 int Property snuCRC Auto
+
+Bool Property useMuscleAnims = true Auto
+Bool Property useDARAnims = true Auto
+Bool Property isUsingFNIS = false Auto
 
 String[] cbbeSliders
 String[] uunpSliders
@@ -155,6 +163,8 @@ Float Property MultSamuel = 1.0 Auto
 Float Property MultSamson = 0.0 Auto
 Float[] Property maleValues Auto
 
+;ToDo- Werewolf morphs
+Float[] Property wufwufValues Auto
 
 Int Function GetVersion()
 	Return Version
@@ -203,10 +213,12 @@ Event OnPlayerLoadGame()
 			;Debug.Trace("SNU - PSQ mod was not found")
 		EndIf
 		
-		is3BAPhysicsLoaded = (Game.GetModByName("3BBB.esp") != 255)
-		Debug.Trace("SNU - Is 3BBB loaded? "+is3BAPhysicsLoaded)
-		If is3BAPhysicsLoaded
-			firstUpdateForBoobs = true
+		If useDynamicPhysics
+			is3BAPhysicsLoaded = (Game.GetModByName("3BBB.esp") != 255)
+			Debug.Trace("SNU - Is 3BBB loaded? "+is3BAPhysicsLoaded)
+			If is3BAPhysicsLoaded
+				firstUpdateForBoobs = true
+			EndIf
 		EndIf
 		
 		initSliderArrays()
@@ -218,12 +230,11 @@ Event OnPlayerLoadGame()
 		
 		RegisterForKey(getInfoKey)
 		
-		;TLALOC-ToDo- Add MCM option to choose a different key
 		;Experimental NPC muscle gain
-		RegisterForKey(37);K
+		RegisterForKey(npcMuscleKey);K
 		
 		;Pushup exceptions management
-		RegisterForKey(38);L
+		;RegisterForKey(38);L
 		
 		If !snuCRC
 			initFNISanims()
@@ -651,11 +662,13 @@ Event OnKeyDown(Int KeyCode)
 		If !disableNormals
 			Debug.Notification("Normals="+getFinalNormalsPath())
 		EndIf
-	ElseIf KeyCode == 37 && !UI.IsTextInputEnabled() && !Utility.IsInMenuMode()
+	ElseIf KeyCode == npcMuscleKey && !UI.IsTextInputEnabled() && !Utility.IsInMenuMode()
 		 ;37 = K
 		applyNPCMuscle(npcMuscleScore)
 	ElseIf KeyCode == 38 && !UI.IsTextInputEnabled() && !Utility.IsInMenuMode()
 		;38 = L
+		
+		;TLALOC- FOR NOW THIS FUNCTIONALITY IS NOT TO BE INCLUDED IN THE RELEASE VERSION OF THIS MOD
 		addPushupException()
 	EndIf
 EndEvent
@@ -716,7 +729,9 @@ Function UpdateWeight(Bool applyNow = True)
 				changeForearmBoneScale(PlayerRef, getBoneSize(muscleScore / muscleScoreMax, bonesValues[1]))
 				
 				;TLALOC- Custom Boobs physics
-				updateBoobsPhysics()
+				If useDynamicPhysics
+					updateBoobsPhysics()
+				EndIf
 			EndIf
 		Else
 			Int PlayerSex = PlayerRef.GetActorBase().GetSex()
@@ -742,7 +757,8 @@ Function UpdateWeight(Bool applyNow = True)
 					changeSpineBoneScale(PlayerRef, getBoneSize(muscleScore / muscleScoreMax, bonesValues[0]))
 					changeForearmBoneScale(PlayerRef, getBoneSize(muscleScore / muscleScoreMax, bonesValues[1]))
 					
-					;TLALOC- Werewolf body morph --------------------------------------------------------------------
+					;/TLALOC- Werewolf body morph --------------------------------------------------------------------
+					;ToDo- Add slider support for all Werewolf morphs
 					
 					;NiOverride.SetBodyMorph(PlayerRef, "BodyHigh", SNUSNU_KEY, fightingMuscle * 1.5) ;1.5
 					;NiOverride.SetBodyMorph(PlayerRef, "BreastsLowHDT", SNUSNU_KEY, fightingMuscle * -1.0)
@@ -759,11 +775,13 @@ Function UpdateWeight(Bool applyNow = True)
 							;NiOverride.SetBodyMorph(PlayerRef, "BodyVeryHighHDT", SNUSNU_KEY, fightingMuscle * 0.4)
 						EndIf
 					EndIf
-					;TLALOC- Werewolf body morph --------------------------------------------------------------------
+					/;;TLALOC- Werewolf body morph --------------------------------------------------------------------
 				EndIf
 				
 				;TLALOC- Custom Boobs physics
-				updateBoobsPhysics()
+				If useDynamicPhysics
+					updateBoobsPhysics()
+				EndIf
 			; Male
 			ElseIf PlayerSex == 0
 				If maleValues[0] != 0.0
@@ -938,6 +956,10 @@ Function clearBoneScales(Actor theActor)
 EndFunction
 
 Function chooseBoobsPhysics(Int buildStage)
+	If !useDynamicPhysics
+		return
+	EndIf
+	
 	Int boobsLevel = 3
 	
 	If buildStage >= 3
@@ -971,9 +993,11 @@ Function chooseBoobsPhysics(Int buildStage)
 EndFunction
 
 Function updateBoobsPhysics(Bool forceUpdate = false, Int newLevel = -1)
-	;TLALOC- FOR NOW THIS FUNCTIONALITY IS NOT TO BE INCLUDED IN THE RELEASE VERSION OF THIS MOD
-	return
-
+	If checkSMPPhysics()
+		;Player is using SMP for body physics so we stop here
+		return
+	EndIf
+	
 	;TLALOC- Boobs physics only get updated once, unless a significant muscle change is made
 	If is3BAPhysicsLoaded && (firstUpdateForBoobs || forceUpdate)
 		Mus3BPhysicsManager PhysicsManager = Game.GetFormFromFile(0x0500084A, "3BBB.esp") As Mus3BPhysicsManager
@@ -1024,7 +1048,38 @@ Function updateBoobsPhysics(Bool forceUpdate = false, Int newLevel = -1)
 	EndIf
 EndFunction
 
-;TLALOC - This function controls how much cleavage effect should be removed from the current equiped
+Bool Function checkSMPPhysics()
+	;/	
+	armor property SMPONObjectP48 auto
+	armor property SMPONObjectP50 auto
+	armor property SMPONObjectP51 auto
+	armor property SMPONObjectP60 auto
+	/;
+	
+	Armor smpArmor = PlayerRef.GetWornForm(Armor.GetMaskForSlot(48)) as Armor
+	If smpArmor && StringUtil.Find(smpArmor.getName(), "3BBB Body SMP", 0) != -1
+		return true
+	Else
+		smpArmor = PlayerRef.GetWornForm(Armor.GetMaskForSlot(50)) as Armor
+		If smpArmor && StringUtil.Find(smpArmor.getName(), "3BBB Body SMP", 0) != -1
+			return true
+		Else
+			smpArmor = PlayerRef.GetWornForm(Armor.GetMaskForSlot(51)) as Armor
+			If smpArmor && StringUtil.Find(smpArmor.getName(), "3BBB Body SMP", 0) != -1
+				return true
+			Else
+				smpArmor = PlayerRef.GetWornForm(Armor.GetMaskForSlot(60)) as Armor
+				If smpArmor && StringUtil.Find(smpArmor.getName(), "3BBB Body SMP", 0) != -1
+					return true
+				EndIf
+			EndIf
+		EndIf
+	EndIf
+	
+	return false
+EndFunction
+
+;TLALOC - This Function controls how much cleavage effect should be removed from the current equiped
 ;       clothing depending on weight and muscle score.
 ;       NOTE: It is heavely linked with PSQ, therefore this will not work at all if PSQ is not installed
 ;       ToDo- We can add new cleavage managmen mecanics in this mod but it might be out of its scope right now
@@ -1190,9 +1245,8 @@ Function checkBodyNormalsState()
 		currentPregStage = 0
 	EndIf
 	
-	;TLALOC- For use with DAR
-	If (MuscleLevel.getValue() as Int) != currentBuildStage - 1
-		MuscleLevel.setValue(currentBuildStage - 1)
+	If useMuscleAnims
+		updateAnimations(currentBuildStage)
 	EndIf
 	
 	;TLALOC- Custom Boobs physics
@@ -2495,24 +2549,41 @@ EndFunction
 
 Function setMuscleAnimations(Actor buffActor, Bool removeAnims = false)
 	bool bOk
-	if ( removeAnims )
+	If isUsingFNIS && removeAnims
 		bOk = FNIS_aa.SetAnimGroup(buffActor, "_mt", 0, 0, "Snusnu", true)
 		bOk = FNIS_aa.SetAnimGroup(buffActor, "_mtx", 0, 0, "Snusnu", true)
 		bOk = FNIS_aa.SetAnimGroup(buffActor, "_mtidle", 0, 0, "Snusnu", true)
 		bOk = FNIS_aa.SetAnimGroup(buffActor, "_sneakmt", 0, 0, "Snusnu", true)
 		bOk = FNIS_aa.SetAnimGroup(buffActor, "_sneakidle", 0, 0, "Snusnu", true)
 		bOk = FNIS_aa.SetAnimGroup(buffActor, "_sprint", 0, 0, "Snusnu", true)
-	else
+		isUsingFNIS = false
+	ElseIf !isUsingFNIS
 		bOk = FNIS_aa.SetAnimGroup(buffActor, "_mt", snuMtBase, 0, "Snusnu", true)
 		bOk = FNIS_aa.SetAnimGroup(buffActor, "_mtx", snuMtxBase, 0, "Snusnu", true)
 		bOk = FNIS_aa.SetAnimGroup(buffActor, "_mtidle", snuIdleBase, 0, "Snusnu", true)
 		bOk = FNIS_aa.SetAnimGroup(buffActor, "_sneakmt", snuSneakBase, 0, "Snusnu", true)
 		bOk = FNIS_aa.SetAnimGroup(buffActor, "_sneakidle", snuSneakIdleBase, 0, "Snusnu", true)
 		bOk = FNIS_aa.SetAnimGroup(buffActor, "_sprint", snuSprintBase, 0, "Snusnu", true)
-	endif
-	if !bOk
+		isUsingFNIS = true
+	EndIf
+	If !bOk
 		Debug.Trace("SNU - ERROR cannot set player animvar for group _mt")
-	endif
+	EndIf
+EndFunction
+
+Function updateAnimations(Int newBuildStage)
+	If (MuscleLevel.getValue() as Int) != newBuildStage - 1
+		;TLALOC- For use with DAR
+		MuscleLevel.setValue(newBuildStage - 1)
+		
+		If !useDARAnims
+			If isUsingFNIS && (MuscleLevel.getValue() as Int) < (muscleAnimsLevel.getValue() as Int)
+				setMuscleAnimations(PlayerRef, true)
+			ElseIf !isUsingFNIS && (MuscleLevel.getValue() as Int) >= (muscleAnimsLevel.getValue() as Int)
+				setMuscleAnimations(PlayerRef)
+			EndIf
+		EndIf
+	EndIf
 EndFunction
 
 Function ReloadHotkeys()
@@ -2520,10 +2591,10 @@ Function ReloadHotkeys()
 	RegisterForKey(getInfoKey)
 	
 	;Experimental NPC muscle gain
-	RegisterForKey(37);K
+	RegisterForKey(npcMuscleKey);K
 	
 	;Pushup exceptions management
-	RegisterForKey(38);L
+	;RegisterForKey(38);L
 EndFunction
 
 Function SetNodeScale(Actor akActor, bool isFemale, string nodeName, float value, string modkey) global
@@ -2620,20 +2691,22 @@ EndFunction
 
 Function addWerewolfBuild()
 	Debug.Trace("SNU - addWerewolfBuild()")
-	;Werewolf characters should have a lean, muscular build, so that means:
-	;   added muscle mass (take from stored) and updated body weight
-	;	(should be around 20% chubbiness) after transformation.
-	
-	totalSleepTime = GameDaysPassed.GetValue() - startSleepTime
-	justWakeUp = true
-	updateMuscleScore(muscleScoreMax * 0.05) ;Add 5% extra muscle
-	
-	If isWeightMorphsLoaded
-		WeightMorphsMCM WMCM = Game.GetFormFromFile(0x05000888, "WeightMorphs.esp") As WeightMorphsMCM
-		If WMCM.WMorphs.Weight <= 0.065 ;0.155
-			WMCM.WMorphs.ChangeWeight(0.01, true)
-		ElseIf WMCM.WMorphs.Weight >= 0.085 ;0.22
-			WMCM.WMorphs.ChangeWeight(-0.01, true)
+	If addWerewolfStrength > 0.0
+		;Werewolf characters should have a lean, muscular build, so that means:
+		;   added muscle mass (take from stored) and updated body weight
+		;	(should be around 20% chubbiness) after transformation.
+		
+		totalSleepTime = GameDaysPassed.GetValue() - startSleepTime
+		justWakeUp = true
+		updateMuscleScore(muscleScoreMax * addWerewolfStrength) ;Add 5% extra muscle
+		
+		If isWeightMorphsLoaded
+			WeightMorphsMCM WMCM = Game.GetFormFromFile(0x05000888, "WeightMorphs.esp") As WeightMorphsMCM
+			If WMCM.WMorphs.Weight <= 0.065 ;0.155
+				WMCM.WMorphs.ChangeWeight(0.01, true)
+			ElseIf WMCM.WMorphs.Weight >= 0.085 ;0.22
+				WMCM.WMorphs.ChangeWeight(-0.01, true)
+			EndIf
 		EndIf
 	EndIf
 EndFunction

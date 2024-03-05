@@ -1587,6 +1587,23 @@ Function initSliderArrays()
 	cbbeSESliders = new String[27]
 	cbbe3BASliders = new String[40]
 	
+	
+	;Check if new arrays havent been initialized
+	If !bonesValues
+		bonesValues = new Float[2]
+		
+		bonesValues[0] = MultSpineBone ;1.05
+		bonesValues[1] = MultForearmBone ;1.0
+	EndIf
+	
+	If !maleValues
+		maleValues = new Float[2]
+		
+		maleValues[0] = MultSamuel ;1.0
+		maleValues[1] = MultSamson ;0.0
+	EndIf
+	
+	
 	cbbeSliders[0] = "Breasts"
 	cbbeSliders[1] = "BreastsSmall"
 	cbbeSliders[2] = "BreastsSH"
@@ -2313,41 +2330,6 @@ Function initDefaultSliders()
 	;ToDo- Add conditions to choose the slider set depending on selected body
 	IntListClear(PlayerRef, SNUSNU_KEY)
 	
-	;/UUNP
-	IntListAdd(PlayerRef, SNUSNU_KEY, 117, false)
-	IntListAdd(PlayerRef, SNUSNU_KEY, 89, false)
-	IntListAdd(PlayerRef, SNUSNU_KEY, 47, false)
-	IntListAdd(PlayerRef, SNUSNU_KEY, 15, false)
-	IntListAdd(PlayerRef, SNUSNU_KEY, 50, false)
-	IntListAdd(PlayerRef, SNUSNU_KEY, 40, false)
-	IntListAdd(PlayerRef, SNUSNU_KEY, 38, false)
-	IntListAdd(PlayerRef, SNUSNU_KEY, 45, false)
-	IntListAdd(PlayerRef, SNUSNU_KEY, 51, false)
-	IntListAdd(PlayerRef, SNUSNU_KEY, 8, false)
-	IntListAdd(PlayerRef, SNUSNU_KEY, 33, false)
-	IntListAdd(PlayerRef, SNUSNU_KEY, 29, false)
-	IntListAdd(PlayerRef, SNUSNU_KEY, 35, false)
-	IntListAdd(PlayerRef, SNUSNU_KEY, 32, false)
-	IntListAdd(PlayerRef, SNUSNU_KEY, 23, false)
-	IntListAdd(PlayerRef, SNUSNU_KEY, 24, false)
-	IntListAdd(PlayerRef, SNUSNU_KEY, 31, false)
-	IntListAdd(PlayerRef, SNUSNU_KEY, 9, false)
-	IntListAdd(PlayerRef, SNUSNU_KEY, 3, false)
-	IntListAdd(PlayerRef, SNUSNU_KEY, 11, false)
-	IntListAdd(PlayerRef, SNUSNU_KEY, 13, false)
-	IntListAdd(PlayerRef, SNUSNU_KEY, 30, false)
-	IntListAdd(PlayerRef, SNUSNU_KEY, 37, false)
-	IntListAdd(PlayerRef, SNUSNU_KEY, 46, false)
-	IntListAdd(PlayerRef, SNUSNU_KEY, 4, false)
-	IntListAdd(PlayerRef, SNUSNU_KEY, 5, false)
-	IntListAdd(PlayerRef, SNUSNU_KEY, 18, false)
-	IntListAdd(PlayerRef, SNUSNU_KEY, 19, false)
-	IntListAdd(PlayerRef, SNUSNU_KEY, 10, false)
-	IntListAdd(PlayerRef, SNUSNU_KEY, 7, false)
-	IntListAdd(PlayerRef, SNUSNU_KEY, 12, false)
-	IntListAdd(PlayerRef, SNUSNU_KEY, 22, false)
-	/;
-	
 	IntListAdd(PlayerRef, SNUSNU_KEY, 33, false) ;Back
 	IntListAdd(PlayerRef, SNUSNU_KEY, 211, false) ;BackValley_v2
 	IntListAdd(PlayerRef, SNUSNU_KEY, 212, false) ;BackWing_v2
@@ -2388,39 +2370,38 @@ Function LoadDefaultProfile(Int profileID)
 	IntListClear(PlayerRef, SNUSNU_KEY)
 	;setSliderValue(Int position, Float value, Bool updateWeightNow = true)
 	If profileID == 1 ;UUNP
-		;ToDo- Pending update values from old UUNP focused code
-		setSliderValue(117, 000, false)
-		setSliderValue(89, 000, false)
-		setSliderValue(47, 000, false)
-		setSliderValue(15, 000, false)
-		setSliderValue(50, 000, false)
-		setSliderValue(40, 000, false)
-		setSliderValue(38, 000, false)
-		setSliderValue(45, 000, false)
-		setSliderValue(51, 000, false)
-		setSliderValue(8, 000, false)
-		setSliderValue(33, 000, false)
-		setSliderValue(29, 000, false)
-		setSliderValue(35, 000, false)
-		setSliderValue(32, 000, false)
-		setSliderValue(23, 000, false)
-		setSliderValue(24, 000, false)
-		setSliderValue(31, 000, false)
-		setSliderValue(9, 000, false)
-		setSliderValue(3, 000, false)
-		setSliderValue(11, 000, false)
-		setSliderValue(13, 000, false)
-		setSliderValue(30, 000, false)
-		setSliderValue(37, 000, false)
-		setSliderValue(46, 000, false)
-		setSliderValue(4, 000, false)
-		setSliderValue(5, 000, false)
-		setSliderValue(18, 000, false)
-		setSliderValue(19, 000, false)
-		setSliderValue(10, 000, false)
-		setSliderValue(7, 000, false)
-		setSliderValue(12, 000, false)
-		setSliderValue(22, 000, false)
+		setSliderValue(117, 0.5, false) ;MultMCBMHigh
+		setSliderValue(89, 0.5, false) ;MultUNPSHHigh
+		setSliderValue(47, 0.2, false) ;MultChubbyLegs
+		setSliderValue(15, -0.4, false) ;MultNippleLength
+		setSliderValue(50, -0.25, false) ;MultCalfSize
+		setSliderValue(40, -0.6, false) ;MultAppleCheeks
+		setSliderValue(38, 0.8, false) ;MultBigButt
+		setSliderValue(45, 0.7, false) ;MultSlimThighs
+		setSliderValue(51, -0.25, false) ;MultCalfSmooth
+		setSliderValue(8, 1.1, false) ;MultBreastGravity
+		setSliderValue(33, 0.4, false) ;MultBack
+		setSliderValue(29, 0.5, false) ;MultBigTorso
+		setSliderValue(35, -0.1, false) ;MultButt
+		setSliderValue(32, -0.6, false) ;MultChubbyWaist
+		setSliderValue(23, 0.1, false) ;MultShoulderSmooth
+		setSliderValue(24, 0.5, false) ;MultShoulderWidth
+		setSliderValue(31, 0.05, false) ;MultWideWaistLine
+		setSliderValue(9, -0.4, false) ;MultPushUp
+		setSliderValue(3, -0.8, false) ;MultBreastsSSH
+		setSliderValue(11, -1.2, false) ;MultBreastPerkiness
+		setSliderValue(13, -0.6, false) ;MultNippleDistance
+		setSliderValue(30, -0.45, false) ;MultWaist
+		setSliderValue(37, 0.4, false) ;MultButtShape2
+		setSliderValue(46, -0.5, false) ;MultThighs
+		setSliderValue(4, -1.0, false) ;MultBreastsFantasy
+		setSliderValue(5, 0.7, false) ;MultDoubleMelon
+		setSliderValue(18, -1.0, false) ;MultNippleUp
+		setSliderValue(19, 0.2, false) ;MultNippleDown
+		setSliderValue(10, 1.6, false) ;MultBreastHeight
+		setSliderValue(7, -0.1, false) ;MultBreastFlatness
+		setSliderValue(12, 1.2, false) ;MultBreastWidth
+		setSliderValue(22, 1.1, false) ;MultChubbyArms
 		
 		bonesValues[0] = 1.05 ;MultSpineBone
 		bonesValues[1] = 1.05 ;MultForearmBone

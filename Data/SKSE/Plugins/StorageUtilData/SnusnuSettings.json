@@ -1,0 +1,37 @@
+{
+	"float" : 
+	{
+		"addwerewolfstrength" : 0.05000000074505806,
+		"carryweightboost" : 100.0,
+		"combatproficiency" : 10.0,
+		"malnourishmentvalue" : -0.93999999761581421,
+		"multgainarmor" : 1.0,
+		"multgainfight" : 1.0,
+		"multgainmisc" : 1.0,
+		"multloss" : 2.0,
+		"muscleanimslevel" : 2.0,
+		"musclescoremax" : 4000.0,
+		"npcmusclescore" : 1800.0,
+		"speed" : 15.0,
+		"stamina" : 50.0
+	},
+	"int" : 
+	{
+		"changeheadpart" : 1,
+		"disablenormals" : 0,
+		"enabled" : 1,
+		"getinfokey" : 52,
+		"hardcoremode" : 1,
+		"npcmusclekey" : 37,
+		"playtfsound" : 1,
+		"removeweightmorphs" : 1,
+		"selectedbody" : 1,
+		"tfanimation" : 1,
+		"tfanimationnpc" : 1,
+		"usealtanims" : 1,
+		"usealtanimsnpc" : 1,
+		"usedaranims" : 1,
+		"usedynamicphysics" : 1,
+		"usemuscleanims" : 1
+	}
+}

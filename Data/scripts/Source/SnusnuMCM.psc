@@ -540,7 +540,7 @@ Event OnOptionHighlight(Int a_option)
 	ElseIf a_option == _myDisableNormals
 		SetInfoText("$SNUSNU_DISABLENORMALS_DESC")
 	ElseIf a_option == _myDynamicPhysics
-		SetInfoText("Change breasts physics depending on muscle score (CBPC needed).")
+		SetInfoText("Change breasts physics depending on muscle score (CBPC needed). This will reduce breast bounciness to simulate muscular \"firmness\".")
 ;	ElseIf a_option == _mySelectedBody
 ;		SetInfoText("$SNUSNU_SELECTEDBODY_DESC")
 	ElseIf a_option == _myZeroSliders
@@ -614,13 +614,7 @@ Event OnOptionSelect(Int a_option)
 		applyNormalsOption()
 	ElseIf a_option == _myDynamicPhysics
 		snusnuMain.useDynamicPhysics = !snusnuMain.useDynamicPhysics
-		SetToggleOptionValue(a_option, snusnuMain.useDynamicPhysics)
-		
-		If snusnuMain.useDynamicPhysics
-			snusnuMain.checkBodyNormalsState()
-		Else
-			snusnuMain.updateBoobsPhysics(true, 3)
-		EndIf
+		applyDynamicPhysicsOption()
 	ElseIf a_option == _myZeroSliders
 		snusnuMain.ClearMorphs()
 		SetToggleOptionValue(a_option, true)
@@ -1387,6 +1381,7 @@ Bool Function saveSettings()
 	JsonUtil.SetIntValue(fileName, "npcMuscleKey", snusnuMain.npcMuscleKey)
 	JsonUtil.SetFloatValue(fileName, "npcMuscleScore", snusnuMain.npcMuscleScore)
 	
+	JsonUtil.SetIntValue(fileName, "useDynamicPhysics", snusnuMain.useDynamicPhysics as Int)
 	JsonUtil.SetIntValue(fileName, "useMuscleAnims", snusnuMain.useMuscleAnims as Int)
 	JsonUtil.SetIntValue(fileName, "useDARAnims", snusnuMain.useDARAnims as Int)
 	JsonUtil.SetFloatValue(fileName, "muscleAnimsLevel", snusnuMain.muscleAnimsLevel.getValue())
@@ -1456,6 +1451,10 @@ bool Function loadSettings()
 			applyNPCMuscleValue(JsonUtil.GetFloatValue(fileName, "npcMuscleScore", snusnuMain.npcMuscleScore))
 		EndIf
 		
+		If snusnuMain.useDynamicPhysics != JsonUtil.GetIntValue(fileName, "useDynamicPhysics", snusnuMain.useDynamicPhysics as Int)
+			snusnuMain.useDynamicPhysics = JsonUtil.GetIntValue(fileName, "useDynamicPhysics", snusnuMain.useDynamicPhysics as Int)
+			applyDynamicPhysicsOption()
+		EndIf
 		If snusnuMain.useMuscleAnims != JsonUtil.GetIntValue(fileName, "useMuscleAnims", snusnuMain.useMuscleAnims as Int)
 			snusnuMain.useMuscleAnims = JsonUtil.GetIntValue(fileName, "useMuscleAnims", snusnuMain.useMuscleAnims as Int)
 			applyChangeAnimsOption()
@@ -1640,6 +1639,15 @@ Function applyNormalsOption()
 	EndIf
 EndFunction
 
+Function applyDynamicPhysicsOption()
+	SetToggleOptionValue(_myDynamicPhysics, snusnuMain.useDynamicPhysics)
+		
+	If snusnuMain.useDynamicPhysics
+		snusnuMain.checkBodyNormalsState()
+	Else
+		snusnuMain.updateBoobsPhysics(true, 3)
+	EndIf
+EndFunction
 Function applyChangeAnimsOption()
 	SetToggleOptionValue(_myChangeAnims, snusnuMain.useMuscleAnims)
 	snusnuMain.checkBodyNormalsState()

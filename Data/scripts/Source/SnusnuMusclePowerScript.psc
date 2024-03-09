@@ -251,7 +251,7 @@ Function removeNormalMuscle(Actor buffTarget, Float changePercent)
 	Int slidersLoop = 0
 	while slidersLoop < totalSliders
 		Int currentSliderIndex = StorageUtil.IntListGet(buffTarget, snusnuMain.SNUSNU_KEY, slidersLoop)
-		NiOverride.SetBodyMorph(buffTarget, snusnuMain.getSliderString(currentSliderIndex), snusnuMain.SNUSNU_KEY, fightingMuscle * snusnuMain.getSliderValue(currentSliderIndex))
+		SetBodyMorph(buffTarget, snusnuMain.getSliderString(currentSliderIndex), snusnuMain.SNUSNU_KEY, fightingMuscle * snusnuMain.getSliderValue(currentSliderIndex))
 		slidersLoop += 1
 	endWhile
 EndFunction

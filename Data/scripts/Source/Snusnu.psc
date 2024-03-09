@@ -205,14 +205,6 @@ Event OnPlayerLoadGame()
 		
 		isWeightMorphsLoaded = (Game.GetModByName("WeightMorphs.esp") != 255)
 		
-		If Game.GetModByName("PSQ PlayerSuccubusQuest.esm") != 255
-			;PSQM = Game.GetFormFromFile(0x04000D63, "PSQ PlayerSuccubusQuest.esm") As PlayerSuccubusMenu
-			;Debug.Trace("SNU - Found PSQ mod at index: "+Game.GetModByName("PSQ PlayerSuccubusQuest.esm"))
-		Else
-			;PSQM = none
-			;Debug.Trace("SNU - PSQ mod was not found")
-		EndIf
-		
 		If useDynamicPhysics
 			is3BAPhysicsLoaded = (Game.GetModByName("3BBB.esp") != 255)
 			Debug.Trace("SNU - Is 3BBB loaded? "+is3BAPhysicsLoaded)
@@ -1001,7 +993,7 @@ Function updateBoobsPhysics(Bool forceUpdate = false, Int newLevel = -1)
 	;TLALOC- Boobs physics only get updated once, unless a significant muscle change is made
 	If is3BAPhysicsLoaded && (firstUpdateForBoobs || forceUpdate)
 		Mus3BPhysicsManager PhysicsManager = Game.GetFormFromFile(0x0500084A, "3BBB.esp") As Mus3BPhysicsManager
-		Debug.Trace("SNU- Checking for boobs physics")
+		;Debug.Trace("SNU- Checking for boobs physics")
 		If PhysicsManager != none
 			;ToDo- Check if the SMP item is equiped to skip the breasts physics modification as this only works with CBPC
 			Int physicsLevel = PhysicsManager.getPhysicsLevel()
@@ -1204,7 +1196,7 @@ Function checkBodyNormalsState()
 			stage3Score = stage3Score + stage2Score
 			stage4Score = stage4Score + stage2Score
 			
-			Debug.Trace("SNU - New change ranges are: stage2="+stage2Score+", stage3="+stage3Score+", stage4="+stage4Score)
+			;Debug.Trace("SNU - New change ranges are: stage2="+stage2Score+", stage3="+stage3Score+", stage4="+stage4Score)
 		EndIf
 	EndIf
 	
@@ -2366,6 +2358,17 @@ EndFunction
 
 ;profileID: 1=UUNP, 2=CBBE 3BA, 3=CBBE 3BA Pecs
 Function LoadDefaultProfile(Int profileID)
+	If profileID == 1 ;UUNP
+		loadAllMorphs("SnuSnuProfiles/SnuDefaultUUNP")
+	ElseIf profileID == 2 ;CBBE 3BA
+		loadAllMorphs("SnuSnuProfiles/SnuDefault3BA")
+	ElseIf profileID == 3 ;CBBE 3BA Pecs
+		loadAllMorphs("SnuSnuProfiles/SnuDefault3BAPecs")
+	Else
+		Debug.Trace("SNU - ERROR Default profile index not recognized!")
+	EndIf
+	
+	;/ OLD CODE
 	ClearMorphs(true)
 	IntListClear(PlayerRef, SNUSNU_KEY)
 	;setSliderValue(Int position, Float value, Bool updateWeightNow = true)
@@ -2489,6 +2492,7 @@ Function LoadDefaultProfile(Int profileID)
 	EndIf
 	
 	UpdateWeight()
+	/;
 EndFunction
 
 Function ForceNewWeight(Float newScore = 500.0)
@@ -2735,7 +2739,7 @@ Function applyNPCMuscle(Float howMuch)
 			NiOverride.RemoveAllReferenceNodeOverrides(crosshairActor);For the custom normals
 			NiOverride.RemoveSkinOverride(crosshairActor, true, false, 0x04, 9, 1)
 			
-			NiOverride.ClearMorphs(crosshairActor)
+			NiOverride.ClearBodyMorphKeys(crosshairActor, SNUSNU_KEY)
 			clearBoneScales(crosshairActor)
 			NiOverride.UpdateModelWeight(crosshairActor)
 			
@@ -2869,6 +2873,8 @@ Bool Function loadAllMorphs(String profileName = "")
 			Return false
 		EndIf
 		
+		NiOverride.ClearBodyMorphKeys(PlayerRef, SNUSNU_KEY)
+		
 		cbbeValues = JsonUtil.FloatListToArray(fileName, "CBBEMorphs")
 		uunpValues = JsonUtil.FloatListToArray(fileName, "UUNPMorphs")
 		bhunpValues = JsonUtil.FloatListToArray(fileName, "BHUNPMorphs")
@@ -2877,6 +2883,8 @@ Bool Function loadAllMorphs(String profileName = "")
 		
 		bonesValues = JsonUtil.FloatListToArray(fileName, "BoneMorphs")
 		maleValues = JsonUtil.FloatListToArray(fileName, "MaleMorphs")
+		
+		UpdateWeight(true)
 	Else
 		Debug.Trace("SNU - ERROR: Morphs array could not be loaded!!")
 		Return false

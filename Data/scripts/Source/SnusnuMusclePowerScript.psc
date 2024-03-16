@@ -171,7 +171,7 @@ event OnEffectStart(Actor akTarget, Actor akCaster)
 			akTarget.RegenerateHead()
 		EndIf
 		
-		If (snusnuMain.heavyItemsEquiped > 0 || snusnuMain.lightItemsEquiped > 0) && snusnuMain.PlayerRef.GetActorValue("CarryWeight") < -100
+		If snusnuMain.heavyItemsEquiped && snusnuMain.PlayerRef.GetActorValue("CarryWeight") < -100
 			Debug.Trace("SNU - All heavy items were removed. Restoring carryWeight")
 			
 			snusnuMain.PlayerRef.ModActorValue("CarryWeight", snusnuMain.actualCarryWeight + 500)
@@ -235,12 +235,13 @@ event OnEffectFinish(Actor akTarget, Actor akCaster)
 	
 	Game.SetGameSettingFloat("fJumpHeightMin", 76.0)
 	
-	If snusnuMain.heavyItemsEquiped > 0 || snusnuMain.lightItemsEquiped > 0
+	If snusnuMain.itemsEquipedWeight > snusnuMain.allowedItemsEquipedWeight
 		snusnuMain.actualCarryWeight = snusnuMain.PlayerRef.GetActorValue("CarryWeight")
 		Float modWeight = snusnuMain.actualCarryWeight + 500.0
 		Debug.Trace("SNU - actualCarryWeight="+snusnuMain.actualCarryWeight)
 		
 		snusnuMain.PlayerRef.ModActorValue("CarryWeight", -modWeight)
+		snusnuMain.heavyItemsEquiped = 1
 	EndIf
 endevent
 

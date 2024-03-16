@@ -438,8 +438,8 @@ Event OnPageReset(String a_page)
 		AddEmptyOption()
 		
 		;ToDo- Need to remove everything related to this:
-		_myMultSamuel = AddSliderOption("Samuel", snusnuMain.maleValues[0], "{2}")
-		_myMultSamson = AddSliderOption("Samson", snusnuMain.maleValues[1], "{2}")
+		_myMultSamuel = AddSliderOption("Samuel", snusnuMain.maleValues[0], "{2}", OPTION_FLAG_DISABLED)
+		_myMultSamson = AddSliderOption("Samson", snusnuMain.maleValues[1], "{2}", OPTION_FLAG_DISABLED)
 		
 		AddEmptyOption()
 		AddEmptyOption()
@@ -1612,7 +1612,10 @@ EndFunction
 Function applyHardcoreOption()
 	SetToggleOptionValue(_myHardcoreMode, snusnuMain.hardcoreMode)
 	
-	If !snusnuMain.hardcoreMode
+	If snusnuMain.hardcoreMode
+		snusnuMain.updateAllowedItemsEquipedWeight()
+		snusnuMain.getEquipedFullWeight()
+	Else
 		snusnuMain.cleanupHardcoreMode()
 	EndIf
 EndFunction

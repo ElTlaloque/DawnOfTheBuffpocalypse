@@ -19,6 +19,7 @@ Bool Property showUpdateMessage = false Auto
 Bool HAS_NIOVERRIDE = false
 
 String Property SNUSNU_KEY = "Snusnu.esp" AutoReadOnly
+String Property SNU_EQUIP_WEIGHTS_KEY = "SNU_EQUIP_WEIGHTS" AutoReadOnly
 
 Actor Property PlayerRef Auto
 
@@ -110,17 +111,18 @@ Float Property npcMuscleScore = 500.0 Auto
 
 ;TLALOC- Body management stuff
 Float prevPositionZ = 0.0
-;Will change when onEquip/Unequip relevant items
-Bool Property hasCleavage = false Auto
-Bool Property cleavageRemoved = false Auto
-FormList Property PushupExceptions Auto
 Bool firstUpdateForBoobs = true
+FormList Property PushupExceptions Auto
 
+Keyword property daggerKeyword auto
 Float Property actualCarryWeight = 0.0 Auto
 Bool Property hardcoreMode = false Auto
-int Property lightItemsEquiped = 0 Auto
+;int Property lightItemsEquiped = 0 Auto
 int Property heavyItemsEquiped = 0 Auto
-Keyword property daggerKeyword auto
+Float Property itemsEquipedWeight = -1.0 Auto
+Float Property allowedItemsEquipedWeight = -1.0 Auto
+Float Property maxItemsEquipedWeight = 150.0 Auto
+Float Property minItemsEquipedWeight = 15.0 Auto
 
 Bool Property isWerewolf = false Auto
 Float Property addWerewolfStrength = 0.05 Auto
@@ -220,13 +222,12 @@ Event OnPlayerLoadGame()
 		finalNormalsPath = "EMPTY"
 		checkBodyNormalsState()
 		
-		RegisterForKey(getInfoKey)
+		ReloadHotkeys()
 		
-		;Experimental NPC muscle gain
-		RegisterForKey(npcMuscleKey);K
-		
-		;Pushup exceptions management
-		;RegisterForKey(38);L
+		If allowedItemsEquipedWeight == -1.0 && hardcoreMode
+			updateAllowedItemsEquipedWeight()
+			getEquipedFullWeight()
+		EndIf
 		
 		If !snuCRC
 			initFNISanims()
@@ -304,6 +305,10 @@ Event OnUpdate()
 				;ToDo- We might need to find a way to update the carry way in a non intrusive way without having to 
 				;      rely on specific events like sleep or eat.
 				updateCarryWeight()
+				
+				If hardcoreMode
+					updateAllowedItemsEquipedWeight()
+				EndIf
 			EndIf
 			justWakeUp = false
 			;Debug.Trace("SNU - DegradationTimer="+DegradationTimer)
@@ -338,9 +343,20 @@ Event OnUpdate()
 	EndIf
 EndEvent
 
+Bool Function IsValidSlotForEquipWeight(Armor itemArmor)
+	;31=Hair, 35=Amulet, 36=Ring, 40=Tail, 41=LongHair, 43=Earrings, 44=FaceCover, 45=Chokers, 
+	;47=Backpacks, 52=Underwear, 55=Wig, 57=Bras, 58=Armlets
+	return !Math.LogicalAnd(itemArmor.getSlotMask(), itemArmor.kSlotMask31) && !Math.LogicalAnd(itemArmor.getSlotMask(), itemArmor.kSlotMask35) && \
+		   !Math.LogicalAnd(itemArmor.getSlotMask(), itemArmor.kSlotMask36) && !Math.LogicalAnd(itemArmor.getSlotMask(), itemArmor.kSlotMask40) && \
+		   !Math.LogicalAnd(itemArmor.getSlotMask(), itemArmor.kSlotMask41) && !Math.LogicalAnd(itemArmor.getSlotMask(), itemArmor.kSlotMask43) && \
+		   !Math.LogicalAnd(itemArmor.getSlotMask(), itemArmor.kSlotMask44) && !Math.LogicalAnd(itemArmor.getSlotMask(), itemArmor.kSlotMask45) && \
+		   !Math.LogicalAnd(itemArmor.getSlotMask(), itemArmor.kSlotMask47) && !Math.LogicalAnd(itemArmor.getSlotMask(), itemArmor.kSlotMask52) && \
+		   !Math.LogicalAnd(itemArmor.getSlotMask(), itemArmor.kSlotMask55) && !Math.LogicalAnd(itemArmor.getSlotMask(), itemArmor.kSlotMask57) && \
+		   !Math.LogicalAnd(itemArmor.getSlotMask(), itemArmor.kSlotMask58)
+EndFunction
 
 ;ITEM TYPES:
-;0=LightArmor, 1=HeavyArmor, 2=LightWeapon, 3=HeavyWeapon, 4=Bow, 5=Shield
+;-1=Clothing, 0=LightArmor, 1=HeavyArmor, 2=LightWeapon, 3=HeavyWeapon, 4=Bow, 5=Shield, 6=Staff
 Int Function getEquipedItemType(Form theItem)
 	If theItem as Armor
 		Armor itemArmor = theItem as Armor
@@ -353,6 +369,11 @@ Int Function getEquipedItemType(Form theItem)
 			Else
 				return -1
 			EndIf
+		Else
+			;Adding exceptions for small items:
+			If IsValidSlotForEquipWeight(itemArmor)
+				return 11
+			EndIf
 		EndIf
 	ElseIf theItem as Weapon
 		Weapon itemWeapon = theItem as Weapon
@@ -362,7 +383,10 @@ Int Function getEquipedItemType(Form theItem)
 			return 4
 		ElseIf itemWeapon.getEquipType().getNumParents() == 2
 			return 3
-		ElseIf !itemWeapon.isStaff()
+		ElseIf itemWeapon.isStaff()
+			;Staffs will need to have special handling because we don't want them to be too heavy
+			return 6
+		Else
 			return 2
 		EndIf
 	EndIf
@@ -375,7 +399,7 @@ EndFunction
 ;           skill / 15 ->  This means that if the skill level is at the minimum (15), there will not be any skill bonus,
 ;           but if for example, skill is 30, the skill bonus will double the muscle score for this calculation
 Float Function getEquipmentSkillBonus(Int itemType)
-	Float bonus = 1.0
+	Float bonus = 0.0
 	
 	If itemType == 2
 		bonus = PlayerRef.getBaseActorValue("OneHanded")
@@ -387,114 +411,173 @@ Float Function getEquipmentSkillBonus(Int itemType)
 		bonus = PlayerRef.getBaseActorValue("HeavyArmor")
 	ElseIf itemType == 0
 		bonus = PlayerRef.getBaseActorValue("LightArmor")
+	ElseIf itemType == 6
+		;Staffs will need special handling
+		bonus = 65.0
 	EndIf
 	
 	Debug.Trace("SNU - Skill value is: "+bonus)
-	bonus = bonus/15
-	Debug.Trace("SNU - Calculated skill bonus for equiped item: "+bonus)
-	If bonus < 1.0
-		bonus = 1.0
-	EndIf
-	
 	return bonus
 EndFunction
 
-;ToDo- Nueva logica:
+;Nueva logica:
 ;         Sumar el peso de todos los items equipados en los slots principales (+Slot 49) mas las armas y escudos
 ;         y hacer el calculo con el rango de 10 como minimo y 150 como maximo
-Event OnObjectEquipped(Form type, ObjectReference ref)
-	;ITEM TYPES:
-	;0=LightArmor, 1=HeavyArmor, 2=LightWeapon, 3=HeavyWeapon, 4=Bow, 5=Shield
-	Int itemType = getEquipedItemType(type)
-	Debug.Trace("SNU - Item "+type.getName())
-	Debug.Trace("SNU - Item type is "+itemType)
+Float Function getEquipedFullWeight()
+	Form[] equipedItems = PO3_SKSEFunctions.AddAllEquippedItemsToArray(PlayerRef)
 	
-	;Cleavage management
-	If type as Armor && itemType < 2 && itemType > -2
-		If PushupExceptions.find(type) == -1
-			hasCleavage = true
-			UpdateWeight(true)
+	int counter = 0
+	itemsEquipedWeight = 0
+	while counter < equipedItems.length
+		Armor tmpItem = equipedItems[counter] as Armor
+		If tmpItem
+			Float tmpItemWeight = getItemWeight(tmpItem)
+			If tmpItemWeight > 0.0
+				itemsEquipedWeight = itemsEquipedWeight + tmpItemWeight
+				
+				FormListAdd(PlayerRef, SNU_EQUIP_WEIGHTS_KEY, tmpItem, true)
+				FloatListAdd(PlayerRef, SNU_EQUIP_WEIGHTS_KEY, tmpItemWeight, true)
+			EndIf
+		EndIf
+		counter += 1
+	endWhile
+	
+	; 0 - left hand, 1 - right hand, 2 - shout
+	Form theWeapon = PlayerRef.GetEquippedObject(0)
+	If theWeapon
+		Float tmpItemWeight = getItemWeight(theWeapon)
+		If tmpItemWeight > 0.0
+			itemsEquipedWeight = itemsEquipedWeight + tmpItemWeight
+			
+			FormListAdd(PlayerRef, SNU_EQUIP_WEIGHTS_KEY, theWeapon, true)
+			FloatListAdd(PlayerRef, SNU_EQUIP_WEIGHTS_KEY, tmpItemWeight, true)
 		EndIf
 	EndIf
 	
-	If !hardcoreMode || itemType < 0
-		return
+	theWeapon = PlayerRef.GetEquippedObject(1)
+	If theWeapon && FormListFind(PlayerRef, SNU_EQUIP_WEIGHTS_KEY, theWeapon) == -1
+		Float tmpItemWeight = getItemWeight(theWeapon)
+		If tmpItemWeight > 0.0
+			itemsEquipedWeight = itemsEquipedWeight + tmpItemWeight
+			
+			FormListAdd(PlayerRef, SNU_EQUIP_WEIGHTS_KEY, theWeapon, true)
+			FloatListAdd(PlayerRef, SNU_EQUIP_WEIGHTS_KEY, tmpItemWeight, true)
+		EndIf
 	EndIf
-	
-	Bool failedSkillCheck = false
 
-	If itemType >= 2
-		;WEAPONS
-		if muscleScore*getEquipmentSkillBonus(itemType) < muscleScoreMax * 0.1
-			Debug.Notification("I'm too weak to use any weapons!")
-			failedSkillCheck = true
-		ElseIf itemType == 3 && muscleScore*getEquipmentSkillBonus(itemType) < muscleScoreMax / 2
-			Debug.Notification("This weapon is too heavy for me!")
-			failedSkillCheck = true
-		EndIf
-	ElseIf (itemType == 1 && muscleScore*getEquipmentSkillBonus(itemType) < muscleScoreMax / 2) || \
-	(itemType == 0 && muscleScore*getEquipmentSkillBonus(itemType) < muscleScoreMax * 0.1)
-		;ARMOR
-		Debug.Notification("This armor is too heavy for me!")
-		failedSkillCheck = true
-	EndIf
-	
-	If failedSkillCheck
-		If itemType == 0 || itemType == 2 || itemType == 4
-			lightItemsEquiped = lightItemsEquiped + 1
-		Else
-			heavyItemsEquiped = heavyItemsEquiped + 1
-		EndIf
-		
-		Debug.Trace("SNU - lightItemsEquiped="+lightItemsEquiped)
-		Debug.Trace("SNU - heavyItemsEquiped="+heavyItemsEquiped)
-		
-		
+	;We also need to check if weight is above character limits!
+	If itemsEquipedWeight > allowedItemsEquipedWeight
 		If StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle") != 0
-			return
+			return itemsEquipedWeight
 		EndIf
 	
 		actualCarryWeight = PlayerRef.GetActorValue("CarryWeight")
 		Float modWeight = actualCarryWeight + 500.0
 		Debug.Trace("SNU - actualCarryWeight="+actualCarryWeight)
-		;Debug.Notification("Carry weight: "+actualCarryWeight)
-	
-		;PlayerRef.UnequipItem(type, true)
+		
 		PlayerRef.ModActorValue("CarryWeight", -modWeight)
+		heavyItemsEquiped = 1
+	EndIf
+	
+	return itemsEquipedWeight
+EndFunction
+
+Float Function getItemWeight(Form theItem)
+	Int itemType = getEquipedItemType(theItem)
+	If itemType != -2
+		Float skillHelp = getEquipmentSkillBonus(itemType)
+		skillHelp = (skillHelp/100) - 0.15
+		If skillHelp < 0.0
+			skillHelp = 0.0
+		EndIf
+		
+		Float itemWeight = theItem.GetWeight()
+		;Debug.Trace("SNU - "+theItem.getName()+" weight is "+itemWeight)
+		itemWeight = itemWeight * (1.0 - skillHelp)
+		Debug.Trace("SNU - "+theItem.getName()+" NEW weight is "+itemWeight)
+	
+		return itemWeight
+	EndIf
+	
+	return 0.0
+EndFunction
+
+Function updateAllowedItemsEquipedWeight()
+	Float currentEquipRange = maxItemsEquipedWeight - minItemsEquipedWeight
+	Float musclePercent = muscleScore / muscleScoreMax
+	allowedItemsEquipedWeight = (currentEquipRange * musclePercent) + minItemsEquipedWeight
+EndFunction
+
+Event OnObjectEquipped(Form type, ObjectReference ref)
+	Debug.Trace("SNU -----------------OnObjectEquipped()-----------------")
+	
+	If !hardcoreMode
+		return
+	EndIf
+	
+	Debug.Trace("SNU - Adding weight of "+type.getName())
+	Float newItemWeight = getItemWeight(type)
+	If newItemWeight > 0.0
+		itemsEquipedWeight = itemsEquipedWeight + newItemWeight
+		FormListAdd(PlayerRef, SNU_EQUIP_WEIGHTS_KEY, type, true)
+		FloatListAdd(PlayerRef, SNU_EQUIP_WEIGHTS_KEY, newItemWeight, true)
+		Debug.Trace("SNU - Full equiped weight is "+itemsEquipedWeight)
+		
+		If itemsEquipedWeight > allowedItemsEquipedWeight
+			Debug.Notification("I'm too weak to equip all of this!")
+			
+			If StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle") != 0
+				return
+			EndIf
+		
+			actualCarryWeight = PlayerRef.GetActorValue("CarryWeight")
+			Float modWeight = actualCarryWeight + 500.0
+			Debug.Trace("SNU - actualCarryWeight="+actualCarryWeight)
+			;Debug.Notification("Carry weight: "+actualCarryWeight)
+		
+			;PlayerRef.UnequipItem(type, true)
+			PlayerRef.ModActorValue("CarryWeight", -modWeight)
+			heavyItemsEquiped = 1
+		EndIf
 	EndIf
 EndEvent
 
 Event OnObjectUnequipped(Form type, ObjectReference ref)
 	Int itemType = getEquipedItemType(type)
+	Debug.Trace("SNU -----------------OnObjectUnequipped()-----------------")
 	
-	;Cleavage management
-	If type as Armor && itemType < 2 && itemType > -2
-		hasCleavage = false
-		removeCleavageEffect(0.0, true)
-		NiOverride.UpdateModelWeight(PlayerRef)
-	EndIf
-	
-	If !hardcoreMode && lightItemsEquiped == 0 && heavyItemsEquiped == 0
+	If !hardcoreMode || itemType == -2
 		return
 	EndIf
 	
-	If lightItemsEquiped > 0 && (itemType == 0 || itemType == 2 || itemType == 4)
-		lightItemsEquiped = lightItemsEquiped - 1
-	ElseIf heavyItemsEquiped > 0 && (itemType == 1 || itemType == 3)
-		heavyItemsEquiped = heavyItemsEquiped - 1
+	Debug.Trace("SNU - Removing weight of "+type.getName())
+	Int itemIndex = FormListFind(PlayerRef, SNU_EQUIP_WEIGHTS_KEY, type)
+	if itemIndex > -1
+		FormListPluck(PlayerRef, SNU_EQUIP_WEIGHTS_KEY, itemIndex, none)
+		Float oldItemWeight = FloatListPluck(PlayerRef, SNU_EQUIP_WEIGHTS_KEY, itemIndex, 0.0)
+		Debug.Trace("SNU - Item weight "+oldItemWeight)
+		itemsEquipedWeight = itemsEquipedWeight - oldItemWeight
+		Debug.Trace("SNU - New full equiped weight is "+itemsEquipedWeight)
 	EndIf
-	
-	If heavyItemsEquiped < 1 && lightItemsEquiped < 1 && PlayerRef.GetActorValue("CarryWeight") < -100
+		
+	If heavyItemsEquiped && itemsEquipedWeight <= allowedItemsEquipedWeight && PlayerRef.GetActorValue("CarryWeight") < -100
 		Debug.Trace("SNU - All heavy items were removed. Restoring carryWeight")
 		;Debug.Notification("Restoring carry weight: "+actualCarryWeight+"+500")
+		Debug.Notification("I can move freely now")
 		
 		PlayerRef.ModActorValue("CarryWeight", actualCarryWeight + 500)
+		heavyItemsEquiped = 0
 	EndIf
 EndEvent
 
 Function cleanupHardcoreMode()
-	If lightItemsEquiped != 0 || heavyItemsEquiped != 0
-		lightItemsEquiped = 0
+	itemsEquipedWeight = -1.0
+	allowedItemsEquipedWeight = -1.0
+	
+	FormListClear(PlayerRef, SNU_EQUIP_WEIGHTS_KEY)
+	FloatListClear(PlayerRef, SNU_EQUIP_WEIGHTS_KEY)
+	
+	If heavyItemsEquiped
 		heavyItemsEquiped = 0
 		
 		If PlayerRef.GetActorValue("CarryWeight") < -100
@@ -647,7 +730,9 @@ Event OnKeyDown(Int KeyCode)
 		EndIf
 		If carryWeightBoost != 0.0
 			Debug.Notification("ExtraCarryWeight="+currentExtraCarryWeight)
+			
 		EndIf
+		Debug.Notification("itemsEquipedWeight="+itemsEquipedWeight+", allowedItemsEquipedWeight="+allowedItemsEquipedWeight)
 		Debug.Notification("muscleScore="+getMuscleValuePercent(muscleScore)+"%, normalsScore="+getMuscleValuePercent(normalsScore)+"%")
 		Debug.Notification("lostMuscle="+getMuscleValuePercent(lostMuscle)+"%, storedMuscle="+getMuscleValuePercent(storedMuscle)+"%")
 		
@@ -657,11 +742,6 @@ Event OnKeyDown(Int KeyCode)
 	ElseIf KeyCode == npcMuscleKey && !UI.IsTextInputEnabled() && !Utility.IsInMenuMode()
 		 ;37 = K
 		applyNPCMuscle(npcMuscleScore)
-	ElseIf KeyCode == 38 && !UI.IsTextInputEnabled() && !Utility.IsInMenuMode()
-		;38 = L
-		
-		;TLALOC- FOR NOW THIS FUNCTIONALITY IS NOT TO BE INCLUDED IN THE RELEASE VERSION OF THIS MOD
-		addPushupException()
 	EndIf
 EndEvent
 
@@ -729,9 +809,7 @@ Function UpdateWeight(Bool applyNow = True)
 			Int PlayerSex = PlayerRef.GetActorBase().GetSex()
 			
 			; Female
-			If PlayerSex == 1	
-				removeCleavageEffect(fightingMuscle)
-			
+			If PlayerSex == 1
 				If fightingMuscle > 0.0 && StorageUtil.GetIntValue(PlayerRef, "PSQ_HasMuscle") == 0 && \
 				StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle") == 0 ;ToDo- PSQ_HasMuscle logic will be used for FMG spell
 					Int totalSliders = IntListCount(PlayerRef, SNUSNU_KEY)
@@ -749,7 +827,7 @@ Function UpdateWeight(Bool applyNow = True)
 					changeSpineBoneScale(PlayerRef, getBoneSize(muscleScore / muscleScoreMax, bonesValues[0]))
 					changeForearmBoneScale(PlayerRef, getBoneSize(muscleScore / muscleScoreMax, bonesValues[1]))
 					
-					;/TLALOC- Werewolf body morph --------------------------------------------------------------------
+					;TLALOC- Werewolf body morph --------------------------------------------------------------------
 					;ToDo- Add slider support for all Werewolf morphs
 					
 					;NiOverride.SetBodyMorph(PlayerRef, "BodyHigh", SNUSNU_KEY, fightingMuscle * 1.5) ;1.5
@@ -767,7 +845,7 @@ Function UpdateWeight(Bool applyNow = True)
 							;NiOverride.SetBodyMorph(PlayerRef, "BodyVeryHighHDT", SNUSNU_KEY, fightingMuscle * 0.4)
 						EndIf
 					EndIf
-					/;;TLALOC- Werewolf body morph --------------------------------------------------------------------
+					;TLALOC- Werewolf body morph --------------------------------------------------------------------
 				EndIf
 				
 				;TLALOC- Custom Boobs physics
@@ -811,14 +889,19 @@ Function updateMuscleScore(float incValue)
 			EndIf
 		EndIf
 	ElseIf incValue > 0
-		;TLALOC-Original Idea: Check if PSQ is installed and then call updateMuscleScore depending on current succu energy value
-		;                    (going from -4 at low energy to +2 at max)
-		;TLALOC-Implementation: Multiply incValue by succubus energy factor (0.5 for succu energy < 10%, 2.0 for succu energy > 90%)
-;/		If PSQM
-			Float succuEnergy = PSQM.PSQ.SuccubusEnergy.GetValue() / PSQM.PSQ.MaxEnergy
-			incValue = ( incValue * ( succuEnergy * 2.0 ) )
+		;NEW IDEA: Change incValue depending on muscle score. Low score increases value, high score decreases value
+		;          This way it would feel like the traditional leveling system where the stronger you get, the longer
+		;          it takes to get even stronger.
+		;ToDo- We could add a toggle for this in the MCM, but it might not be necesary
+		Float medScoreMax = muscleScoreMax / 2
+		If muscleScore < medScoreMax
+			Float scoreIncFactor = 2 - (muscleScore / medScoreMax)
+			incValue = incValue * scoreIncFactor
+		Else
+			Float medScore = muscleScore - medScoreMax
+			Float scoreDecFactor = 1 + (medScore / medScoreMax)
+			incValue = incValue / scoreDecFactor
 		EndIf
-/;		
 		
 		;TLALOC- If Weight is too low muscle can't grow much due to lack of carbs
 		If isWeightMorphsLoaded
@@ -852,6 +935,8 @@ Function updateMuscleScore(float incValue)
 	
 	If muscleScore > muscleScoreMax
 		muscleScore = muscleScoreMax
+	ElseIf muscleScore < 0.0
+		muscleScore = 0.0
 	EndIf
 	
 	If normalsScore > muscleScore
@@ -1071,84 +1156,6 @@ Bool Function checkSMPPhysics()
 	return false
 EndFunction
 
-;TLALOC - This Function controls how much cleavage effect should be removed from the current equiped
-;       clothing depending on weight and muscle score.
-;       NOTE: It is heavely linked with PSQ, therefore this will not work at all if PSQ is not installed
-;       ToDo- We can add new cleavage managmen mecanics in this mod but it might be out of its scope right now
-Function removeCleavageEffect(Float cleavageAmount, Bool forceRemoval = false)
-	;TLALOC- FOR NOW THIS FUNCTIONALITY IS NOT TO BE INCLUDED IN THE RELEASE VERSION OF THIS MOD
-	return
-	
-	
-	
-	If !hasCleavage && !cleavageRemoved
-		return
-	EndIf
-	
-	Float scoreReference = cleavageAmount
-	Float WMorphsWeight = 0.0
-	
-	Debug.Trace("SNU - removeCleavageEffect("+cleavageAmount+")")
-	
-	If isWeightMorphsLoaded
-		WeightMorphsMCM WMCM = Game.GetFormFromFile(0x05000888, "WeightMorphs.esp") As WeightMorphsMCM
-		WMorphsWeight = WMCM.WMorphs.Weight
-	EndIf
-	
-	If WMorphsWeight < 0 && Math.abs(WMorphsWeight) > scoreReference
-		scoreReference = Math.abs(WMorphsWeight)
-	EndIf
-	
-;/	
-	;TLALOC- Check if character actually has a piece of clothing with cleavage effect
-	If PSQM
-		If !PSQM.PSQ.cleavageMode
-			scoreReference = 0.0
-		EndIf
-	Else
-		return
-	EndIf
-	
-	;TLALOC- Maybe keep a little cleave effect
-	If WMorphsWeight > 0 && !(PSQM.PSQ.UseMuscularBuild && PSQM.PSQ.IsHenshined && !PlayerRef.hasSpell(PSQM.PSQ.PSQDisguiseCastSpell))
-		scoreReference = scoreReference * 0.8
-	EndIf
-	
-	;TLALOC- Bigger milky boobs need more cleavage effect
-	If StorageUtil.GetFloatValue(PlayerRef, "PRG_MilkTotal") > 0.0
-		scoreReference = scoreReference - (StorageUtil.GetFloatValue(PlayerRef, "PRG_MilkTotal") * 0.005)
-	EndIf
-/;	
-	If scoreReference < 0
-		scoreReference = 0.0
-	EndIf
-	If scoreReference == 0 && !cleavageRemoved
-		return
-	EndIf
-	
-	If forceRemoval
-		scoreReference = 0.0
-	EndIf
-	
-	Debug.Trace("SNU - CleavageMorphValue="+scoreReference)
-	
-	If scoreReference > 0
-		NiOverride.SetBodyMorph(PlayerRef, "BreastCleavage", "CleavageMorphs", -scoreReference * 1.0 )
-		NiOverride.SetBodyMorph(PlayerRef, "BreastsNewSH", "CleavageMorphs", scoreReference * 0.1 )
-		NiOverride.SetBodyMorph(PlayerRef, "BreastsPressed_v2", "CleavageMorphs", -scoreReference * 0.4 )
-		NiOverride.SetBodyMorph(PlayerRef, "BreastsTogether", "CleavageMorphs", -scoreReference * 0.8 )
-		NiOverride.SetBodyMorph(PlayerRef, "PushUp", "CleavageMorphs", -scoreReference * 0.7 )
-		cleavageRemoved = true
-	Else
-		NiOverride.ClearBodyMorph(PlayerRef, "BreastCleavage", "CleavageMorphs")
-		NiOverride.ClearBodyMorph(PlayerRef, "BreastsNewSH", "CleavageMorphs")
-		NiOverride.ClearBodyMorph(PlayerRef, "BreastsPressed_v2", "CleavageMorphs")
-		NiOverride.ClearBodyMorph(PlayerRef, "BreastsTogether", "CleavageMorphs")
-		NiOverride.ClearBodyMorph(PlayerRef, "PushUp", "CleavageMorphs")
-		cleavageRemoved = false
-	EndIf
-EndFunction
-
 Function tempDebugSliders()
 	Int totalSliders = IntListCount(PlayerRef, SNUSNU_KEY)
 	Debug.Trace("SNU - totalSliders="+totalSliders)
@@ -1161,7 +1168,14 @@ Function tempDebugSliders()
 	Debug.Trace("SNU - SpineBoneScale = "+bonesValues[0])
 	Debug.Trace("SNU - ForearmBoneScale = "+bonesValues[1])
 	
-	Debug.Trace("SNU - Pushup Exceptions: "+PushupExceptions)
+	Debug.Trace("SNU - Hardcore values:")
+	slidersLoop = 0
+	while slidersLoop < FormListCount(PlayerRef, SNU_EQUIP_WEIGHTS_KEY)
+		Form currentItem = FormListGet(PlayerRef, SNU_EQUIP_WEIGHTS_KEY, slidersLoop)
+		Float currentWeight = FloatListGet(PlayerRef, SNU_EQUIP_WEIGHTS_KEY, slidersLoop)
+		Debug.Trace("SNU -     currentItem="+currentItem.getName()+", Item weight="+currentWeight)
+		slidersLoop += 1
+	endWhile
 EndFunction
 
 ;     Muscle build stages = 1=Civilian, 2=Athletic, 3=Bone Crusher, 4=Extra Bone Crusher
@@ -2573,13 +2587,11 @@ EndFunction
 
 Function ReloadHotkeys()
 	UnregisterForAllKeys()
+	
 	RegisterForKey(getInfoKey)
 	
 	;Experimental NPC muscle gain
 	RegisterForKey(npcMuscleKey);K
-	
-	;Pushup exceptions management
-	;RegisterForKey(38);L
 EndFunction
 
 Function SetNodeScale(Actor akActor, bool isFemale, string nodeName, float value, string modkey) global
@@ -2798,19 +2810,6 @@ Function applyNPCMuscle(Float howMuch)
 				npcsLoop += 1
 			EndIf
 		endWhile
-	EndIf
-EndFunction
-
-Function addPushupException()
-	Armor mainArmor = PlayerRef.GetWornForm(0x00000004) as Armor
-	If mainArmor
-		If PushupExceptions.find(mainArmor) != -1
-			PushupExceptions.RemoveAddedForm(mainArmor)
-			Debug.Notification("Item "+mainArmor.getName()+" has been removed")
-		Else
-			PushupExceptions.AddForm(mainArmor)
-			Debug.Notification("Item "+mainArmor.getName()+" has been added")
-		EndIf
 	EndIf
 EndFunction
 

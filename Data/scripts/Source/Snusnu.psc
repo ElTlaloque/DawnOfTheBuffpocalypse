@@ -123,6 +123,8 @@ Float Property itemsEquipedWeight = -1.0 Auto
 Float Property allowedItemsEquipedWeight = -1.0 Auto
 Float Property maxItemsEquipedWeight = 150.0 Auto
 Float Property minItemsEquipedWeight = 15.0 Auto
+;FIX: CarryWeight value doesn't get updated after switch equipping 2 heavy items
+Bool isEquipWeightUpdating = false
 
 Bool Property isWerewolf = false Auto
 Float Property addWerewolfStrength = 0.05 Auto
@@ -227,6 +229,7 @@ Event OnPlayerLoadGame()
 		If allowedItemsEquipedWeight == -1.0 && hardcoreMode
 			updateAllowedItemsEquipedWeight()
 			getEquipedFullWeight()
+			isEquipWeightUpdating = false
 		EndIf
 		
 		If !snuCRC
@@ -352,7 +355,7 @@ Bool Function IsValidSlotForEquipWeight(Armor itemArmor)
 		   !Math.LogicalAnd(itemArmor.getSlotMask(), itemArmor.kSlotMask44) && !Math.LogicalAnd(itemArmor.getSlotMask(), itemArmor.kSlotMask45) && \
 		   !Math.LogicalAnd(itemArmor.getSlotMask(), itemArmor.kSlotMask47) && !Math.LogicalAnd(itemArmor.getSlotMask(), itemArmor.kSlotMask52) && \
 		   !Math.LogicalAnd(itemArmor.getSlotMask(), itemArmor.kSlotMask55) && !Math.LogicalAnd(itemArmor.getSlotMask(), itemArmor.kSlotMask57) && \
-		   !Math.LogicalAnd(itemArmor.getSlotMask(), itemArmor.kSlotMask58)
+		   !Math.LogicalAnd(itemArmor.getSlotMask(), itemArmor.kSlotMask58) && itemArmor != HandsFix
 EndFunction
 
 ;ITEM TYPES:
@@ -515,6 +518,11 @@ Event OnObjectEquipped(Form type, ObjectReference ref)
 		return
 	EndIf
 	
+	While isEquipWeightUpdating
+		Utility.wait(0.1)
+	endWhile
+	
+	isEquipWeightUpdating = true
 	Debug.Trace("SNU - Adding weight of "+type.getName())
 	Float newItemWeight = getItemWeight(type)
 	If newItemWeight > 0.0
@@ -540,6 +548,7 @@ Event OnObjectEquipped(Form type, ObjectReference ref)
 			heavyItemsEquiped = 1
 		EndIf
 	EndIf
+	isEquipWeightUpdating = false
 EndEvent
 
 Event OnObjectUnequipped(Form type, ObjectReference ref)
@@ -550,6 +559,11 @@ Event OnObjectUnequipped(Form type, ObjectReference ref)
 		return
 	EndIf
 	
+	While isEquipWeightUpdating
+		Utility.wait(0.1)
+	endWhile
+	
+	isEquipWeightUpdating = true
 	Debug.Trace("SNU - Removing weight of "+type.getName())
 	Int itemIndex = FormListFind(PlayerRef, SNU_EQUIP_WEIGHTS_KEY, type)
 	if itemIndex > -1
@@ -568,6 +582,7 @@ Event OnObjectUnequipped(Form type, ObjectReference ref)
 		PlayerRef.ModActorValue("CarryWeight", actualCarryWeight + 500)
 		heavyItemsEquiped = 0
 	EndIf
+	isEquipWeightUpdating = false
 EndEvent
 
 Function cleanupHardcoreMode()
@@ -2819,6 +2834,7 @@ Bool Function saveAllMorphs(String profileName = "")
 		fileName = profileName
 	EndIf
 	
+	cleanupCurrentMorphsList(true) ;ToDo- Will this be always needed?
 	int[] tempMorphsArray = IntListToArray(PlayerRef, SNUSNU_KEY)
 	If !JsonUtil.IntListCopy(fileName, "MainMorphs", tempMorphsArray)
 		Debug.Trace("SNU - ERROR: Morphs array could not be saved!!")
@@ -2883,6 +2899,8 @@ Bool Function loadAllMorphs(String profileName = "")
 		bonesValues = JsonUtil.FloatListToArray(fileName, "BoneMorphs")
 		maleValues = JsonUtil.FloatListToArray(fileName, "MaleMorphs")
 		
+		cleanupCurrentMorphsList(false) ;ToDo- Will this be always needed?
+		
 		UpdateWeight(true)
 	Else
 		Debug.Trace("SNU - ERROR: Morphs array could not be loaded!!")
@@ -2890,4 +2908,84 @@ Bool Function loadAllMorphs(String profileName = "")
 	EndIf
 	
 	Return true
+EndFunction
+
+Function cleanupCurrentMorphsList(Bool cleanValues)
+	If !cleanValues
+		IntListClear(PlayerRef, SNUSNU_KEY)
+	EndIf
+	
+	Int cbbeLoop = 0
+	while cbbeLoop < 52
+		If cbbeValues[cbbeLoop] != 0.0
+			If cleanValues
+				If !IntListHas(PlayerRef, SNUSNU_KEY, cbbeLoop)
+					cbbeValues[cbbeLoop] = 0.0
+				EndIf
+			Else
+				IntListAdd(PlayerRef, SNUSNU_KEY, cbbeLoop, false)
+			EndIf
+		EndIf
+		cbbeLoop += 1
+	endWhile
+	
+	;UUNP
+	Int uunpLoop = 0
+	while uunpLoop < 74
+		If uunpValues[uunpLoop] != 0.0
+			If cleanValues
+				If !IntListHas(PlayerRef, SNUSNU_KEY, cbbeLoop+uunpLoop)
+					uunpValues[uunpLoop] = 0.0
+				EndIf
+			Else
+				IntListAdd(PlayerRef, SNUSNU_KEY, cbbeLoop+uunpLoop, false)
+			EndIf
+		EndIf
+		uunpLoop += 1
+	endWhile
+
+	;BHUNP Sliders
+	Int bhunpLoop = 0
+	while bhunpLoop < 43
+		If bhunpValues[bhunpLoop] != 0.0
+			If cleanValues
+				If !IntListHas(PlayerRef, SNUSNU_KEY, cbbeLoop+uunpLoop+bhunpLoop)
+					bhunpValues[bhunpLoop] = 0.0
+				EndIf
+			Else
+				IntListAdd(PlayerRef, SNUSNU_KEY, cbbeLoop+uunpLoop+bhunpLoop, false)
+			EndIf
+		EndIf
+		bhunpLoop += 1
+	endWhile
+	
+	;CBBE SE Sliders
+	Int cbbeSELoop = 0
+	while cbbeSELoop < 27
+		If cbbeSEValues[cbbeSELoop] != 0.0
+			If cleanValues
+				If !IntListHas(PlayerRef, SNUSNU_KEY, cbbeLoop+uunpLoop+bhunpLoop+cbbeSELoop)
+					cbbeSEValues[cbbeSELoop] = 0.0
+				EndIf
+			Else
+				IntListAdd(PlayerRef, SNUSNU_KEY, cbbeLoop+uunpLoop+bhunpLoop+cbbeSELoop, false)
+			EndIf
+		EndIf
+		cbbeSELoop += 1
+	endWhile
+	
+	;CBBE 3BA Sliders
+	Int cbbe3BALoop = 0
+	while cbbe3BALoop < 40
+		If cbbe3BAValues[cbbe3BALoop] != 0.0
+			If cleanValues
+				If !IntListHas(PlayerRef, SNUSNU_KEY, cbbeLoop+uunpLoop+bhunpLoop+cbbeSELoop+cbbe3BALoop)
+					cbbe3BAValues[cbbe3BALoop] = 0.0
+				EndIf
+			Else
+				IntListAdd(PlayerRef, SNUSNU_KEY, cbbeLoop+uunpLoop+bhunpLoop+cbbeSELoop+cbbe3BALoop, false)
+			EndIf
+		EndIf
+		cbbe3BALoop += 1
+	endWhile
 EndFunction

@@ -23,6 +23,7 @@ Int _myMaxWeight
 Int _myFightingScore
 Int _myStoredScore
 Int _myRemoveWeightMorphs
+Int _myCustomizeFMG
 Int _mytfAnimation
 Int _mytfAnimationNPC
 Int _myuseAltAnims
@@ -74,30 +75,44 @@ Int _myMultForearmBone
 Int _myMultSamuel
 Int _myMultSamson
 
+String[] pageNames
 Int selectedDefaultMorphs = 1
+Bool editFMGMorphs = False
 
-Event OnConfigInit()
+
+Function setMenuPages()
 	Pages = new String[7]
+	String fmgString = ""
+	
+	If editFMGMorphs
+		fmgString = "FMG "
+	EndIf
+	
 	Pages[0] = "$SNUSNU_OPTIONS"
 	If snusnuMain.selectedBody == 0 ;UUNP/BHUNP
-		Pages[1] = "$SNUSNU_MORPHS_CBBE"
-		Pages[2] = "$SNUSNU_MORPHS_UUNP"
-		Pages[3] = "$SNUSNU_MORPHS_BHUNP"
+		Pages[1] = fmgString+pageNames[3]
+		Pages[2] = fmgString+pageNames[4]
+		Pages[3] = fmgString+pageNames[5]
 	ElseIf snusnuMain.selectedBody == 1 ;CBBE
-		Pages[1] = "CBBE Morphs Page 1"
-		Pages[2] = "CBBE Morphs Page 2"
-		Pages[3] = "CBBE Special Morphs"
+		Pages[1] = fmgString+pageNames[6]
+		Pages[2] = fmgString+pageNames[7]
+		Pages[3] = fmgString+pageNames[8]
 	EndIf
 	
 	If snusnuMain.selectedBody != 2
-		Pages[4] = "$SNUSNU_MORPHS_MALE"
-		Pages[5] = "SAVE & LOAD"
-		Pages[6] = "$SNUSNU_INFO"
+		Pages[4] = fmgString+pageNames[9]
+		Pages[5] = pageNames[1]
+		Pages[6] = pageNames[2]
 	Else
-		Pages[1] = "$SNUSNU_MORPHS_MALE"
-		Pages[2] = "SAVE & LOAD"
-		Pages[3] = "$SNUSNU_INFO"
+		Pages[1] = fmgString+pageNames[9]
+		Pages[2] = pageNames[1]
+		Pages[3] = pageNames[2]
 	EndIf
+EndFunction
+
+Event OnConfigInit()
+	initPageNames()
+	setMenuPages()
 	
 	cbbeSliders = new Int[52]
 	uunpSliders = new Int[74]
@@ -120,6 +135,20 @@ EndEvent
 
 Event OnConfigOpen()
 	self.OnConfigInit()
+EndEvent
+
+Event OnConfigClose()
+	If editFMGMorphs
+		;Save FMG morphs profile and load the previous morphs
+		If !snusnuMain.saveAllMorphs("SnuSnuProfiles/SnuDefaultFMG")
+			Debug.Notification("There was an error while saving FMG morphs!")
+		EndIf
+		If !snusnuMain.loadAllMorphs("SnuSnuProfiles/SnuTempMorphs")
+			Debug.Notification("There was an error while loading current morphs!")
+		EndIf
+		
+		editFMGMorphs = False
+	EndIf
 EndEvent
 
 Event OnPageReset(String a_page)
@@ -195,246 +224,249 @@ Event OnPageReset(String a_page)
 			_myMalnourishment = AddSliderOption("Malnourishment", snusnuMain.malnourishmentValue, "{2}")
 			AddEmptyOption()
 		EndIf
-		AddEmptyOption()
-		AddEmptyOption()
-		AddEmptyOption()
-		AddEmptyOption()
 		
-		;AddHeaderOption("$SNUSNU_TRANSFORMATION")
-		_mytfAnimation = AddToggleOption("$SNUSNU_USETFANIM", snusnuMain.tfAnimation)
-		_mytfAnimationNPC = AddToggleOption("$SNUSNU_USETFANIMNPC", snusnuMain.tfAnimationNPC)
-		_myuseAltAnims = AddToggleOption("$SNUSNU_USEALTANIMS", snusnuMain.useAltAnims)
-		_myuseAltAnimsNPC = AddToggleOption("$SNUSNU_USEALTANIMSNPC", snusnuMain.useAltAnimsNPC)
-		_mychangeHeadPart = AddToggleOption("$SNUSNU_CHANGEHEAD", snusnuMain.changeHeadPart)
-		_myplayTFSound = AddToggleOption("$SNUSNU_PLAYTFSOUND", snusnuMain.playTFSound)
-		If snusnuMain.isWeightMorphsLoaded
-			_myRemoveWeightMorphs = AddToggleOption("$SNUSNU_NOWEIGHTMORPHS", snusnuMain.removeWeightMorphs)
-		Else
-			_myRemoveWeightMorphs = AddToggleOption("$SNUSNU_NOWEIGHTMORPHS", snusnuMain.removeWeightMorphs, OPTION_FLAG_DISABLED)
-		EndIf
-		AddEmptyOption()
 		AddEmptyOption()
 		AddEmptyOption()
 		
 		AddKeyMapOptionST("SnusnuNPCMuscle","Add muscles to targeted NPCs", snusnuMain.npcMuscleKey)
 		AddKeyMapOptionST("SnusnuDumpInfo","$SNUSNU_DUMPINFO", snusnuMain.getInfoKey)
 		_myNPCMuscleScore = AddSliderOption("NPC Custom Muscle", (snusnuMain.npcMuscleScore/snusnuMain.muscleScoreMax)*100, "{0}%")
+		
+		AddEmptyOption()
+		AddEmptyOption()
+		AddEmptyOption()
+		
+		AddHeaderOption("$SNUSNU_TRANSFORMATION")
+		AddEmptyOption()
+		_myCustomizeFMG = AddToggleOption("Customize FMG Morphs", editFMGMorphs)
+		If snusnuMain.isWeightMorphsLoaded
+			_myRemoveWeightMorphs = AddToggleOption("$SNUSNU_NOWEIGHTMORPHS", snusnuMain.removeWeightMorphs)
+		Else
+			_myRemoveWeightMorphs = AddToggleOption("$SNUSNU_NOWEIGHTMORPHS", snusnuMain.removeWeightMorphs, OPTION_FLAG_DISABLED)
+		EndIf
+		_mytfAnimation = AddToggleOption("$SNUSNU_USETFANIM", snusnuMain.tfAnimation)
+		_mytfAnimationNPC = AddToggleOption("$SNUSNU_USETFANIMNPC", snusnuMain.tfAnimationNPC)
+		_myuseAltAnims = AddToggleOption("$SNUSNU_USEALTANIMS", snusnuMain.useAltAnims)
+		_myuseAltAnimsNPC = AddToggleOption("$SNUSNU_USEALTANIMSNPC", snusnuMain.useAltAnimsNPC)
+		_mychangeHeadPart = AddToggleOption("$SNUSNU_CHANGEHEAD", snusnuMain.changeHeadPart)
+		_myplayTFSound = AddToggleOption("$SNUSNU_PLAYTFSOUND", snusnuMain.playTFSound)
+		
 	ElseIf (a_page == Pages[1] && snusnuMain.selectedBody != 2)
 		SetCursorFillMode(LEFT_TO_RIGHT)
 		If snusnuMain.selectedBody == 0 ;UUNP/BHUNP
-			AddHeaderOption("$SNUSNU_MORPHS_CBBE")
+			AddHeaderOption(pageNames[3])
 			AddEmptyOption()
 			
 			Int counter = 0
 			while counter < 52
-				cbbeSliders[counter] = AddSliderOption(cbbeStrings[counter], snusnuMain.cbbeValues[counter], "{2}")
+				cbbeSliders[counter] = AddSliderOption(sliderHasValue(snusnuMain.cbbeValues[counter])+cbbeStrings[counter], snusnuMain.cbbeValues[counter], "{2}")
 				counter += 1
 			endWhile
 		Else ;CBBE SE
-			AddHeaderOption("CBBE MORPHS PAGE 1")
+			AddHeaderOption(pageNames[6])
 			AddEmptyOption()
 			AddHeaderOption("BREASTS")
 			AddEmptyOption()
-			cbbeSliders[0] = AddSliderOption("Size (Inverted)", snusnuMain.cbbeValues[0], "{2}")
-			cbbeSliders[1] = AddSliderOption("Smaller 1 (Inverted)", snusnuMain.cbbeValues[1], "{2}")
-			cbbeSESliders[0] = AddSliderOption("Smaller 2", snusnuMain.cbbeSEValues[0], "{2}")
-			cbbeSESliders[1] = AddSliderOption("Silly Huge", snusnuMain.cbbeSEValues[1], "{2}")
-			cbbeSESliders[2] = AddSliderOption("Silly Huge Symmetry", snusnuMain.cbbeSEValues[2], "{2}")
-			cbbeSliders[4] = AddSliderOption("Fantasy", snusnuMain.cbbeValues[4], "{2}")
-			cbbeSliders[5] = AddSliderOption("Melons", snusnuMain.cbbeValues[5], "{2}")
-			bhunpSliders[0] = AddSliderOption("Push Together", snusnuMain.bhunpValues[0], "{2}")
-			cbbe3BASliders[0] = AddSliderOption("Converge", snusnuMain.cbbe3BAValues[0], "{2}")
-			bhunpSliders[1] = AddSliderOption("Center", snusnuMain.bhunpValues[1], "{2}")
-			bhunpSliders[2] = AddSliderOption("Center Big", snusnuMain.bhunpValues[2], "{2}")
-			cbbeSESliders[3] = AddSliderOption("Top Slope", snusnuMain.cbbeSEValues[3], "{2}")
-			cbbeSliders[6] = AddSliderOption("Cleavage", snusnuMain.cbbeValues[6], "{2}")
-			cbbeSESliders[4] = AddSliderOption("Flatness", snusnuMain.cbbeSEValues[4], "{2}")
-			cbbeSliders[7] = AddSliderOption("More Flatness", snusnuMain.cbbeValues[7], "{2}")
-			bhunpSliders[5] = AddSliderOption("Gone", snusnuMain.bhunpValues[5], "{2}")
-			cbbeSESliders[5] = AddSliderOption("Gravity", snusnuMain.cbbeSEValues[5], "{2}")
-			cbbeSliders[9] = AddSliderOption("Push Up", snusnuMain.cbbeValues[9], "{2}")
-			cbbeSliders[10] = AddSliderOption("Height", snusnuMain.cbbeValues[10], "{2}")
-			cbbeSliders[11] = AddSliderOption("Perkiness", snusnuMain.cbbeValues[11], "{2}")
-			cbbeSliders[12] = AddSliderOption("Width", snusnuMain.cbbeValues[12], "{2}")
-			cbbeSESliders[6] = AddSliderOption("Side Shape", snusnuMain.cbbeSEValues[6], "{2}")
-			cbbeSESliders[7] = AddSliderOption("Under Depth", snusnuMain.cbbeSEValues[7], "{2}")
-			cbbe3BASliders[1] = AddSliderOption("Pressed", snusnuMain.cbbe3BAValues[1], "{2}")
+			cbbeSliders[0] = AddSliderOption(sliderHasValue(snusnuMain.cbbeValues[0])+"Size (Inverted)", snusnuMain.cbbeValues[0], "{2}")
+			cbbeSliders[1] = AddSliderOption(sliderHasValue(snusnuMain.cbbeValues[1])+"Smaller 1 (Inverted)", snusnuMain.cbbeValues[1], "{2}")
+			cbbeSESliders[0] = AddSliderOption(sliderHasValue(snusnuMain.cbbeSEValues[0])+"Smaller 2", snusnuMain.cbbeSEValues[0], "{2}")
+			cbbeSESliders[1] = AddSliderOption(sliderHasValue(snusnuMain.cbbeSEValues[1])+"Silly Huge", snusnuMain.cbbeSEValues[1], "{2}")
+			cbbeSESliders[2] = AddSliderOption(sliderHasValue(snusnuMain.cbbeSEValues[2])+"Silly Huge Symmetry", snusnuMain.cbbeSEValues[2], "{2}")
+			cbbeSliders[4] = AddSliderOption(sliderHasValue(snusnuMain.cbbeValues[4])+"Fantasy", snusnuMain.cbbeValues[4], "{2}")
+			cbbeSliders[5] = AddSliderOption(sliderHasValue(snusnuMain.cbbeValues[5])+"Melons", snusnuMain.cbbeValues[5], "{2}")
+			bhunpSliders[0] = AddSliderOption(sliderHasValue(snusnuMain.bhunpValues[0])+"Push Together", snusnuMain.bhunpValues[0], "{2}")
+			cbbe3BASliders[0] = AddSliderOption(sliderHasValue(snusnuMain.cbbe3BAValues[0])+"Converge", snusnuMain.cbbe3BAValues[0], "{2}")
+			bhunpSliders[1] = AddSliderOption(sliderHasValue(snusnuMain.bhunpValues[1])+"Center", snusnuMain.bhunpValues[1], "{2}")
+			bhunpSliders[2] = AddSliderOption(sliderHasValue(snusnuMain.bhunpValues[2])+"Center Big", snusnuMain.bhunpValues[2], "{2}")
+			cbbeSESliders[3] = AddSliderOption(sliderHasValue(snusnuMain.cbbeSEValues[3])+"Top Slope", snusnuMain.cbbeSEValues[3], "{2}")
+			cbbeSliders[6] = AddSliderOption(sliderHasValue(snusnuMain.cbbeValues[6])+"Cleavage", snusnuMain.cbbeValues[6], "{2}")
+			cbbeSESliders[4] = AddSliderOption(sliderHasValue(snusnuMain.cbbeSEValues[4])+"Flatness", snusnuMain.cbbeSEValues[4], "{2}")
+			cbbeSliders[7] = AddSliderOption(sliderHasValue(snusnuMain.cbbeValues[7])+"More Flatness", snusnuMain.cbbeValues[7], "{2}")
+			bhunpSliders[5] = AddSliderOption(sliderHasValue(snusnuMain.bhunpValues[5])+"Gone", snusnuMain.bhunpValues[5], "{2}")
+			cbbeSESliders[5] = AddSliderOption(sliderHasValue(snusnuMain.cbbeSEValues[5])+"Gravity", snusnuMain.cbbeSEValues[5], "{2}")
+			cbbeSliders[9] = AddSliderOption(sliderHasValue(snusnuMain.cbbeValues[9])+"Push Up", snusnuMain.cbbeValues[9], "{2}")
+			cbbeSliders[10] = AddSliderOption(sliderHasValue(snusnuMain.cbbeValues[10])+"Height", snusnuMain.cbbeValues[10], "{2}")
+			cbbeSliders[11] = AddSliderOption(sliderHasValue(snusnuMain.cbbeValues[11])+"Perkiness", snusnuMain.cbbeValues[11], "{2}")
+			cbbeSliders[12] = AddSliderOption(sliderHasValue(snusnuMain.cbbeValues[12])+"Width", snusnuMain.cbbeValues[12], "{2}")
+			cbbeSESliders[6] = AddSliderOption(sliderHasValue(snusnuMain.cbbeSEValues[6])+"Side Shape", snusnuMain.cbbeSEValues[6], "{2}")
+			cbbeSESliders[7] = AddSliderOption(sliderHasValue(snusnuMain.cbbeSEValues[7])+"Under Depth", snusnuMain.cbbeSEValues[7], "{2}")
+			cbbe3BASliders[1] = AddSliderOption(sliderHasValue(snusnuMain.cbbe3BAValues[1])+"Pressed", snusnuMain.cbbe3BAValues[1], "{2}")
 			AddHeaderOption("NIPPLES")
 			AddEmptyOption()
-			cbbeSESliders[8] = AddSliderOption("Areola Size", snusnuMain.cbbeSEValues[8], "{2}")
-			cbbe3BASliders[2] = AddSliderOption("Areola Pull", snusnuMain.cbbe3BAValues[2], "{2}")
-			cbbeSliders[18] = AddSliderOption("Point Up", snusnuMain.cbbeValues[18], "{2}")
-			cbbeSliders[19] = AddSliderOption("Point Down", snusnuMain.cbbeValues[19], "{2}")
-			cbbeSliders[16] = AddSliderOption("Size (Inverted)", snusnuMain.cbbeValues[16], "{2}")
-			cbbeSliders[15] = AddSliderOption("Length", snusnuMain.cbbeValues[15], "{2}")
-			cbbe3BASliders[3] = AddSliderOption("Squash Vertical", snusnuMain.cbbe3BAValues[3], "{2}")
-			cbbe3BASliders[4] = AddSliderOption("Squash Horizontal", snusnuMain.cbbe3BAValues[4], "{2}")
-			cbbeSESliders[9] = AddSliderOption("Defined", snusnuMain.cbbeSEValues[9], "{2}")
-			cbbeSliders[14] = AddSliderOption("Perky", snusnuMain.cbbeValues[14], "{2}")
-			cbbeSESliders[10] = AddSliderOption("Puffy", snusnuMain.cbbeSEValues[10], "{2}")
+			cbbeSESliders[8] = AddSliderOption(sliderHasValue(snusnuMain.cbbeSEValues[8])+"Areola Size", snusnuMain.cbbeSEValues[8], "{2}")
+			cbbe3BASliders[2] = AddSliderOption(sliderHasValue(snusnuMain.cbbe3BAValues[2])+"Areola Pull", snusnuMain.cbbe3BAValues[2], "{2}")
+			cbbeSliders[18] = AddSliderOption(sliderHasValue(snusnuMain.cbbeValues[18])+"Point Up", snusnuMain.cbbeValues[18], "{2}")
+			cbbeSliders[19] = AddSliderOption(sliderHasValue(snusnuMain.cbbeValues[19])+"Point Down", snusnuMain.cbbeValues[19], "{2}")
+			cbbeSliders[16] = AddSliderOption(sliderHasValue(snusnuMain.cbbeValues[16])+"Size (Inverted)", snusnuMain.cbbeValues[16], "{2}")
+			cbbeSliders[15] = AddSliderOption(sliderHasValue(snusnuMain.cbbeValues[15])+"Length", snusnuMain.cbbeValues[15], "{2}")
+			cbbe3BASliders[3] = AddSliderOption(sliderHasValue(snusnuMain.cbbe3BAValues[3])+"Squash Vertical", snusnuMain.cbbe3BAValues[3], "{2}")
+			cbbe3BASliders[4] = AddSliderOption(sliderHasValue(snusnuMain.cbbe3BAValues[4])+"Squash Horizontal", snusnuMain.cbbe3BAValues[4], "{2}")
+			cbbeSESliders[9] = AddSliderOption(sliderHasValue(snusnuMain.cbbeSEValues[9])+"Defined", snusnuMain.cbbeSEValues[9], "{2}")
+			cbbeSliders[14] = AddSliderOption(sliderHasValue(snusnuMain.cbbeValues[14])+"Perky", snusnuMain.cbbeValues[14], "{2}")
+			cbbeSESliders[10] = AddSliderOption(sliderHasValue(snusnuMain.cbbeSEValues[10])+"Puffy", snusnuMain.cbbeSEValues[10], "{2}")
 			
-			cbbe3BASliders[5] = AddSliderOption("More Puffy", snusnuMain.cbbe3BAValues[5], "{2}")
-			cbbe3BASliders[6] = AddSliderOption("Shy", snusnuMain.cbbe3BAValues[6], "{2}")
-			cbbe3BASliders[7] = AddSliderOption("Thick", snusnuMain.cbbe3BAValues[7], "{2}")
-			cbbe3BASliders[8] = AddSliderOption("Tube", snusnuMain.cbbe3BAValues[8], "{2}")
-			cbbe3BASliders[9] = AddSliderOption("Crease", snusnuMain.cbbe3BAValues[9], "{2}")
-			cbbe3BASliders[10] = AddSliderOption("Crumpled", snusnuMain.cbbe3BAValues[10], "{2}")
-			cbbe3BASliders[11] = AddSliderOption("Bump", snusnuMain.cbbe3BAValues[11], "{2}")
-			cbbe3BASliders[12] = AddSliderOption("Invert", snusnuMain.cbbe3BAValues[12], "{2}")
+			cbbe3BASliders[5] = AddSliderOption(sliderHasValue(snusnuMain.cbbe3BAValues[5])+"More Puffy", snusnuMain.cbbe3BAValues[5], "{2}")
+			cbbe3BASliders[6] = AddSliderOption(sliderHasValue(snusnuMain.cbbe3BAValues[6])+"Shy", snusnuMain.cbbe3BAValues[6], "{2}")
+			cbbe3BASliders[7] = AddSliderOption(sliderHasValue(snusnuMain.cbbe3BAValues[7])+"Thick", snusnuMain.cbbe3BAValues[7], "{2}")
+			cbbe3BASliders[8] = AddSliderOption(sliderHasValue(snusnuMain.cbbe3BAValues[8])+"Tube", snusnuMain.cbbe3BAValues[8], "{2}")
+			cbbe3BASliders[9] = AddSliderOption(sliderHasValue(snusnuMain.cbbe3BAValues[9])+"Crease", snusnuMain.cbbe3BAValues[9], "{2}")
+			cbbe3BASliders[10] = AddSliderOption(sliderHasValue(snusnuMain.cbbe3BAValues[10])+"Crumpled", snusnuMain.cbbe3BAValues[10], "{2}")
+			cbbe3BASliders[11] = AddSliderOption(sliderHasValue(snusnuMain.cbbe3BAValues[11])+"Bump", snusnuMain.cbbe3BAValues[11], "{2}")
+			cbbe3BASliders[12] = AddSliderOption(sliderHasValue(snusnuMain.cbbe3BAValues[12])+"Invert", snusnuMain.cbbe3BAValues[12], "{2}")
 
-			cbbeSliders[20] = AddSliderOption("Nipple Tip", snusnuMain.cbbeValues[20], "{2}")
-			cbbeSESliders[11] = AddSliderOption("Twist", snusnuMain.cbbeSEValues[11], "{2}")
-			cbbeSliders[13] = AddSliderOption("Distance (Inverted)", snusnuMain.cbbeValues[13], "{2}")
-			cbbeSESliders[12] = AddSliderOption("Dip", snusnuMain.cbbeSEValues[12], "{2}")
-			bhunpSliders[8] = AddSliderOption("NipBGone", snusnuMain.bhunpValues[8], "{2}")
+			cbbeSliders[20] = AddSliderOption(sliderHasValue(snusnuMain.cbbeValues[20])+"Nipple Tip", snusnuMain.cbbeValues[20], "{2}")
+			cbbeSESliders[11] = AddSliderOption(sliderHasValue(snusnuMain.cbbeSEValues[11])+"Twist", snusnuMain.cbbeSEValues[11], "{2}")
+			cbbeSliders[13] = AddSliderOption(sliderHasValue(snusnuMain.cbbeValues[13])+"Distance (Inverted)", snusnuMain.cbbeValues[13], "{2}")
+			cbbeSESliders[12] = AddSliderOption(sliderHasValue(snusnuMain.cbbeSEValues[12])+"Dip", snusnuMain.cbbeSEValues[12], "{2}")
+			bhunpSliders[8] = AddSliderOption(sliderHasValue(snusnuMain.bhunpValues[8])+"NipBGone", snusnuMain.bhunpValues[8], "{2}")
 			
 			AddHeaderOption("TORSO")
 			AddEmptyOption()
-			bhunpSliders[10] = AddSliderOption("Chest Depth", snusnuMain.bhunpValues[10], "{2}")
-			bhunpSliders[11] = AddSliderOption("Chest Width", snusnuMain.bhunpValues[11], "{2}")
-			cbbe3BASliders[13] = AddSliderOption("Clavicle", snusnuMain.cbbe3BAValues[13], "{2}")
-			bhunpSliders[12] = AddSliderOption("Ribs", snusnuMain.bhunpValues[12], "{2}")
-			cbbe3BASliders[14] = AddSliderOption("Protruded Ribs", snusnuMain.cbbe3BAValues[14], "{2}")
-			bhunpSliders[13] = AddSliderOption("Sternum Depth", snusnuMain.bhunpValues[13], "{2}")
-			bhunpSliders[14] = AddSliderOption("Sternum Height", snusnuMain.bhunpValues[14], "{2}")
-			cbbeSliders[29] = AddSliderOption("Size", snusnuMain.cbbeValues[29], "{2}")
-			cbbeSliders[33] = AddSliderOption("Back Size", snusnuMain.cbbeValues[33], "{2}")
-			bhunpSliders[16] = AddSliderOption("Back Arch", snusnuMain.bhunpValues[16], "{2}")
-			cbbe3BASliders[15] = AddSliderOption("Back Valley", snusnuMain.cbbe3BAValues[15], "{2}")
-			cbbe3BASliders[16] = AddSliderOption("Back Wing", snusnuMain.cbbe3BAValues[16], "{2}")
-			cbbeSESliders[13] = AddSliderOption("Navel Even", snusnuMain.cbbeSEValues[13], "{2}")
-			cbbeSliders[30] = AddSliderOption("Waist Size (Inverted)", snusnuMain.cbbeValues[30], "{2}")
-			bhunpSliders[15] = AddSliderOption("Waist Height", snusnuMain.bhunpValues[15], "{2}")
-			cbbeSliders[31] = AddSliderOption("Waist Line", snusnuMain.cbbeValues[31], "{2}")
-			cbbeSliders[32] = AddSliderOption("Chubby Waist", snusnuMain.cbbeValues[32], "{2}")
+			bhunpSliders[10] = AddSliderOption(sliderHasValue(snusnuMain.bhunpValues[10])+"Chest Depth", snusnuMain.bhunpValues[10], "{2}")
+			bhunpSliders[11] = AddSliderOption(sliderHasValue(snusnuMain.bhunpValues[11])+"Chest Width", snusnuMain.bhunpValues[11], "{2}")
+			cbbe3BASliders[13] = AddSliderOption(sliderHasValue(snusnuMain.cbbe3BAValues[13])+"Clavicle", snusnuMain.cbbe3BAValues[13], "{2}")
+			bhunpSliders[12] = AddSliderOption(sliderHasValue(snusnuMain.bhunpValues[12])+"Ribs", snusnuMain.bhunpValues[12], "{2}")
+			cbbe3BASliders[14] = AddSliderOption(sliderHasValue(snusnuMain.cbbe3BAValues[14])+"Protruded Ribs", snusnuMain.cbbe3BAValues[14], "{2}")
+			bhunpSliders[13] = AddSliderOption(sliderHasValue(snusnuMain.bhunpValues[13])+"Sternum Depth", snusnuMain.bhunpValues[13], "{2}")
+			bhunpSliders[14] = AddSliderOption(sliderHasValue(snusnuMain.bhunpValues[14])+"Sternum Height", snusnuMain.bhunpValues[14], "{2}")
+			cbbeSliders[29] = AddSliderOption(sliderHasValue(snusnuMain.cbbeValues[29])+"Size", snusnuMain.cbbeValues[29], "{2}")
+			cbbeSliders[33] = AddSliderOption(sliderHasValue(snusnuMain.cbbeValues[33])+"Back Size", snusnuMain.cbbeValues[33], "{2}")
+			bhunpSliders[16] = AddSliderOption(sliderHasValue(snusnuMain.bhunpValues[16])+"Back Arch", snusnuMain.bhunpValues[16], "{2}")
+			cbbe3BASliders[15] = AddSliderOption(sliderHasValue(snusnuMain.cbbe3BAValues[15])+"Back Valley", snusnuMain.cbbe3BAValues[15], "{2}")
+			cbbe3BASliders[16] = AddSliderOption(sliderHasValue(snusnuMain.cbbe3BAValues[16])+"Back Wing", snusnuMain.cbbe3BAValues[16], "{2}")
+			cbbeSESliders[13] = AddSliderOption(sliderHasValue(snusnuMain.cbbeSEValues[13])+"Navel Even", snusnuMain.cbbeSEValues[13], "{2}")
+			cbbeSliders[30] = AddSliderOption(sliderHasValue(snusnuMain.cbbeValues[30])+"Waist Size (Inverted)", snusnuMain.cbbeValues[30], "{2}")
+			bhunpSliders[15] = AddSliderOption(sliderHasValue(snusnuMain.bhunpValues[15])+"Waist Height", snusnuMain.bhunpValues[15], "{2}")
+			cbbeSliders[31] = AddSliderOption(sliderHasValue(snusnuMain.cbbeValues[31])+"Waist Line", snusnuMain.cbbeValues[31], "{2}")
+			cbbeSliders[32] = AddSliderOption(sliderHasValue(snusnuMain.cbbeValues[32])+"Chubby Waist", snusnuMain.cbbeValues[32], "{2}")
 		EndIf
 	ElseIf (a_page == Pages[2] && snusnuMain.selectedBody != 2)
 		SetCursorFillMode(LEFT_TO_RIGHT)
 		If snusnuMain.selectedBody == 0 ;UUNP/BHUNP
-			AddHeaderOption("$SNUSNU_MORPHS_UUNP")
+			AddHeaderOption(pageNames[4])
 			AddEmptyOption()
 			
 			Int counter = 0
 			while counter < 74
-				uunpSliders[counter] = AddSliderOption(uunpStrings[counter], snusnuMain.uunpValues[counter], "{2}")
+				uunpSliders[counter] = AddSliderOption(sliderHasValue(snusnuMain.uunpValues[counter])+uunpStrings[counter], snusnuMain.uunpValues[counter], "{2}")
 				counter += 1
 			endWhile
 		Else ;CBBE SE
-			AddHeaderOption("CBBE MORPHS PAGE 2")
+			AddHeaderOption(pageNames[7])
 			AddEmptyOption()
 			AddHeaderOption("BUTT")
 			AddEmptyOption()
-			cbbeSESliders[14] = AddSliderOption("Shape Classic", snusnuMain.cbbeSEValues[14], "{2}")
-			cbbeSliders[37] = AddSliderOption("Shape Lower", snusnuMain.cbbeValues[37], "{2}")
-			cbbeSliders[34] = AddSliderOption("Crack (Inverted)", snusnuMain.cbbeValues[34], "{2}")
-			cbbeSliders[35] = AddSliderOption("Size (Inverted)", snusnuMain.cbbeValues[34], "{2}")
-			cbbeSliders[36] = AddSliderOption("Smaller (Inverted)", snusnuMain.cbbeValues[36], "{2}")
-			cbbeSliders[38] = AddSliderOption("Big", snusnuMain.cbbeValues[38], "{2}")
-			cbbeSliders[39] = AddSliderOption("Chubby", snusnuMain.cbbeValues[39], "{2}")
-			cbbeSliders[40] = AddSliderOption("Apple", snusnuMain.cbbeValues[40], "{2}")
-			cbbe3BASliders[17] = AddSliderOption("Saggy", snusnuMain.cbbe3BAValues[17], "{2}")
-			cbbe3BASliders[18] = AddSliderOption("Pressed", snusnuMain.cbbe3BAValues[18], "{2}")
-			cbbe3BASliders[19] = AddSliderOption("Narrow", snusnuMain.cbbe3BAValues[19], "{2}")
-			cbbeSESliders[15] = AddSliderOption("Dimples", snusnuMain.cbbeSEValues[15], "{2}")
-			cbbeSESliders[16] = AddSliderOption("Under Fold", snusnuMain.cbbeSEValues[16], "{2}")
-			cbbeSliders[41] = AddSliderOption("Round", snusnuMain.cbbeValues[41], "{2}")
-			bhunpSliders[17] = AddSliderOption("Move Crotch", snusnuMain.bhunpValues[17], "{2}")
-			cbbeSliders[42] = AddSliderOption("Groin", snusnuMain.cbbeValues[42], "{2}")
+			cbbeSESliders[14] = AddSliderOption(sliderHasValue(snusnuMain.cbbeSEValues[14])+"Shape Classic", snusnuMain.cbbeSEValues[14], "{2}")
+			cbbeSliders[37] = AddSliderOption(sliderHasValue(snusnuMain.cbbeValues[37])+"Shape Lower", snusnuMain.cbbeValues[37], "{2}")
+			cbbeSliders[34] = AddSliderOption(sliderHasValue(snusnuMain.cbbeValues[34])+"Crack (Inverted)", snusnuMain.cbbeValues[34], "{2}")
+			cbbeSliders[35] = AddSliderOption(sliderHasValue(snusnuMain.cbbeValues[34])+"Size (Inverted)", snusnuMain.cbbeValues[34], "{2}")
+			cbbeSliders[36] = AddSliderOption(sliderHasValue(snusnuMain.cbbeValues[36])+"Smaller (Inverted)", snusnuMain.cbbeValues[36], "{2}")
+			cbbeSliders[38] = AddSliderOption(sliderHasValue(snusnuMain.cbbeValues[38])+"Big", snusnuMain.cbbeValues[38], "{2}")
+			cbbeSliders[39] = AddSliderOption(sliderHasValue(snusnuMain.cbbeValues[39])+"Chubby", snusnuMain.cbbeValues[39], "{2}")
+			cbbeSliders[40] = AddSliderOption(sliderHasValue(snusnuMain.cbbeValues[40])+"Apple", snusnuMain.cbbeValues[40], "{2}")
+			cbbe3BASliders[17] = AddSliderOption(sliderHasValue(snusnuMain.cbbe3BAValues[17])+"Saggy", snusnuMain.cbbe3BAValues[17], "{2}")
+			cbbe3BASliders[18] = AddSliderOption(sliderHasValue(snusnuMain.cbbe3BAValues[18])+"Pressed", snusnuMain.cbbe3BAValues[18], "{2}")
+			cbbe3BASliders[19] = AddSliderOption(sliderHasValue(snusnuMain.cbbe3BAValues[19])+"Narrow", snusnuMain.cbbe3BAValues[19], "{2}")
+			cbbeSESliders[15] = AddSliderOption(sliderHasValue(snusnuMain.cbbeSEValues[15])+"Dimples", snusnuMain.cbbeSEValues[15], "{2}")
+			cbbeSESliders[16] = AddSliderOption(sliderHasValue(snusnuMain.cbbeSEValues[16])+"Under Fold", snusnuMain.cbbeSEValues[16], "{2}")
+			cbbeSliders[41] = AddSliderOption(sliderHasValue(snusnuMain.cbbeValues[41])+"Round", snusnuMain.cbbeValues[41], "{2}")
+			bhunpSliders[17] = AddSliderOption(sliderHasValue(snusnuMain.bhunpValues[17])+"Move Crotch", snusnuMain.bhunpValues[17], "{2}")
+			cbbeSliders[42] = AddSliderOption(sliderHasValue(snusnuMain.cbbeValues[42])+"Groin", snusnuMain.cbbeValues[42], "{2}")
 			
 			AddHeaderOption("LEGS AND FEET")
 			AddEmptyOption()
-			cbbeSESliders[18] = AddSliderOption("Shape Classic", snusnuMain.cbbeSEValues[18], "{2}")
-			cbbe3BASliders[20] = AddSliderOption("7B Legs", snusnuMain.cbbe3BAValues[20], "{2}")
-			bhunpSliders[18] = AddSliderOption("Thin", snusnuMain.bhunpValues[18], "{2}")
-			cbbeSliders[45] = AddSliderOption("Slim", snusnuMain.cbbeValues[45], "{2}")
-			cbbeSliders[46] = AddSliderOption("Thighs", snusnuMain.cbbeValues[46], "{2}")
-			cbbe3BASliders[21] = AddSliderOption("Outside", snusnuMain.cbbe3BAValues[21], "{2}")
-			cbbe3BASliders[22] = AddSliderOption("Inside", snusnuMain.cbbe3BAValues[22], "{2}")
-			cbbe3BASliders[23] = AddSliderOption("Front-Back", snusnuMain.cbbe3BAValues[23], "{2}")
-			cbbeSliders[47] = AddSliderOption("Chubby", snusnuMain.cbbeValues[47], "{2}")
-			cbbeSliders[48] = AddSliderOption("Size (Inverted)", snusnuMain.cbbeValues[48], "{2}")
-			cbbe3BASliders[24] = AddSliderOption("Leg Spread", snusnuMain.cbbe3BAValues[24], "{2}")
-			cbbeSliders[49] = AddSliderOption("Knee Height", snusnuMain.cbbeValues[49], "{2}")
-			bhunpSliders[19] = AddSliderOption("Knee Shape", snusnuMain.bhunpValues[19], "{2}")
-			cbbe3BASliders[25] = AddSliderOption("Knee Together", snusnuMain.cbbe3BAValues[25], "{2}")
-			cbbeSliders[50] = AddSliderOption("Calf Size", snusnuMain.cbbeValues[50], "{2}")
-			cbbeSliders[51] = AddSliderOption("Calf Smooth", snusnuMain.cbbeValues[51], "{2}")
-			cbbe3BASliders[26] = AddSliderOption("Calf Front-Back", snusnuMain.cbbe3BAValues[26], "{2}")
-			cbbeSESliders[19] = AddSliderOption("Feminine Feet", snusnuMain.cbbeSEValues[19], "{2}")
+			cbbeSESliders[18] = AddSliderOption(sliderHasValue(snusnuMain.cbbeSEValues[18])+"Shape Classic", snusnuMain.cbbeSEValues[18], "{2}")
+			cbbe3BASliders[20] = AddSliderOption(sliderHasValue(snusnuMain.cbbe3BAValues[20])+"7B Legs", snusnuMain.cbbe3BAValues[20], "{2}")
+			bhunpSliders[18] = AddSliderOption(sliderHasValue(snusnuMain.bhunpValues[18])+"Thin", snusnuMain.bhunpValues[18], "{2}")
+			cbbeSliders[45] = AddSliderOption(sliderHasValue(snusnuMain.cbbeValues[45])+"Slim", snusnuMain.cbbeValues[45], "{2}")
+			cbbeSliders[46] = AddSliderOption(sliderHasValue(snusnuMain.cbbeValues[46])+"Thighs", snusnuMain.cbbeValues[46], "{2}")
+			cbbe3BASliders[21] = AddSliderOption(sliderHasValue(snusnuMain.cbbe3BAValues[21])+"Outside", snusnuMain.cbbe3BAValues[21], "{2}")
+			cbbe3BASliders[22] = AddSliderOption(sliderHasValue(snusnuMain.cbbe3BAValues[22])+"Inside", snusnuMain.cbbe3BAValues[22], "{2}")
+			cbbe3BASliders[23] = AddSliderOption(sliderHasValue(snusnuMain.cbbe3BAValues[23])+"Front-Back", snusnuMain.cbbe3BAValues[23], "{2}")
+			cbbeSliders[47] = AddSliderOption(sliderHasValue(snusnuMain.cbbeValues[47])+"Chubby", snusnuMain.cbbeValues[47], "{2}")
+			cbbeSliders[48] = AddSliderOption(sliderHasValue(snusnuMain.cbbeValues[48])+"Size (Inverted)", snusnuMain.cbbeValues[48], "{2}")
+			cbbe3BASliders[24] = AddSliderOption(sliderHasValue(snusnuMain.cbbe3BAValues[24])+"Leg Spread", snusnuMain.cbbe3BAValues[24], "{2}")
+			cbbeSliders[49] = AddSliderOption(sliderHasValue(snusnuMain.cbbeValues[49])+"Knee Height", snusnuMain.cbbeValues[49], "{2}")
+			bhunpSliders[19] = AddSliderOption(sliderHasValue(snusnuMain.bhunpValues[19])+"Knee Shape", snusnuMain.bhunpValues[19], "{2}")
+			cbbe3BASliders[25] = AddSliderOption(sliderHasValue(snusnuMain.cbbe3BAValues[25])+"Knee Together", snusnuMain.cbbe3BAValues[25], "{2}")
+			cbbeSliders[50] = AddSliderOption(sliderHasValue(snusnuMain.cbbeValues[50])+"Calf Size", snusnuMain.cbbeValues[50], "{2}")
+			cbbeSliders[51] = AddSliderOption(sliderHasValue(snusnuMain.cbbeValues[51])+"Calf Smooth", snusnuMain.cbbeValues[51], "{2}")
+			cbbe3BASliders[26] = AddSliderOption(sliderHasValue(snusnuMain.cbbe3BAValues[26])+"Calf Front-Back", snusnuMain.cbbe3BAValues[26], "{2}")
+			cbbeSESliders[19] = AddSliderOption(sliderHasValue(snusnuMain.cbbeSEValues[19])+"Feminine Feet", snusnuMain.cbbeSEValues[19], "{2}")
 			AddHeaderOption("HIPS")
 			AddEmptyOption()
-			cbbe3BASliders[39] = AddSliderOption("Hip bone", snusnuMain.cbbe3BAValues[39], "{2}")
-			cbbeSliders[44] = AddSliderOption("Size", snusnuMain.cbbeValues[44], "{2}")
-			bhunpSliders[26] = AddSliderOption("Forward", snusnuMain.bhunpValues[26], "{2}")
-			bhunpSliders[27] = AddSliderOption("Upper Width", snusnuMain.bhunpValues[27], "{2}")
-			cbbeSESliders[17] = AddSliderOption("Carved", snusnuMain.cbbeSEValues[17], "{2}")
-			cbbe3BASliders[31] = AddSliderOption("Hip Narrow", snusnuMain.cbbe3BAValues[31], "{2}")
-			cbbe3BASliders[32] = AddSliderOption("UNP Hip", snusnuMain.cbbe3BAValues[32], "{2}")
+			cbbe3BASliders[39] = AddSliderOption(sliderHasValue(snusnuMain.cbbe3BAValues[39])+"Hip bone", snusnuMain.cbbe3BAValues[39], "{2}")
+			cbbeSliders[44] = AddSliderOption(sliderHasValue(snusnuMain.cbbeValues[44])+"Size", snusnuMain.cbbeValues[44], "{2}")
+			bhunpSliders[26] = AddSliderOption(sliderHasValue(snusnuMain.bhunpValues[26])+"Forward", snusnuMain.bhunpValues[26], "{2}")
+			bhunpSliders[27] = AddSliderOption(sliderHasValue(snusnuMain.bhunpValues[27])+"Upper Width", snusnuMain.bhunpValues[27], "{2}")
+			cbbeSESliders[17] = AddSliderOption(sliderHasValue(snusnuMain.cbbeSEValues[17])+"Carved", snusnuMain.cbbeSEValues[17], "{2}")
+			cbbe3BASliders[31] = AddSliderOption(sliderHasValue(snusnuMain.cbbe3BAValues[31])+"Hip Narrow", snusnuMain.cbbe3BAValues[31], "{2}")
+			cbbe3BASliders[32] = AddSliderOption(sliderHasValue(snusnuMain.cbbe3BAValues[32])+"UNP Hip", snusnuMain.cbbe3BAValues[32], "{2}")
 			AddEmptyOption()
 			AddHeaderOption("ARMS")
 			AddEmptyOption()
-			cbbeSliders[21] = AddSliderOption("Size (Inverted)", snusnuMain.cbbeValues[21], "{2}")
-			bhunpSliders[28] = AddSliderOption("Forearm Size", snusnuMain.bhunpValues[28], "{2}")
-			cbbeSliders[22] = AddSliderOption("Chubby", snusnuMain.cbbeValues[22], "{2}")
-			cbbeSliders[23] = AddSliderOption("Shoulder Smooth", snusnuMain.cbbeValues[23], "{2}")
-			cbbeSliders[24] = AddSliderOption("Shoulder Width (Inverted)", snusnuMain.cbbeValues[24], "{2}")
-			bhunpSliders[29] = AddSliderOption("Shoulder Tweak", snusnuMain.bhunpValues[29], "{2}")
-			cbbe3BASliders[33] = AddSliderOption("Armpit", snusnuMain.cbbe3BAValues[33], "{2}")
+			cbbeSliders[21] = AddSliderOption(sliderHasValue(snusnuMain.cbbeValues[21])+"Size (Inverted)", snusnuMain.cbbeValues[21], "{2}")
+			bhunpSliders[28] = AddSliderOption(sliderHasValue(snusnuMain.bhunpValues[28])+"Forearm Size", snusnuMain.bhunpValues[28], "{2}")
+			cbbeSliders[22] = AddSliderOption(sliderHasValue(snusnuMain.cbbeValues[22])+"Chubby", snusnuMain.cbbeValues[22], "{2}")
+			cbbeSliders[23] = AddSliderOption(sliderHasValue(snusnuMain.cbbeValues[23])+"Shoulder Smooth", snusnuMain.cbbeValues[23], "{2}")
+			cbbeSliders[24] = AddSliderOption(sliderHasValue(snusnuMain.cbbeValues[24])+"Shoulder Width (Inverted)", snusnuMain.cbbeValues[24], "{2}")
+			bhunpSliders[29] = AddSliderOption(sliderHasValue(snusnuMain.bhunpValues[29])+"Shoulder Tweak", snusnuMain.bhunpValues[29], "{2}")
+			cbbe3BASliders[33] = AddSliderOption(sliderHasValue(snusnuMain.cbbe3BAValues[33])+"Armpit", snusnuMain.cbbe3BAValues[33], "{2}")
 			AddEmptyOption()
 			AddHeaderOption("BELLY")
 			AddEmptyOption()
-			cbbeSliders[25] = AddSliderOption("Size", snusnuMain.cbbeValues[25], "{2}")
-			cbbeSliders[26] = AddSliderOption("Big", snusnuMain.cbbeValues[26], "{2}")
-			cbbe3BASliders[34] = AddSliderOption("Front Up Fat", snusnuMain.cbbe3BAValues[34], "{2}")
-			cbbe3BASliders[35] = AddSliderOption("Front Down Fat", snusnuMain.cbbe3BAValues[35], "{2}")
-			cbbe3BASliders[36] = AddSliderOption("Side Up Fat", snusnuMain.cbbe3BAValues[36], "{2}")
-			cbbe3BASliders[37] = AddSliderOption("Side Down Fat", snusnuMain.cbbe3BAValues[37], "{2}")
-			cbbe3BASliders[38] = AddSliderOption("Under", snusnuMain.cbbe3BAValues[38], "{2}")
-			cbbeSliders[27] = AddSliderOption("Pregnant", snusnuMain.cbbeValues[27], "{2}")
-			cbbeSliders[28] = AddSliderOption("Tuck", snusnuMain.cbbeValues[28], "{2}")
+			cbbeSliders[25] = AddSliderOption(sliderHasValue(snusnuMain.cbbeValues[25])+"Size", snusnuMain.cbbeValues[25], "{2}")
+			cbbeSliders[26] = AddSliderOption(sliderHasValue(snusnuMain.cbbeValues[26])+"Big", snusnuMain.cbbeValues[26], "{2}")
+			cbbe3BASliders[34] = AddSliderOption(sliderHasValue(snusnuMain.cbbe3BAValues[34])+"Front Up Fat", snusnuMain.cbbe3BAValues[34], "{2}")
+			cbbe3BASliders[35] = AddSliderOption(sliderHasValue(snusnuMain.cbbe3BAValues[35])+"Front Down Fat", snusnuMain.cbbe3BAValues[35], "{2}")
+			cbbe3BASliders[36] = AddSliderOption(sliderHasValue(snusnuMain.cbbe3BAValues[36])+"Side Up Fat", snusnuMain.cbbe3BAValues[36], "{2}")
+			cbbe3BASliders[37] = AddSliderOption(sliderHasValue(snusnuMain.cbbe3BAValues[37])+"Side Down Fat", snusnuMain.cbbe3BAValues[37], "{2}")
+			cbbe3BASliders[38] = AddSliderOption(sliderHasValue(snusnuMain.cbbe3BAValues[38])+"Under", snusnuMain.cbbe3BAValues[38], "{2}")
+			cbbeSliders[27] = AddSliderOption(sliderHasValue(snusnuMain.cbbeValues[27])+"Pregnant", snusnuMain.cbbeValues[27], "{2}")
+			cbbeSliders[28] = AddSliderOption(sliderHasValue(snusnuMain.cbbeValues[28])+"Tuck", snusnuMain.cbbeValues[28], "{2}")
 		EndIf
 	ElseIf (a_page == Pages[3] && snusnuMain.selectedBody != 2)
 		SetCursorFillMode(LEFT_TO_RIGHT)
 		If snusnuMain.selectedBody == 0 ;UUNP/BHUNP
-			AddHeaderOption("$SNUSNU_MORPHS_BHUNP")
+			AddHeaderOption(pageNames[5])
 			AddEmptyOption()
 			
 			Int counter = 0
 			while counter < 43
-				bhunpSliders[counter] = AddSliderOption(bhunpStrings[counter], snusnuMain.bhunpValues[counter], "{2}")
+				bhunpSliders[counter] = AddSliderOption(sliderHasValue(snusnuMain.bhunpValues[counter])+bhunpStrings[counter], snusnuMain.bhunpValues[counter], "{2}")
 				counter += 1
 			endWhile
 		Else ;CBBE SE
-			AddHeaderOption("CBBE SPECIAL MORPHS")
+			AddHeaderOption(pageNames[8])
 			AddEmptyOption()
 			AddHeaderOption("MUSCLE DEFINITION")
 			AddEmptyOption()
-			bhunpSliders[21] = AddSliderOption("Abs", snusnuMain.bhunpValues[21], "{2}")
-			bhunpSliders[22] = AddSliderOption("Arms", snusnuMain.bhunpValues[22], "{2}")
-			bhunpSliders[23] = AddSliderOption("Butt", snusnuMain.bhunpValues[23], "{2}")
-			bhunpSliders[24] = AddSliderOption("Legs", snusnuMain.bhunpValues[24], "{2}")
-			bhunpSliders[25] = AddSliderOption("Pecs", snusnuMain.bhunpValues[25], "{2}")
-			cbbe3BASliders[30] = AddSliderOption("Back", snusnuMain.cbbe3BAValues[30], "{2}")
-			cbbe3BASliders[27] = AddSliderOption("More Abs", snusnuMain.cbbe3BAValues[27], "{2}")
-			cbbe3BASliders[28] = AddSliderOption("More Arms", snusnuMain.cbbe3BAValues[28], "{2}")
-			cbbe3BASliders[29] = AddSliderOption("More Legs", snusnuMain.cbbe3BAValues[29], "{2}")
+			bhunpSliders[21] = AddSliderOption(sliderHasValue(snusnuMain.bhunpValues[21])+"Abs", snusnuMain.bhunpValues[21], "{2}")
+			bhunpSliders[22] = AddSliderOption(sliderHasValue(snusnuMain.bhunpValues[22])+"Arms", snusnuMain.bhunpValues[22], "{2}")
+			bhunpSliders[23] = AddSliderOption(sliderHasValue(snusnuMain.bhunpValues[23])+"Butt", snusnuMain.bhunpValues[23], "{2}")
+			bhunpSliders[24] = AddSliderOption(sliderHasValue(snusnuMain.bhunpValues[24])+"Legs", snusnuMain.bhunpValues[24], "{2}")
+			bhunpSliders[25] = AddSliderOption(sliderHasValue(snusnuMain.bhunpValues[25])+"Pecs", snusnuMain.bhunpValues[25], "{2}")
+			cbbe3BASliders[30] = AddSliderOption(sliderHasValue(snusnuMain.cbbe3BAValues[30])+"Back", snusnuMain.cbbe3BAValues[30], "{2}")
+			cbbe3BASliders[27] = AddSliderOption(sliderHasValue(snusnuMain.cbbe3BAValues[27])+"More Abs", snusnuMain.cbbe3BAValues[27], "{2}")
+			cbbe3BASliders[28] = AddSliderOption(sliderHasValue(snusnuMain.cbbe3BAValues[28])+"More Arms", snusnuMain.cbbe3BAValues[28], "{2}")
+			cbbe3BASliders[29] = AddSliderOption(sliderHasValue(snusnuMain.cbbe3BAValues[29])+"More Legs", snusnuMain.cbbe3BAValues[29], "{2}")
 			AddEmptyOption()
 			AddHeaderOption("FULL BODY")
 			AddEmptyOption()
-			cbbeSESliders[22] = AddSliderOption("VanillaSSELo", snusnuMain.cbbeSEValues[22], "{2}")
-			cbbeSESliders[23] = AddSliderOption("VanillaSSEHi", snusnuMain.cbbeSEValues[23], "{2}")
-			cbbeSESliders[25] = AddSliderOption("7B Lower", snusnuMain.cbbeSEValues[25], "{2}")
-			cbbeSESliders[26] = AddSliderOption("7B Upper", snusnuMain.cbbeSEValues[26], "{2}")
-			cbbeSESliders[24] = AddSliderOption("OldBaseShape", snusnuMain.cbbeSEValues[24], "{2}")
+			cbbeSESliders[22] = AddSliderOption(sliderHasValue(snusnuMain.cbbeSEValues[22])+"VanillaSSELo", snusnuMain.cbbeSEValues[22], "{2}")
+			cbbeSESliders[23] = AddSliderOption(sliderHasValue(snusnuMain.cbbeSEValues[23])+"VanillaSSEHi", snusnuMain.cbbeSEValues[23], "{2}")
+			cbbeSESliders[25] = AddSliderOption(sliderHasValue(snusnuMain.cbbeSEValues[25])+"7B Lower", snusnuMain.cbbeSEValues[25], "{2}")
+			cbbeSESliders[26] = AddSliderOption(sliderHasValue(snusnuMain.cbbeSEValues[26])+"7B Upper", snusnuMain.cbbeSEValues[26], "{2}")
+			cbbeSESliders[24] = AddSliderOption(sliderHasValue(snusnuMain.cbbeSEValues[24])+"OldBaseShape", snusnuMain.cbbeSEValues[24], "{2}")
 			AddEmptyOption()
 			AddHeaderOption("SEAMS")
 			AddEmptyOption()
-			cbbeSESliders[20] = AddSliderOption("Ankle Size", snusnuMain.cbbeSEValues[20], "{2}")
-			cbbeSESliders[21] = AddSliderOption("Wrist Size", snusnuMain.cbbeSEValues[21], "{2}")
+			cbbeSESliders[20] = AddSliderOption(sliderHasValue(snusnuMain.cbbeSEValues[20])+"Ankle Size", snusnuMain.cbbeSEValues[20], "{2}")
+			cbbeSESliders[21] = AddSliderOption(sliderHasValue(snusnuMain.cbbeSEValues[21])+"Wrist Size", snusnuMain.cbbeSEValues[21], "{2}")
 		EndIf
 	ElseIf ((a_page == Pages[4] && snusnuMain.selectedBody != 2) || (a_page == Pages[1] && snusnuMain.selectedBody == 2))
 		SetCursorFillMode(LEFT_TO_RIGHT)
-		AddHeaderOption("$SNUSNU_MORPHS_MALE")
+		AddHeaderOption(pageNames[9])
 		AddEmptyOption()
 		
 		;ToDo- Need to remove everything related to this:
@@ -448,18 +480,23 @@ Event OnPageReset(String a_page)
 		_myMultSpineBone = AddSliderOption("Upper Spine", snusnuMain.bonesValues[0], "{3}")
 		_myMultForearmBone = AddSliderOption("Forearms", snusnuMain.bonesValues[1], "{3}")
 	ElseIf ((a_page == Pages[5] && snusnuMain.selectedBody != 2) || (a_page == Pages[2] && snusnuMain.selectedBody == 2))
+		Int currentFlag = OPTION_FLAG_NONE
+		If editFMGMorphs
+			currentFlag = OPTION_FLAG_DISABLED
+		EndIf
+		
 		SetCursorFillMode(TOP_TO_BOTTOM)
-		_mySaveOptions = AddToggleOption("Save Settings", False)
-		_myLoadOptions = AddToggleOption("Load Settings", False)
+		_mySaveOptions = AddToggleOption("Save Settings", False, currentFlag)
+		_myLoadOptions = AddToggleOption("Load Settings", False, currentFlag)
 		AddEmptyOption()
 		;AddEmptyOption()
-		_mySaveMorphs = AddToggleOption("Save Morphs", False)
-		_myLoadMorphs = AddToggleOption("Load Morphs", False)
+		_mySaveMorphs = AddToggleOption("Save Morphs", False, currentFlag)
+		_myLoadMorphs = AddToggleOption("Load Morphs", False, currentFlag)
 		SetCursorPosition(1)
-		_mySaveMorphsProfile = AddInputOption("Save Morphs Profile", "Default")
+		_mySaveMorphsProfile = AddInputOption("Save Morphs Profile", "Default", currentFlag)
 		
 		If LoadSavedProfiles()
-			_myLoadMorphsProfile = AddMenuOption("Load Morphs Profile", savedProfilesList[0])
+			_myLoadMorphsProfile = AddMenuOption("Load Morphs Profile", savedProfilesList[0], currentFlag)
 		Else
 			_myLoadMorphsProfile = AddMenuOption("Load Morphs Profile", "EMPTY", OPTION_FLAG_DISABLED)
 		EndIf
@@ -533,6 +570,8 @@ Event OnOptionHighlight(Int a_option)
 		SetInfoText("$SNUSNU_USEALTANIMS_DESC")
 	ElseIf a_option == _myuseAltAnimsNPC
 		SetInfoText("$SNUSNU_USEALTANIMSNPC_DESC")
+	ElseIf a_option == _myCustomizeFMG
+		SetInfoText("Toggle FMG morphs customization.")
 	ElseIf a_option == _myRemoveWeightMorphs
 		SetInfoText("$SNUSNU_NOWEIGHTMORPHS_DESC")
 	ElseIf a_option == _myUseWeightSlider
@@ -603,6 +642,43 @@ Event OnOptionSelect(Int a_option)
 	ElseIf a_option == _myplayTFSound
 		snusnuMain.playTFSound = !snusnuMain.playTFSound
 		SetToggleOptionValue(a_option, snusnuMain.playTFSound)
+	ElseIf a_option == _myCustomizeFMG
+		editFMGMorphs = !editFMGMorphs
+		SetToggleOptionValue(a_option, editFMGMorphs)
+		
+		String Msg
+		If editFMGMorphs
+			Msg = "All morph changes you do while this option is selected will only affect the FMG body shape. To go back to normal muscle morphs just disable this option."
+			
+			;Load FMG morphs profile here. All changes to the morphs must be saved after this
+			;option is disabled or user exits this menu.
+			;NOTICE! Previous morphs should be saved to a temporal profile file!
+			
+			If !snusnuMain.saveAllMorphs("SnuSnuProfiles/SnuTempMorphs")
+				ShowMessage("There was an error while saving current morphs!", false)
+				Return
+			EndIf
+			If !snusnuMain.loadAllMorphs("SnuSnuProfiles/SnuDefaultFMG")
+				ShowMessage("There was an error while loading FMG morphs!", false)
+				Return
+			EndIf
+		Else
+			Msg = "Going back to normal muscle morphs customization"
+			
+			;Save morphs to a FMG profile file and load the previous morphs
+			
+			If !snusnuMain.saveAllMorphs("SnuSnuProfiles/SnuDefaultFMG")
+				ShowMessage("There was an error while saving FMG morphs!", false)
+				Return
+			EndIf
+			If !snusnuMain.loadAllMorphs("SnuSnuProfiles/SnuTempMorphs")
+				ShowMessage("There was an error while loading current morphs!", false)
+				Return
+			EndIf
+		EndIf
+		ShowMessage(Msg, False)
+		OpenConfig()
+		setPage(Pages[0], 0)
 	ElseIf a_option == _myRemoveWeightMorphs
 		snusnuMain.removeWeightMorphs = !snusnuMain.removeWeightMorphs
 		SetToggleOptionValue(a_option, snusnuMain.removeWeightMorphs)
@@ -668,7 +744,7 @@ Event OnOptionSelect(Int a_option)
 			
 			Self.SetOptionFlags(_mySaveMorphsProfile, Self.OPTION_FLAG_DISABLED, True)
 			Self.SetOptionFlags(_myLoadMorphsProfile, Self.OPTION_FLAG_DISABLED, True)
-			if saveSettings()
+			if saveSettings(); && savePushupExceptions()
 				ShowMessage("Settings have been saved successfully", false)
 				ForcePageReset()
 			else
@@ -939,12 +1015,10 @@ Event OnOptionSliderAccept(Int a_option, Float a_value)
 	ElseIf a_option == _myMultSpineBone
 		snusnuMain.bonesValues[0] = a_value
 		SetSliderOptionValue(a_option, snusnuMain.bonesValues[0], "{3}")
-		;TLALOC-ToDo: Do we need to add this to an array?
 		snusnuMain.UpdateWeight()
 	ElseIf a_option == _myMultForearmBone
 		snusnuMain.bonesValues[1] = a_value
 		SetSliderOptionValue(a_option, snusnuMain.bonesValues[1], "{3}")
-		;TLALOC-ToDo: Do we need to add this to an array?
 		snusnuMain.UpdateWeight()
 		
 	Else
@@ -957,7 +1031,7 @@ Event OnOptionSliderAccept(Int a_option, Float a_value)
 		while(counter < 52 && !found)
 			If a_option == cbbeSliders[counter]
 				SetSliderOptionValue(a_option, a_value, "{2}")
-				
+				ForcePageReset()
 				snusnuMain.setSliderValue(sliderIndex, a_value)
 				found = true
 			EndIf
@@ -970,7 +1044,7 @@ Event OnOptionSliderAccept(Int a_option, Float a_value)
 			while(counter < 74 && !found)
 				If a_option == uunpSliders[counter]
 					SetSliderOptionValue(a_option, a_value, "{2}")
-					
+					ForcePageReset()
 					snusnuMain.setSliderValue(sliderIndex, a_value)
 					found = true
 				EndIf
@@ -984,7 +1058,7 @@ Event OnOptionSliderAccept(Int a_option, Float a_value)
 			while(counter < 43 && !found)
 				If a_option == bhunpSliders[counter]
 					SetSliderOptionValue(a_option, a_value, "{2}")
-					
+					ForcePageReset()
 					snusnuMain.setSliderValue(sliderIndex, a_value)
 					found = true
 				EndIf
@@ -998,7 +1072,7 @@ Event OnOptionSliderAccept(Int a_option, Float a_value)
 			while(counter < 27 && !found)
 				If a_option == cbbeSESliders[counter]
 					SetSliderOptionValue(a_option, a_value, "{2}")
-					
+					ForcePageReset()
 					snusnuMain.setSliderValue(sliderIndex, a_value)
 					found = true
 				EndIf
@@ -1012,7 +1086,7 @@ Event OnOptionSliderAccept(Int a_option, Float a_value)
 			while(counter < 40 && !found)
 				If a_option == cbbe3BASliders[counter]
 					SetSliderOptionValue(a_option, a_value, "{2}")
-					
+					ForcePageReset()
 					snusnuMain.setSliderValue(sliderIndex, a_value)
 					found = true
 				EndIf
@@ -1106,6 +1180,29 @@ String Function GetDefaultMorphString(Int Cond)
 		Return "CBBE SE Pecs Morphs"
 	EndIf
 	Return ""
+EndFunction
+
+String Function sliderHasValue(Float sliderVal)
+	If sliderVal != 0.0
+		Return "*"
+	Else
+		Return ""
+	EndIf
+EndFunction
+
+Function initPageNames()
+	pageNames = new String[10]
+	
+	pageNames[0] = "Main Options"
+	pageNames[1] = "Save & Load"
+	pageNames[2] = "Info"
+	pageNames[3] = "UUNP/BHUNP Morphs 1"
+	pageNames[4] = "UUNP/BHUNP Morphs 2"
+	pageNames[5] = "Extra BHUNP Morphs"
+	pageNames[6] = "CBBE Morphs Page 1"
+	pageNames[7] = "CBBE Morphs Page 2"
+	pageNames[8] = "CBBE Special Morphs"
+	pageNames[9] = "Unisex Bones"
 EndFunction
 
 Function initStringArrays()
@@ -1389,6 +1486,22 @@ Bool Function saveSettings()
 	Return JsonUtil.Save(fileName, False)
 EndFunction
 
+Bool Function savePushupExceptions()
+	String fileName = "MCPushupExceptions"
+	
+	If snusnuMain.PushupExceptions.getSize() > 128
+		Debug.Trace("SNU - ERROR: Exceptions array is too big to be passed as an array! -->"+snusnuMain.PushupExceptions.getSize())
+		Return false
+	EndIf
+	
+	If !JsonUtil.FormListCopy(fileName, "PushupExceptions", snusnuMain.PushupExceptions.toArray())
+		Debug.Trace("SNU - ERROR: Exceptions array could not be saved!!")
+		Return false
+	EndIf
+	
+	Return JsonUtil.Save(fileName, False)
+EndFunction
+
 bool Function loadSettings()
 	String fileName = "SnusnuSettings"
 	
@@ -1628,8 +1741,11 @@ Function applyBodyOption()
 	EndIf
 	
 	String Msg
-	Msg = "Please exit this menu and enter again for the changes to be correctly applied."
+	Msg = "Doing a full menu reset."
 	ShowMessage(Msg, False)
+	
+	OpenConfig()
+	setPage(Pages[0], 0)
 EndFunction
 
 Function applyNormalsOption()

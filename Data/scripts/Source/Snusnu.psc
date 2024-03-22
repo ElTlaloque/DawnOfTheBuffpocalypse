@@ -531,12 +531,8 @@ Event OnObjectEquipped(Form type, ObjectReference ref)
 		FloatListAdd(PlayerRef, SNU_EQUIP_WEIGHTS_KEY, newItemWeight, true)
 		Debug.Trace("SNU - Full equiped weight is "+itemsEquipedWeight)
 		
-		If itemsEquipedWeight > allowedItemsEquipedWeight
+		If itemsEquipedWeight > allowedItemsEquipedWeight && StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle") == 0
 			Debug.Notification("I'm too weak to equip all of this!")
-			
-			If StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle") != 0
-				return
-			EndIf
 		
 			actualCarryWeight = PlayerRef.GetActorValue("CarryWeight")
 			Float modWeight = actualCarryWeight + 500.0
@@ -574,13 +570,17 @@ Event OnObjectUnequipped(Form type, ObjectReference ref)
 		Debug.Trace("SNU - New full equiped weight is "+itemsEquipedWeight)
 	EndIf
 		
-	If heavyItemsEquiped && itemsEquipedWeight <= allowedItemsEquipedWeight && PlayerRef.GetActorValue("CarryWeight") < -100
+	If heavyItemsEquiped && itemsEquipedWeight <= allowedItemsEquipedWeight && PlayerRef.GetActorValue("CarryWeight") < -100 && \
+	StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle") == 0
 		Debug.Trace("SNU - All heavy items were removed. Restoring carryWeight")
 		;Debug.Notification("Restoring carry weight: "+actualCarryWeight+"+500")
 		Debug.Notification("I can move freely now")
 		
 		PlayerRef.ModActorValue("CarryWeight", actualCarryWeight + 500)
 		heavyItemsEquiped = 0
+		
+		;DEBUG
+		Debug.Trace("SNU - CarryWeight = "+PlayerRef.GetActorValue("CarryWeight"))
 	EndIf
 	isEquipWeightUpdating = false
 EndEvent
@@ -592,13 +592,13 @@ Function cleanupHardcoreMode()
 	FormListClear(PlayerRef, SNU_EQUIP_WEIGHTS_KEY)
 	FloatListClear(PlayerRef, SNU_EQUIP_WEIGHTS_KEY)
 	
-	If heavyItemsEquiped
-		heavyItemsEquiped = 0
-		
-		If PlayerRef.GetActorValue("CarryWeight") < -100
-			PlayerRef.ModActorValue("CarryWeight", actualCarryWeight + 500)
-		EndIf
+	heavyItemsEquiped = 0
+	
+	If PlayerRef.GetActorValue("CarryWeight") < -100
+		PlayerRef.ModActorValue("CarryWeight", actualCarryWeight + 500)
 	EndIf
+	
+	Debug.Trace("SNU - CarryWeight = "+PlayerRef.GetActorValue("CarryWeight"))
 EndFunction
 
 Event OnAnimationEvent(ObjectReference akSource, string asEventName)
@@ -825,8 +825,7 @@ Function UpdateWeight(Bool applyNow = True)
 			
 			; Female
 			If PlayerSex == 1
-				If fightingMuscle > 0.0 && StorageUtil.GetIntValue(PlayerRef, "PSQ_HasMuscle") == 0 && \
-				StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle") == 0 ;ToDo- PSQ_HasMuscle logic will be used for FMG spell
+				If fightingMuscle > 0.0 && StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle") == 0
 					Int totalSliders = IntListCount(PlayerRef, SNUSNU_KEY)
 					;Debug.Trace("SNU - totalSliders="+totalSliders)
 					;Debug.Trace("SNU - currentSliderIndex="+IntListGet(PlayerRef, SNUSNU_KEY, 0))

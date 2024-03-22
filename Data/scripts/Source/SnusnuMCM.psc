@@ -1031,7 +1031,7 @@ Event OnOptionSliderAccept(Int a_option, Float a_value)
 		while(counter < 52 && !found)
 			If a_option == cbbeSliders[counter]
 				SetSliderOptionValue(a_option, a_value, "{2}")
-				ForcePageReset()
+				;ForcePageReset()
 				snusnuMain.setSliderValue(sliderIndex, a_value)
 				found = true
 			EndIf
@@ -1044,7 +1044,7 @@ Event OnOptionSliderAccept(Int a_option, Float a_value)
 			while(counter < 74 && !found)
 				If a_option == uunpSliders[counter]
 					SetSliderOptionValue(a_option, a_value, "{2}")
-					ForcePageReset()
+					;ForcePageReset()
 					snusnuMain.setSliderValue(sliderIndex, a_value)
 					found = true
 				EndIf
@@ -1058,7 +1058,7 @@ Event OnOptionSliderAccept(Int a_option, Float a_value)
 			while(counter < 43 && !found)
 				If a_option == bhunpSliders[counter]
 					SetSliderOptionValue(a_option, a_value, "{2}")
-					ForcePageReset()
+					;ForcePageReset()
 					snusnuMain.setSliderValue(sliderIndex, a_value)
 					found = true
 				EndIf
@@ -1072,7 +1072,7 @@ Event OnOptionSliderAccept(Int a_option, Float a_value)
 			while(counter < 27 && !found)
 				If a_option == cbbeSESliders[counter]
 					SetSliderOptionValue(a_option, a_value, "{2}")
-					ForcePageReset()
+					;ForcePageReset()
 					snusnuMain.setSliderValue(sliderIndex, a_value)
 					found = true
 				EndIf
@@ -1086,7 +1086,7 @@ Event OnOptionSliderAccept(Int a_option, Float a_value)
 			while(counter < 40 && !found)
 				If a_option == cbbe3BASliders[counter]
 					SetSliderOptionValue(a_option, a_value, "{2}")
-					ForcePageReset()
+					;ForcePageReset()
 					snusnuMain.setSliderValue(sliderIndex, a_value)
 					found = true
 				EndIf

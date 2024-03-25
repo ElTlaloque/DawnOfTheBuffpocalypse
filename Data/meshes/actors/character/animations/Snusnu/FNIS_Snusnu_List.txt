@@ -8,4 +8,4 @@ AAset _sneakidle 1
 AAset _sneakmt 1
 AAset _sprint 1
 
-b -a Snu_idle1 snu_FMG_idle.hkx
+b Snu_idle1 snu_FMG_idle.hkx

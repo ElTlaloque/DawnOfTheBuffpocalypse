@@ -146,6 +146,11 @@ Event OnConfigClose()
 		If !snusnuMain.loadAllMorphs("SnuSnuProfiles/SnuTempMorphs")
 			Debug.Notification("There was an error while loading current morphs!")
 		EndIf
+				
+		;Update body if PC is currently transformed
+		If StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle") != 0
+			StorageUtil.SetIntValue(PlayerRef, "SNU_UltraMuscle", 2)
+		EndIf
 		
 		editFMGMorphs = False
 	EndIf
@@ -649,7 +654,7 @@ Event OnOptionSelect(Int a_option)
 		String Msg
 		If editFMGMorphs
 			Msg = "All morph changes you do while this option is selected will only affect the FMG body shape. To go back to normal muscle morphs just disable this option."
-			
+			ShowMessage(Msg, False)
 			;Load FMG morphs profile here. All changes to the morphs must be saved after this
 			;option is disabled or user exits this menu.
 			;NOTICE! Previous morphs should be saved to a temporal profile file!
@@ -664,7 +669,7 @@ Event OnOptionSelect(Int a_option)
 			EndIf
 		Else
 			Msg = "Going back to normal muscle morphs customization"
-			
+			ShowMessage(Msg, False)
 			;Save morphs to a FMG profile file and load the previous morphs
 			
 			If !snusnuMain.saveAllMorphs("SnuSnuProfiles/SnuDefaultFMG")
@@ -675,8 +680,13 @@ Event OnOptionSelect(Int a_option)
 				ShowMessage("There was an error while loading current morphs!", false)
 				Return
 			EndIf
+			
+			;Update body if PC is currently transformed
+			If StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle") != 0
+				StorageUtil.SetIntValue(PlayerRef, "SNU_UltraMuscle", 2)
+			EndIf
 		EndIf
-		ShowMessage(Msg, False)
+		
 		OpenConfig()
 		setPage(Pages[0], 0)
 	ElseIf a_option == _myRemoveWeightMorphs

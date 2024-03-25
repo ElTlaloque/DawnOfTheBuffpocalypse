@@ -1,5 +1,6 @@
 Scriptname SnusnuMusclePowerScript extends ActiveMagicEffect  
 
+;ToDo- Remove imports as they make the code harder to follow
 import NiOverride
 Import StorageUtil
 
@@ -9,6 +10,8 @@ Snusnu Property snusnuMain Auto
 Bool Property wasWMEnabled = false Auto
 Float Property wmWeight = 0.0 Auto
 Float Property originalMuscleScore = 0.0 Auto
+Int Property originalSkinTint = 0 Auto
+Float Property tfTime = 0.0 Auto
 
 ;FMG Morphs
 Float[] cbbeValuesFMG
@@ -19,8 +22,23 @@ Float[] cbbe3BAValuesFMG
 Float[] bonesValuesFMG
 Float[] maleValuesFMG
 
+Bool reloadUpdate = false
+
 
 event OnEffectStart(Actor akTarget, Actor akCaster)
+	If snusnuMain.isTransforming
+		Debug.Notification("Already transforming!")
+		Dispel()
+		return
+	EndIf
+	snusnuMain.isTransforming = true
+	
+	If StorageUtil.GetIntValue(akTarget, "SNU_UltraMuscle") > 0
+		;FMG is already ongoing, so we can skip the initial TF part
+		registerForSingleUpdate(10)
+		return
+	EndIf
+	
 	If snusnuMain.PlayerRef.GetActorBase().GetSex() == 0
 		Debug.Notification("This spell only works on female characters")
 		Dispel()
@@ -45,9 +63,7 @@ event OnEffectStart(Actor akTarget, Actor akCaster)
 				WMCM.WMorphs.Enabled = false
 				wmWeight = WMCM.WMorphs.Weight
 				
-				;ToDo- Gradually move Weight to 0.0 instead of just ClearMorphs
-				;WMCM.WMorphs.ClearMorphs()
-				
+				WMCM.WMorphs.UpdateEffects(False)
 				;WMCM.WMorphs.RegisterEvents(false)
 			EndIf
 		EndIf
@@ -94,10 +110,14 @@ event OnEffectStart(Actor akTarget, Actor akCaster)
 			;                               ToDo- We can apply the shrinking of the normal morphs, and then the growing of the 
 			;                               FMG morphs. So we need to have the FMG morphs stored appart from the normal ones
 			If goingUp
-				growVal = growVal + 0.01
+				growVal = growVal + 0.02
 				If growVal >= growStage * 0.1
 					goingUp = false
 					;Debug.Trace("SNU - growVal is "+growVal+", going back down")
+					
+					;ToDo- Instead of hard apply the normals, add an overlay with the final normal map and apply an alpha override
+					;      with growVal as value. When the TF finishes, first apply the actual normal map as a skin override,
+					;      wait for a second and then remove the overlay.
 					
 					;TLALOC- Update normals if needed
 					currentStage = switchMuscleNormals(akTarget, currentStage, growVal * 100 )
@@ -106,7 +126,7 @@ event OnEffectStart(Actor akTarget, Actor akCaster)
 					snusnuMain.changeForearmBoneScale(akTarget, snusnuMain.getBoneSize(growVal, bonesValuesFMG[1]))
 				EndIf
 			Else
-				growVal = growVal - 0.005
+				growVal = growVal - 0.01
 				If growVal >= growSteps - 0.01 && growVal <= growSteps + 0.01
 					;Debug.Trace("SNU - growVal has rested on "+growVal)
 					
@@ -163,7 +183,7 @@ event OnEffectStart(Actor akTarget, Actor akCaster)
 	;switchBarbarianHair(akTarget)
 	
 	;TLALOC-ToDo- Change skin?
-	;applyBarbarianSkin(akTarget)
+	;applyOverlayStrings(akTarget, initOverlaySlot(akTarget))
 	
 	;TLALOC-ToDo- Add a thick neck headmesh!!! -Add a MCM option for it
 	;changeHeadMesh(akTarget)
@@ -198,46 +218,127 @@ event OnEffectStart(Actor akTarget, Actor akCaster)
 	;CarryWeight Boost
 	akTarget.ModActorValue("CarryWeight", 200)
 	
+	tfTime = snusnuMain.GameDaysPassed.GetValue()
+	
 	Debug.Trace("SNU - Finished applying transformation effect")
 	Debug.Notification("FMG transformation finished")
 	registerForSingleUpdate(10)
-endevent
+	
+	snusnuMain.isTransforming = false
+EndEvent
+
+Event OnPlayerLoadGame()
+	Debug.Trace("SNU - OnPlayerLoadGame()")
+	
+	Debug.Trace("SNU - Stored TF Time is: "+tfTime)
+	
+	reloadUpdate = true
+	registerForSingleUpdate(6)
+EndEvent
 
 Event OnUpdate()
-	;Jump height fix
-	If Game.GetGameSettingFloat("fJumpHeightMin") < 180.0
-		Game.SetGameSettingFloat("fJumpHeightMin", 180.0)
+	If reloadUpdate
+		snusnuMain.changeSpineBoneScale(snusnuMain.PlayerRef, snusnuMain.getBoneSize(1.0, bonesValuesFMG[0]))
+		snusnuMain.changeForearmBoneScale(snusnuMain.PlayerRef, snusnuMain.getBoneSize(1.0, bonesValuesFMG[1]))
+		
+		snusnuMain.updateBoobsPhysics(false, 1)
+		applyMuscleNormals(snusnuMain.PlayerRef, 5)
+		
+		;Jump height fix
+		If Game.GetGameSettingFloat("fJumpHeightMin") < 180.0
+			Game.SetGameSettingFloat("fJumpHeightMin", 180.0)
+		EndIf
+	
+		reloadUpdate = false
+	EndIf
+	
+	If snusnuMain.applyMoreChangesOvertime && tfTime != 0.0 && snusnuMain.GameDaysPassed.GetValue() - tfTime >= 1
+		;Apply tan skin
+		applyBarbarianSkin(snusnuMain.PlayerRef)
+		tfTime = 0.0
+	EndIf
+	
+	If StorageUtil.GetIntValue(snusnuMain.PlayerRef, "SNU_UltraMuscle") == 2
+		;Changes were made!
+		If !loadFMGMorphs()
+			Debug.Trace("SNU - Could not load the FMG morphs!")
+		Else
+			muscleChange(snusnuMain.PlayerRef, 1.0 )
+			snusnuMain.changeSpineBoneScale(snusnuMain.PlayerRef, snusnuMain.getBoneSize(1.0, bonesValuesFMG[0]))
+			snusnuMain.changeForearmBoneScale(snusnuMain.PlayerRef, snusnuMain.getBoneSize(1.0, bonesValuesFMG[1]))
+			
+			Debug.Notification("FMG shape has been updated")
+			Debug.Trace("SNU - FMG shape has been updated")
+		EndIf
+		StorageUtil.SetIntValue(snusnuMain.PlayerRef, "SNU_UltraMuscle", 1)
 	EndIf
 	
 	registerForSingleUpdate(10)
 EndEvent
 
+Event OnObjectUnequipped(Form type, ObjectReference ref)
+	if type == snusnuMain.handsFix && tfTime == 0.0
+		Utility.wait(0.4)
+		applyBarbarianSkin(snusnuMain.PlayerRef)
+	endIf
+EndEvent
+
 event OnEffectFinish(Actor akTarget, Actor akCaster)
-	;StorageUtil.SetIntValue(akTarget, "PSQ_HasMuscle", -1)
+	snusnuMain.isTransforming = true
+	
 	StorageUtil.SetIntValue(akTarget, "SNU_UltraMuscle", 0)
 	
 	Debug.Trace("SNU - Starting removal of transformation effect")
+	Debug.Notification("FMG transformation is wearing off!")
 	
 	If snusnuMain.isWeightMorphsLoaded
 		WeightMorphsMCM WMCM = Game.GetFormFromFile(0x05000888, "WeightMorphs.esp") As WeightMorphsMCM
 		If WMCM != none && snusnuMain.removeWeightMorphs
 			If !WMCM.WMorphs.Enabled && wasWMEnabled
-				WMCM.WMorphs.Weight = wmWeight
-				WMCM.WMorphs.Enabled = true
+				WMCM.WMorphs.tempWeight = wmWeight
+				;WMCM.WMorphs.Enabled = true
 				wasWMEnabled = false
 				WMCM.WMorphs.RegisterEvents(true)
 			EndIf
 		EndIf
 	EndIf
 	
-	;TLALOC-ToDo- Make a deflate animation for this
-	clearMuscleMorphs(akTarget)
-	snusnuMain.clearBoneScales(akTarget)
+	
+	If snusnuMain.tfAnimation
+		;TLALOC-ToDo- Make a deflate animation for this
+		float deflateVal = 1.0
+		while deflateVal > 0.0
+			removeNormalMuscle(akTarget, deflateVal)
+			
+			muscleChange(akTarget, deflateVal)
+			
+			If (deflateVal * 100) as Int % 16 == 0
+				snusnuMain.changeSpineBoneScale(akTarget, snusnuMain.getBoneSize(deflateVal, bonesValuesFMG[0]))
+				snusnuMain.changeForearmBoneScale(akTarget, snusnuMain.getBoneSize(deflateVal, bonesValuesFMG[1]))
+			endIf
+			
+			deflateVal -= 0.02
+			Utility.wait(0.04)
+		endWhile
+		
+		snusnuMain.changeSpineBoneScale(akTarget, snusnuMain.getBoneSize(0, bonesValuesFMG[0]))
+		snusnuMain.changeForearmBoneScale(akTarget, snusnuMain.getBoneSize(0, bonesValuesFMG[1]))
+		
+		clearMuscleMorphs(akTarget)
+		snusnuMain.clearBoneScales(akTarget)
+	Else
+		clearMuscleMorphs(akTarget)
+		snusnuMain.clearBoneScales(akTarget)
+	EndIf
 	
 	;TLALOC-ToDo- Remove normals overlay
 	;AddNodeOverrideFloat(akTarget, true, overlaySlot, 8, -1, growVal, true)
-	RemoveAllReferenceSkinOverrides(akTarget);For the custom normals
 	;RemoveSkinOverride(akTarget, true, false, 0x04, 9, 1)
+	RemoveAllReferenceSkinOverrides(akTarget);For the custom normals
+	;ApplySkinOverrides(akTarget)
+	If !akTarget.IsOnMount()
+		akTarget.QueueNiNodeUpdate()
+	EndIf
 	
 	If snusnuMain.useAltAnims
 		;We need to check for the actual muscle level which is already done in checkBodyNormalsState()
@@ -250,7 +351,9 @@ event OnEffectFinish(Actor akTarget, Actor akCaster)
 	;switchBarbarianHair()
 	
 	;TLALOC-ToDo- Change skin?
-	;applyBarbarianSkin()
+	;If snusnuMain.applyMoreChangesOvertime
+	;	applyBarbarianSkin(akTarget, true)
+	;EndIf
 	
 	If snusnuMain.changeHeadPart && snusnuMain.originalHead != none
 			akTarget.ChangeHeadPart(snusnuMain.originalHead)
@@ -273,7 +376,12 @@ event OnEffectFinish(Actor akTarget, Actor akCaster)
 		snusnuMain.heavyItemsEquiped = 1
 	EndIf
 	
+	snusnuMain.addWerewolfBuild(false)
+	
 	Debug.Trace("SNU - Finished removal of transformation effect")
+	Debug.Notification("FMG transformation is gone")
+	
+	snusnuMain.isTransforming = false
 endevent
 
 Function removeNormalMuscle(Actor buffTarget, Float changePercent)
@@ -289,15 +397,11 @@ Function removeNormalMuscle(Actor buffTarget, Float changePercent)
 EndFunction
 
 Function muscleChange(Actor buffTarget, Float changePercent)
-	
-	;ToDo- We nedd to load the FMG profile here and save it on temporal arrays so that in can be gradually applied.
-	;      We could actually have property arrays in the main script so that both this and the NPC TF scripts can use them.
-	
 	Int totalSliders = IntListCount(none, SNUSNU_BUFF_KEY)
 	Int slidersLoop = 0
 	while slidersLoop < totalSliders
 		Int currentSliderIndex = IntListGet(none, SNUSNU_BUFF_KEY, slidersLoop)
-		NiOverride.SetBodyMorph(buffTarget, snusnuMain.getSliderString(currentSliderIndex), SNUSNU_BUFF_KEY, changePercent * getSliderValue(currentSliderIndex))
+		SetBodyMorph(buffTarget, snusnuMain.getSliderString(currentSliderIndex), SNUSNU_BUFF_KEY, changePercent * getSliderValue(currentSliderIndex))
 		slidersLoop += 1
 	endWhile
 	
@@ -362,18 +466,18 @@ string Function initOverlaySlot(Actor buffTarget) Global
 		overlayString = getCurrentOverlayString(buffTarget, i)
 		Debug.Trace("SNU - overlayString="+overlayString)
 		if overlayString == "" || overlayString == deftex || StringUtil.Find(overlayString, "blank.dds") != -1
-			newOverlayID = "Body [Ovl" + i + "]"
+			newOverlayID = "[Ovl" + i + "]"
 		endIf
 		i += 1
 	endWhile
 	
 	If newOverlayID == "x"
 		Debug.Trace("SNU - ERROR: No free slot was found to apply muscle overlays")
-	Else
+	;/Else
 		;TLALOC-ToDo- Don't assume actor is female in all of niOverride calls
-		AddNodeOverrideString(buffTarget, true, newOverlayID, 9, 0, normalsPath+"tan.dds", true)
-		AddNodeOverrideString(buffTarget, true, newOverlayID, 9, 1, normalsPath+"ultra.dds", true)
-		Debug.Trace("SNU - overlay slot was found: "+newOverlayID)
+		AddNodeOverrideString(buffTarget, true, "Body "+newOverlayID, 9, 0, normalsPath+"tan.dds", true)
+		AddNodeOverrideString(buffTarget, true, "Body "+newOverlayID, 9, 1, normalsPath+"ultra.dds", true)
+		Debug.Trace("SNU - overlay slot was found: "+newOverlayID)/;
 	EndIf
 	
 	return newOverlayID
@@ -392,20 +496,50 @@ string Function getCurrentOverlayString(Actor target, int index) Global
 	return tx
 EndFunction
 
-Function applyOverlayStrings(Actor target, int index)
-	string overlayID = "[Ovl" + index + "]"
+Function applyOverlayStrings(Actor target, String slot)
+	;string overlayID = "[Ovl" + index + "]"
 	String normalsPath = "textures\\Snusnu\\Normals\\Ultra\\"
 	;TLALOC-ToDo- We need to find free slots for all the other body parts!!!!!!
-	AddNodeOverrideString(target, true, "Body "+overlayID, 9, 0, normalsPath+"Body.dds", true)
-	AddNodeOverrideString(target, true, "Body "+overlayID, 9, 1, normalsPath+"Ultra.dds", true)
+	AddNodeOverrideString(target, true, "Body "+slot, 9, 0, normalsPath+"Body.dds", true)
+	AddNodeOverrideString(target, true, "Body "+slot, 9, 1, normalsPath+"Ultra.dds", true)
 
-	AddNodeOverrideString(target, true, "Face "+overlayID, 9, 0, normalsPath+"Face.dds", true)
-	AddNodeOverrideString(target, true, "Face "+overlayID, 9, 1, normalsPath+"FaceMSN.dds", true)
+	AddNodeOverrideString(target, true, "Face "+slot, 9, 0, normalsPath+"Face.dds", true)
+	AddNodeOverrideString(target, true, "Face "+slot, 9, 1, normalsPath+"FaceMSN.dds", true)
 	
-	AddNodeOverrideString(target, true, "Hands "+overlayID, 9, 0, normalsPath+"Hands.dds", true)
+	AddNodeOverrideString(target, true, "Hands "+slot, 9, 0, normalsPath+"Hands.dds", true)
 	
-	AddNodeOverrideString(target, true, "Feet "+overlayID, 9, 0, normalsPath+"Feet.dds", true)
+	AddNodeOverrideString(target, true, "Feet "+slot, 9, 0, normalsPath+"Feet.dds", true)
 	
+EndFunction
+
+Function applyBarbarianSkin(Actor target, Bool removeSkin = false)
+	If !removeSkin
+		String tempNormalsPath = "textures\\Snusnu\\Normals\\Ultra\\"
+		;Body
+		AddSkinOverrideString(target, true, false, 0x04, 9, 0, tempNormalsPath+"Body.dds", true)
+		AddSkinOverrideString(target, true, true, 0x04, 9, 0, tempNormalsPath+"Body.dds", true)
+		
+		;Face
+		;AddSkinOverrideString(target, true, false, 0x04, 9, 0, tempNormalsPath+"Face.dds", true)
+		;AddSkinOverrideString(target, true, true, 0x04, 9, 0, tempNormalsPath+"Face.dds", true)
+		;target.RegenerateHead()
+		target.ChangeHeadPart(snusnuMain.MuscleHeadTan)
+		target.RegenerateHead()
+		
+		;Hands
+		AddSkinOverrideString(target, true, false, 0x08, 9, 0, tempNormalsPath+"Hands.dds", true)
+		AddSkinOverrideString(target, true, true, 0x08, 9, 0, tempNormalsPath+"Hands.dds", true)
+		
+		;Feet
+		AddSkinOverrideString(target, true, false, 0x80, 9, 0, tempNormalsPath+"Body.dds", true)
+		AddSkinOverrideString(target, true, true, 0x80, 9, 0, tempNormalsPath+"Body.dds", true)
+	Else
+		RemoveAllReferenceSkinOverrides(target)
+		;ApplySkinOverrides(target)
+		If !target.IsOnMount()
+			target.QueueNiNodeUpdate()
+		EndIf
+	EndIf
 EndFunction
 
 

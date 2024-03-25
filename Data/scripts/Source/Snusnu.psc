@@ -100,11 +100,14 @@ Bool Property tfAnimation = true Auto
 Bool Property useAltAnims = true Auto
 Bool Property tfAnimationNPC = true Auto
 Bool Property useAltAnimsNPC = true Auto
+Bool Property applyMoreChangesOvertime = true Auto
 Bool Property changeHeadPart = true Auto
 Bool Property playTFSound = true Auto
-HeadPart Property MuscleHead  Auto 
+HeadPart Property MuscleHead  Auto
+HeadPart Property MuscleHeadTan  Auto
 HeadPart Property originalHead Auto
 Sound Property snusnuTFSound  Auto  
+Bool Property isTransforming = false Auto
 
 ;Experimental custom NPC muscle.
 Float Property npcMuscleScore = 500.0 Auto
@@ -125,6 +128,7 @@ Float Property maxItemsEquipedWeight = 150.0 Auto
 Float Property minItemsEquipedWeight = 15.0 Auto
 ;FIX: CarryWeight value doesn't get updated after switch equipping 2 heavy items
 Bool isEquipWeightUpdating = false
+Bool needEquipWeightUpdate = false
 
 Bool Property isWerewolf = false Auto
 Float Property addWerewolfStrength = 0.05 Auto
@@ -341,6 +345,34 @@ Event OnUpdate()
 ;			LastDegradationTime = GameDaysPassed.GetValue()
 ;		EndIf
 		
+		If needEquipWeightUpdate
+			If !heavyItemsEquiped && itemsEquipedWeight > allowedItemsEquipedWeight && StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle") == 0
+				Debug.Notification("I'm too weak to equip all of this!")
+			
+				actualCarryWeight = PlayerRef.GetActorValue("CarryWeight")
+				Float modWeight = actualCarryWeight + 500.0
+				Debug.Trace("SNU - actualCarryWeight="+actualCarryWeight)
+				;Debug.Notification("Carry weight: "+actualCarryWeight)
+			
+				;PlayerRef.UnequipItem(type, true)
+				PlayerRef.ModActorValue("CarryWeight", -modWeight)
+				heavyItemsEquiped = 1
+			ElseIf heavyItemsEquiped && itemsEquipedWeight <= allowedItemsEquipedWeight && PlayerRef.GetActorValue("CarryWeight") < -100 && \
+			StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle") == 0
+				Debug.Trace("SNU - All heavy items were removed. Restoring carryWeight")
+				;Debug.Notification("Restoring carry weight: "+actualCarryWeight+"+500")
+				Debug.Notification("I can move freely now")
+				
+				PlayerRef.ModActorValue("CarryWeight", actualCarryWeight + 500)
+				heavyItemsEquiped = 0
+				
+				;DEBUG
+				Debug.Trace("SNU - CarryWeight after items unequipped = "+PlayerRef.GetActorValue("CarryWeight"))
+			EndIf
+			
+			needEquipWeightUpdate = false
+		EndIf
+		
 		RegisterForSingleUpdate(15) ;Was 6
 		RegisterForSleep()
 	EndIf
@@ -532,16 +564,8 @@ Event OnObjectEquipped(Form type, ObjectReference ref)
 		Debug.Trace("SNU - Full equiped weight is "+itemsEquipedWeight)
 		
 		If itemsEquipedWeight > allowedItemsEquipedWeight && StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle") == 0
-			Debug.Notification("I'm too weak to equip all of this!")
-		
-			actualCarryWeight = PlayerRef.GetActorValue("CarryWeight")
-			Float modWeight = actualCarryWeight + 500.0
-			Debug.Trace("SNU - actualCarryWeight="+actualCarryWeight)
-			;Debug.Notification("Carry weight: "+actualCarryWeight)
-		
-			;PlayerRef.UnequipItem(type, true)
-			PlayerRef.ModActorValue("CarryWeight", -modWeight)
-			heavyItemsEquiped = 1
+			needEquipWeightUpdate = true
+			RegisterForSingleUpdate(1)
 		EndIf
 	EndIf
 	isEquipWeightUpdating = false
@@ -572,15 +596,8 @@ Event OnObjectUnequipped(Form type, ObjectReference ref)
 		
 	If heavyItemsEquiped && itemsEquipedWeight <= allowedItemsEquipedWeight && PlayerRef.GetActorValue("CarryWeight") < -100 && \
 	StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle") == 0
-		Debug.Trace("SNU - All heavy items were removed. Restoring carryWeight")
-		;Debug.Notification("Restoring carry weight: "+actualCarryWeight+"+500")
-		Debug.Notification("I can move freely now")
-		
-		PlayerRef.ModActorValue("CarryWeight", actualCarryWeight + 500)
-		heavyItemsEquiped = 0
-		
-		;DEBUG
-		Debug.Trace("SNU - CarryWeight = "+PlayerRef.GetActorValue("CarryWeight"))
+		needEquipWeightUpdate = true
+		RegisterForSingleUpdate(1)
 	EndIf
 	isEquipWeightUpdating = false
 EndEvent
@@ -909,7 +926,13 @@ Function updateMuscleScore(float incValue)
 		;ToDo- We could add a toggle for this in the MCM, but it might not be necesary
 		Float medScoreMax = muscleScoreMax / 2
 		If muscleScore < medScoreMax
-			Float scoreIncFactor = 2 - (muscleScore / medScoreMax)
+			;Growth goes from 1:1 to 2:1
+			;Float scoreIncFactor = 2 - (muscleScore / medScoreMax)
+			;incValue = incValue * scoreIncFactor
+			
+			;Growth goes from 1:1 to 1.5:1
+			Float scoreIncFactor = 2 - (muscleScore / muscleScoreMax)
+			scoreIncFactor = scoreIncFactor - 0.5
 			incValue = incValue * scoreIncFactor
 		Else
 			Float medScore = muscleScore - medScoreMax
@@ -1197,7 +1220,7 @@ EndFunction
 ;     Pregnancy stages = 0=Not preg, 1=Preg
 Function checkBodyNormalsState()
 	;Debug.Trace("SNU - checkBodyNormalsState()")
-	If disableNormals || StorageUtil.GetIntValue(PlayerRef, "PSQ_HasMuscle") != 0 || StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle") != 0
+	If disableNormals || StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle") != 0
 		return
 	EndIf
 	
@@ -1349,7 +1372,7 @@ Function UpdateEffects(Bool reAdd = True)
 			magStamina = (muscleScore / muscleScoreMax) * Stamina
 			magSpeed = (muscleScore / muscleScoreMax) * Speed
 		Else
-			magStamina = Stamina * 2
+			magStamina = Stamina * 4
 			magSpeed = Speed * 2
 		EndIf
 		
@@ -2700,7 +2723,7 @@ Float Function getCarryWeightPercent()
 	return newCarryWeight
 EndFunction
 
-Function addWerewolfBuild()
+Function addWerewolfBuild(Bool wasWerewolf = true)
 	Debug.Trace("SNU - addWerewolfBuild()")
 	If addWerewolfStrength > 0.0
 		;Werewolf characters should have a lean, muscular build, so that means:
@@ -2712,11 +2735,16 @@ Function addWerewolfBuild()
 		updateMuscleScore(muscleScoreMax * addWerewolfStrength) ;Add 5% extra muscle
 		
 		If isWeightMorphsLoaded
+			Float weightBase = 0.075
+			If !wasWerewolf
+				weightBase = 0.0
+			EndIf
+			
 			WeightMorphsMCM WMCM = Game.GetFormFromFile(0x05000888, "WeightMorphs.esp") As WeightMorphsMCM
-			If WMCM.WMorphs.Weight <= 0.065 ;0.155
-				WMCM.WMorphs.ChangeWeight(0.01, true)
-			ElseIf WMCM.WMorphs.Weight >= 0.085 ;0.22
-				WMCM.WMorphs.ChangeWeight(-0.01, true)
+			If WMCM.WMorphs.Weight <= weightBase - 0.05 ;0.025
+				WMCM.WMorphs.ChangeWeight(0.05, true)
+			ElseIf WMCM.WMorphs.Weight >= weightBase + 0.05 ;0.085
+				WMCM.WMorphs.ChangeWeight(-0.05, true)
 			EndIf
 		EndIf
 	EndIf

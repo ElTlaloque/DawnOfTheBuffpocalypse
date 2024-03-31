@@ -32,6 +32,8 @@ Int _mychangeHeadPart
 Int _myplayTFSound
 Int _myUseWeightSlider
 Int _myDisableNormals
+Int _myApplyMoreChanges
+Int _myChangesInterval
 
 Int _myZeroSliders
 Int _myApplyDefault
@@ -111,6 +113,11 @@ Function setMenuPages()
 EndFunction
 
 Event OnConfigInit()
+	If StorageUtil.GetIntValue(snusnuMain.PlayerRef, "SNU_UltraMuscle") > 0
+		editFMGMorphs = True
+		switchFMGMorphs(True)
+	EndIf
+	
 	initPageNames()
 	setMenuPages()
 	
@@ -140,11 +147,9 @@ EndEvent
 Event OnConfigClose()
 	If editFMGMorphs
 		;Save FMG morphs profile and load the previous morphs
-		If !snusnuMain.saveAllMorphs("SnuSnuProfiles/SnuDefaultFMG")
-			Debug.Notification("There was an error while saving FMG morphs!")
-		EndIf
-		If !snusnuMain.loadAllMorphs("SnuSnuProfiles/SnuTempMorphs")
-			Debug.Notification("There was an error while loading current morphs!")
+		String loadErrorMsg = switchFMGMorphs(False)
+		If loadErrorMsg
+			ShowMessage(loadErrorMsg, false)
 		EndIf
 				
 		;Update body if PC is currently transformed
@@ -233,9 +238,7 @@ Event OnPageReset(String a_page)
 		AddEmptyOption()
 		AddEmptyOption()
 		
-		AddKeyMapOptionST("SnusnuNPCMuscle","Add muscles to targeted NPCs", snusnuMain.npcMuscleKey)
 		AddKeyMapOptionST("SnusnuDumpInfo","$SNUSNU_DUMPINFO", snusnuMain.getInfoKey)
-		_myNPCMuscleScore = AddSliderOption("NPC Custom Muscle", (snusnuMain.npcMuscleScore/snusnuMain.muscleScoreMax)*100, "{0}%")
 		
 		AddEmptyOption()
 		AddEmptyOption()
@@ -255,6 +258,10 @@ Event OnPageReset(String a_page)
 		_myuseAltAnimsNPC = AddToggleOption("$SNUSNU_USEALTANIMSNPC", snusnuMain.useAltAnimsNPC)
 		_mychangeHeadPart = AddToggleOption("$SNUSNU_CHANGEHEAD", snusnuMain.changeHeadPart)
 		_myplayTFSound = AddToggleOption("$SNUSNU_PLAYTFSOUND", snusnuMain.playTFSound)
+		_myApplyMoreChanges = AddToggleOption("More changes while TF", snusnuMain.applyMoreChangesOvertime)
+		_myChangesInterval = AddSliderOption("More changes interval", snusnuMain.moreChangesInterval, "{2}")
+		_myNPCMuscleScore = AddSliderOption("NPC Custom Muscle", snusnuMain.npcMuscleScore*100, "{0}%")
+		AddKeyMapOptionST("SnusnuNPCMuscle","Reload NPC muscles", snusnuMain.npcMuscleKey)
 		
 	ElseIf (a_page == Pages[1] && snusnuMain.selectedBody != 2)
 		SetCursorFillMode(LEFT_TO_RIGHT)
@@ -537,6 +544,20 @@ Event OnPageReset(String a_page)
 		snusnuMain.tempDebugSliders()
 		AddToggleOption("Dumping sliders info into log file", True, OPTION_FLAG_DISABLED)
 		_myFoceScore = AddSliderOption("Set muscle score", snusnuMain.muscleScore, "{3}")
+		
+		AddEmptyOption()
+		AddEmptyOption()
+		AddHeaderOption("NPCs with muscle:")
+		AddEmptyOption()
+		SetCursorFillMode(TOP_TO_BOTTOM)
+		Int totalNPCs = FormListCount(none, "MUSCLE_NPCS")
+		Int npcsLoop = 0
+		while npcsLoop < totalNPCs
+			Actor currentActor = FormListGet(none, "MUSCLE_NPCS", npcsLoop) as Actor
+			Float muscleScoreNPC = GetFloatValue(currentActor, "hasMuscle", 0) * 100
+			AddSliderOption(currentActor.GetBaseObject().getName(), muscleScoreNPC, "{0}%", OPTION_FLAG_DISABLED)
+			npcsLoop += 1
+		endWhile
 	EndIf
 EndEvent
 
@@ -575,6 +596,10 @@ Event OnOptionHighlight(Int a_option)
 		SetInfoText("$SNUSNU_USEALTANIMS_DESC")
 	ElseIf a_option == _myuseAltAnimsNPC
 		SetInfoText("$SNUSNU_USEALTANIMSNPC_DESC")
+	ElseIf a_option == _myApplyMoreChanges
+		SetInfoText("Apply more visual changes during FMG transformation. Right now the only change is the body skin will change to a darker tan-like version.")
+	ElseIf a_option == _myChangesInterval
+		SetInfoText("How much to wait for the next change to be applied, in in-game days.")
 	ElseIf a_option == _myCustomizeFMG
 		SetInfoText("Toggle FMG morphs customization.")
 	ElseIf a_option == _myRemoveWeightMorphs
@@ -594,7 +619,7 @@ Event OnOptionHighlight(Int a_option)
 	ElseIf a_option == _myFoceScore
 		SetInfoText("Force muscle score value. Only for debug purposes!!")
 	ElseIf a_option == _myNPCMuscleScore
-		SetInfoText("Muscle to apply to NPCs")
+		SetInfoText("How much FMG muscle to apply to NPCs")
 	ElseIf a_option == _myMalnourishment
 		SetInfoText("At which WeightMorphs weigh value would the character be considered malnourished. Being malnourished greately reduces the muscle gain rate.")
 	ElseIf a_option == _myPushupException
@@ -647,6 +672,9 @@ Event OnOptionSelect(Int a_option)
 	ElseIf a_option == _myplayTFSound
 		snusnuMain.playTFSound = !snusnuMain.playTFSound
 		SetToggleOptionValue(a_option, snusnuMain.playTFSound)
+	ElseIf a_option == _myApplyMoreChanges
+		snusnuMain.applyMoreChangesOvertime = !snusnuMain.applyMoreChangesOvertime
+		SetToggleOptionValue(a_option, snusnuMain.applyMoreChangesOvertime)
 	ElseIf a_option == _myCustomizeFMG
 		editFMGMorphs = !editFMGMorphs
 		SetToggleOptionValue(a_option, editFMGMorphs)
@@ -655,30 +683,22 @@ Event OnOptionSelect(Int a_option)
 		If editFMGMorphs
 			Msg = "All morph changes you do while this option is selected will only affect the FMG body shape. To go back to normal muscle morphs just disable this option."
 			ShowMessage(Msg, False)
+			
 			;Load FMG morphs profile here. All changes to the morphs must be saved after this
 			;option is disabled or user exits this menu.
 			;NOTICE! Previous morphs should be saved to a temporal profile file!
-			
-			If !snusnuMain.saveAllMorphs("SnuSnuProfiles/SnuTempMorphs")
-				ShowMessage("There was an error while saving current morphs!", false)
-				Return
-			EndIf
-			If !snusnuMain.loadAllMorphs("SnuSnuProfiles/SnuDefaultFMG")
-				ShowMessage("There was an error while loading FMG morphs!", false)
-				Return
+			String loadErrorMsg = switchFMGMorphs(True)
+			If loadErrorMsg
+				ShowMessage(loadErrorMsg, false)
 			EndIf
 		Else
 			Msg = "Going back to normal muscle morphs customization"
 			ShowMessage(Msg, False)
-			;Save morphs to a FMG profile file and load the previous morphs
 			
-			If !snusnuMain.saveAllMorphs("SnuSnuProfiles/SnuDefaultFMG")
-				ShowMessage("There was an error while saving FMG morphs!", false)
-				Return
-			EndIf
-			If !snusnuMain.loadAllMorphs("SnuSnuProfiles/SnuTempMorphs")
-				ShowMessage("There was an error while loading current morphs!", false)
-				Return
+			;Save morphs to a FMG profile file and load the previous morphs
+			String loadErrorMsg = switchFMGMorphs(False)
+			If loadErrorMsg
+				ShowMessage(loadErrorMsg, false)
 			EndIf
 			
 			;Update body if PC is currently transformed
@@ -860,7 +880,7 @@ Event OnOptionSliderOpen(Int a_option)
 		SetSliderDialogRange(0.0, snusnuMain.muscleScoreMax)
 		SetSliderDialogInterval(10.0)
 	ElseIf a_option == _myNPCMuscleScore
-		SetSliderDialogStartValue((snusnuMain.npcMuscleScore/snusnuMain.muscleScoreMax)*100)
+		SetSliderDialogStartValue(snusnuMain.npcMuscleScore*100)
 		SetSliderDialogDefaultValue(50)
 		SetSliderDialogRange(0, 100)
 		SetSliderDialogInterval(1)
@@ -869,6 +889,11 @@ Event OnOptionSliderOpen(Int a_option)
 		SetSliderDialogDefaultValue(-0.9)
 		SetSliderDialogRange(-1.0, 0.0)
 		SetSliderDialogInterval(0.02)
+	ElseIf a_option == _myChangesInterval
+		SetSliderDialogStartValue(snusnuMain.moreChangesInterval)
+		SetSliderDialogDefaultValue(1.0)
+		SetSliderDialogRange(0.1, 5.0)
+		SetSliderDialogInterval(0.01)
 	ElseIf a_option == _myMuscleAnimsLevel
 		SetSliderDialogStartValue(snusnuMain.muscleAnimsLevel.getValue())
 		SetSliderDialogDefaultValue(2.0)
@@ -1003,11 +1028,14 @@ Event OnOptionSliderAccept(Int a_option, Float a_value)
 		snusnuMain.ForceNewWeight(a_value)
 		SetSliderOptionValue(a_option, a_value, "{3}")
 	ElseIf a_option == _myNPCMuscleScore
-		applyNPCMuscleValue((a_value/100)*snusnuMain.muscleScoreMax)
+		applyNPCMuscleValue(a_value/100)
 		SetSliderOptionValue(_myNPCMuscleScore, a_value, "{0}%")
 	ElseIf a_option == _myMalnourishment	
 		snusnuMain.malnourishmentValue = a_value
 		SetSliderOptionValue(a_option, snusnuMain.malnourishmentValue, "{2}")
+	ElseIf a_option == _myChangesInterval	
+		snusnuMain.moreChangesInterval = a_value
+		SetSliderOptionValue(a_option, snusnuMain.moreChangesInterval, "{2}")
 	ElseIf a_option == _myMuscleAnimsLevel
 		applyMuscleAnimsLevelValue(a_value)
 		
@@ -1484,6 +1512,8 @@ Bool Function saveSettings()
 	JsonUtil.SetIntValue(fileName, "changeHeadPart", snusnuMain.changeHeadPart as Int)
 	JsonUtil.SetIntValue(fileName, "playTFSound", snusnuMain.playTFSound as Int)
 	JsonUtil.SetIntValue(fileName, "removeWeightMorphs", snusnuMain.removeWeightMorphs as Int)
+	JsonUtil.SetIntValue(fileName, "applyMoreChangesOvertime", snusnuMain.applyMoreChangesOvertime as Int)
+	JsonUtil.SetFloatValue(fileName, "moreChangesInterval", snusnuMain.moreChangesInterval)
 	JsonUtil.SetIntValue(fileName, "getInfoKey", snusnuMain.getInfoKey)
 	JsonUtil.SetIntValue(fileName, "npcMuscleKey", snusnuMain.npcMuscleKey)
 	JsonUtil.SetFloatValue(fileName, "npcMuscleScore", snusnuMain.npcMuscleScore)
@@ -1561,6 +1591,8 @@ bool Function loadSettings()
 		snusnuMain.changeHeadPart = JsonUtil.GetIntValue(fileName, "changeHeadPart", snusnuMain.changeHeadPart as Int)
 		snusnuMain.playTFSound = JsonUtil.GetIntValue(fileName, "playTFSound", snusnuMain.playTFSound as Int)
 		snusnuMain.removeWeightMorphs = JsonUtil.GetIntValue(fileName, "removeWeightMorphs", snusnuMain.removeWeightMorphs as Int)
+		snusnuMain.applyMoreChangesOvertime = JsonUtil.GetIntValue(fileName, "applyMoreChangesOvertime", snusnuMain.applyMoreChangesOvertime as Int)
+		snusnuMain.moreChangesInterval = JsonUtil.GetFloatValue(fileName, "moreChangesInterval", snusnuMain.moreChangesInterval as Float)
 		
 		If snusnuMain.getInfoKey != JsonUtil.GetIntValue(fileName, "getInfoKey", snusnuMain.getInfoKey)
 			snusnuMain.getInfoKey = JsonUtil.GetIntValue(fileName, "getInfoKey", snusnuMain.getInfoKey)
@@ -1888,4 +1920,25 @@ Function applyLoadMorphs(String profileName = "")
 	
 	Self.SetOptionFlags(_mySaveMorphsProfile, Self.OPTION_FLAG_NONE, True)
 	Self.SetOptionFlags(_myLoadMorphsProfile, Self.OPTION_FLAG_NONE, True)
+EndFunction
+
+String Function switchFMGMorphs(Bool loadFMG)
+	String errorMSG
+	If loadFMG
+		If !snusnuMain.saveAllMorphs("SnuSnuProfiles/SnuTempMorphs")
+			errorMSG = "There was an error while saving current morphs!"
+		EndIf
+		If !snusnuMain.loadAllMorphs("SnuSnuProfiles/SnuDefaultFMG")
+			errorMSG = "There was an error while loading FMG morphs!"
+		EndIf
+	Else
+		If !snusnuMain.saveAllMorphs("SnuSnuProfiles/SnuDefaultFMG")
+			errorMSG = "There was an error while saving FMG morphs!"
+		EndIf
+		If !snusnuMain.loadAllMorphs("SnuSnuProfiles/SnuTempMorphs")
+			errorMSG = "There was an error while loading current morphs!"
+		EndIf
+	EndIf
+	
+	Return errorMSG
 EndFunction

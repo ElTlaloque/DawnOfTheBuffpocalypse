@@ -30,7 +30,8 @@ SPELL Property DecreaseCombat  Auto
 
 GlobalVariable Property GameDaysPassed  Auto  
 GlobalVariable Property MuscleLevel  Auto  
-GlobalVariable Property muscleAnimsLevel  Auto  
+GlobalVariable Property muscleAnimsLevel  Auto
+GlobalVariable Property IsOverwhelmed  Auto
 
 Bool Property Enabled = False Auto
 Bool Property useWeightSlider = False Auto
@@ -93,6 +94,7 @@ Bool Property useDynamicPhysics = true Auto
 Bool Property is3BAPhysicsLoaded Auto
 
 ;TLALOC- TF related stuff
+Bool Property isTransforming = false Auto
 SPELL Property MusclePowerSpell  Auto  
 SPELL Property UltraMusclePowerSpell  Auto  
 Armor Property FistsOfRage  Auto 
@@ -105,12 +107,13 @@ Bool Property changeHeadPart = true Auto
 Bool Property playTFSound = true Auto
 HeadPart Property MuscleHead  Auto
 HeadPart Property MuscleHeadTan  Auto
+HeadPart Property MuscleHeadTan2  Auto
 HeadPart Property originalHead Auto
-Sound Property snusnuTFSound  Auto  
-Bool Property isTransforming = false Auto
+Sound Property snusnuTFSound  Auto
+Float Property moreChangesInterval = 1.0  Auto
 
 ;Experimental custom NPC muscle.
-Float Property npcMuscleScore = 500.0 Auto
+Float Property npcMuscleScore = 0.5 Auto
 
 ;TLALOC- Body management stuff
 Float prevPositionZ = 0.0
@@ -292,21 +295,21 @@ Event OnUpdate()
 				EndIf
 			EndIf
 			
-			;TLALOC- Muscle score degradation
-			;ToDo- Make it time based instead of loop based (Use getCurrentTime)
-			Float DegradationTimer = GameDaysPassed.GetValue() - LastDegradationTime
-			;updateMuscleScore(-0.1 * MultLoss)
-			Float totalDegradation = degradationBase * MultLoss * DegradationTimer
-			If justWakeUp
-				Debug.Trace("SNU - justWakeUp, totalDegradation="+totalDegradation)
-				Float sleepBonus = getSleepBonus()
-				If sleepBonus > 0.0
-					Debug.Notification("I got back "+sleepBonus+" muscle score points")
+			If StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle") == 0
+				;TLALOC- Muscle score degradation
+				Float DegradationTimer = GameDaysPassed.GetValue() - LastDegradationTime
+				Float totalDegradation = degradationBase * MultLoss * DegradationTimer
+				If justWakeUp
+					Debug.Trace("SNU - justWakeUp, totalDegradation="+totalDegradation)
+					Float sleepBonus = getSleepBonus()
+					If sleepBonus > 0.0
+						Debug.Notification("I got back "+sleepBonus+" muscle score points")
+					EndIf
+					totalDegradation = totalDegradation + sleepBonus
+					Debug.Trace("SNU -             finalDegradation="+totalDegradation)
 				EndIf
-				totalDegradation = totalDegradation + sleepBonus
-				Debug.Trace("SNU -             finalDegradation="+totalDegradation)
+				updateMuscleScore(totalDegradation)
 			EndIf
-			updateMuscleScore(totalDegradation)
 			
 			If justWakeUp
 				;ToDo- We might need to find a way to update the carry way in a non intrusive way without having to 
@@ -314,14 +317,17 @@ Event OnUpdate()
 				updateCarryWeight()
 				
 				If hardcoreMode
+					;Cleanup equipped item weights
+					Debug.Notification("Refreshing hardcore weights")
 					updateAllowedItemsEquipedWeight()
+					getEquipedFullWeight()
 				EndIf
 			EndIf
 			justWakeUp = false
 			;Debug.Trace("SNU - DegradationTimer="+DegradationTimer)
 			LastDegradationTime = GameDaysPassed.GetValue()
 			
-			If StorageUtil.GetIntValue(PlayerRef, "PSQ_HasMuscle") == 0 && StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle") == 0
+			If StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle") == 0
 				UpdateWeight(true)
 				checkBodyNormalsState()
 				
@@ -357,6 +363,7 @@ Event OnUpdate()
 				;PlayerRef.UnequipItem(type, true)
 				PlayerRef.ModActorValue("CarryWeight", -modWeight)
 				heavyItemsEquiped = 1
+				IsOverwhelmed.setValue(1)
 			ElseIf heavyItemsEquiped && itemsEquipedWeight <= allowedItemsEquipedWeight && PlayerRef.GetActorValue("CarryWeight") < -100 && \
 			StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle") == 0
 				Debug.Trace("SNU - All heavy items were removed. Restoring carryWeight")
@@ -365,6 +372,7 @@ Event OnUpdate()
 				
 				PlayerRef.ModActorValue("CarryWeight", actualCarryWeight + 500)
 				heavyItemsEquiped = 0
+				IsOverwhelmed.setValue(0)
 				
 				;DEBUG
 				Debug.Trace("SNU - CarryWeight after items unequipped = "+PlayerRef.GetActorValue("CarryWeight"))
@@ -451,7 +459,7 @@ Float Function getEquipmentSkillBonus(Int itemType)
 		bonus = 65.0
 	EndIf
 	
-	Debug.Trace("SNU - Skill value is: "+bonus)
+	;Debug.Trace("SNU - Skill value is: "+bonus)
 	return bonus
 EndFunction
 
@@ -460,6 +468,9 @@ EndFunction
 ;         y hacer el calculo con el rango de 10 como minimo y 150 como maximo
 Float Function getEquipedFullWeight()
 	Form[] equipedItems = PO3_SKSEFunctions.AddAllEquippedItemsToArray(PlayerRef)
+	
+	FormListClear(PlayerRef, SNU_EQUIP_WEIGHTS_KEY)
+	FloatListClear(PlayerRef, SNU_EQUIP_WEIGHTS_KEY)
 	
 	int counter = 0
 	itemsEquipedWeight = 0
@@ -508,10 +519,11 @@ Float Function getEquipedFullWeight()
 	
 		actualCarryWeight = PlayerRef.GetActorValue("CarryWeight")
 		Float modWeight = actualCarryWeight + 500.0
-		Debug.Trace("SNU - actualCarryWeight="+actualCarryWeight)
+		;Debug.Trace("SNU - actualCarryWeight="+actualCarryWeight)
 		
 		PlayerRef.ModActorValue("CarryWeight", -modWeight)
 		heavyItemsEquiped = 1
+		IsOverwhelmed.setValue(1)
 	EndIf
 	
 	return itemsEquipedWeight
@@ -529,7 +541,7 @@ Float Function getItemWeight(Form theItem)
 		Float itemWeight = theItem.GetWeight()
 		;Debug.Trace("SNU - "+theItem.getName()+" weight is "+itemWeight)
 		itemWeight = itemWeight * (1.0 - skillHelp)
-		Debug.Trace("SNU - "+theItem.getName()+" NEW weight is "+itemWeight)
+		;Debug.Trace("SNU - "+theItem.getName()+" NEW weight is "+itemWeight)
 	
 		return itemWeight
 	EndIf
@@ -544,7 +556,7 @@ Function updateAllowedItemsEquipedWeight()
 EndFunction
 
 Event OnObjectEquipped(Form type, ObjectReference ref)
-	Debug.Trace("SNU -----------------OnObjectEquipped()-----------------")
+	;Debug.Trace("SNU -----------------OnObjectEquipped()-----------------")
 	
 	If !hardcoreMode
 		return
@@ -555,13 +567,13 @@ Event OnObjectEquipped(Form type, ObjectReference ref)
 	endWhile
 	
 	isEquipWeightUpdating = true
-	Debug.Trace("SNU - Adding weight of "+type.getName())
+	;Debug.Trace("SNU - Adding weight of "+type.getName())
 	Float newItemWeight = getItemWeight(type)
 	If newItemWeight > 0.0
 		itemsEquipedWeight = itemsEquipedWeight + newItemWeight
 		FormListAdd(PlayerRef, SNU_EQUIP_WEIGHTS_KEY, type, true)
 		FloatListAdd(PlayerRef, SNU_EQUIP_WEIGHTS_KEY, newItemWeight, true)
-		Debug.Trace("SNU - Full equiped weight is "+itemsEquipedWeight)
+		;Debug.Trace("SNU - Full equiped weight is "+itemsEquipedWeight)
 		
 		If itemsEquipedWeight > allowedItemsEquipedWeight && StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle") == 0
 			needEquipWeightUpdate = true
@@ -573,7 +585,7 @@ EndEvent
 
 Event OnObjectUnequipped(Form type, ObjectReference ref)
 	Int itemType = getEquipedItemType(type)
-	Debug.Trace("SNU -----------------OnObjectUnequipped()-----------------")
+	;Debug.Trace("SNU -----------------OnObjectUnequipped()-----------------")
 	
 	If !hardcoreMode || itemType == -2
 		return
@@ -584,14 +596,14 @@ Event OnObjectUnequipped(Form type, ObjectReference ref)
 	endWhile
 	
 	isEquipWeightUpdating = true
-	Debug.Trace("SNU - Removing weight of "+type.getName())
+	;Debug.Trace("SNU - Removing weight of "+type.getName())
 	Int itemIndex = FormListFind(PlayerRef, SNU_EQUIP_WEIGHTS_KEY, type)
 	if itemIndex > -1
 		FormListPluck(PlayerRef, SNU_EQUIP_WEIGHTS_KEY, itemIndex, none)
 		Float oldItemWeight = FloatListPluck(PlayerRef, SNU_EQUIP_WEIGHTS_KEY, itemIndex, 0.0)
-		Debug.Trace("SNU - Item weight "+oldItemWeight)
+		;Debug.Trace("SNU - Item weight "+oldItemWeight)
 		itemsEquipedWeight = itemsEquipedWeight - oldItemWeight
-		Debug.Trace("SNU - New full equiped weight is "+itemsEquipedWeight)
+		;Debug.Trace("SNU - New full equiped weight is "+itemsEquipedWeight)
 	EndIf
 		
 	If heavyItemsEquiped && itemsEquipedWeight <= allowedItemsEquipedWeight && PlayerRef.GetActorValue("CarryWeight") < -100 && \
@@ -610,6 +622,7 @@ Function cleanupHardcoreMode()
 	FloatListClear(PlayerRef, SNU_EQUIP_WEIGHTS_KEY)
 	
 	heavyItemsEquiped = 0
+	IsOverwhelmed.setValue(0)
 	
 	If PlayerRef.GetActorValue("CarryWeight") < -100
 		PlayerRef.ModActorValue("CarryWeight", actualCarryWeight + 500)
@@ -720,9 +733,10 @@ EndEvent
 Event OnSleepStop(bool abInterrupted)
 	;Debug.Trace("SNU - OnSleepStop()")
 	
-	If StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle") != 0
-		return
-	EndIf
+	;If StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle") != 0
+	;	return
+	;EndIf
+	
 	;TLALOC-ToDo- Check if sleep time was enough (7 hrs. could be configurable) and restore muscleScore with 
 	;           previously stored value (Around 0.291748 GameDaysPassed for 7 hrs)
 	
@@ -752,8 +766,11 @@ EndFunction
 Event OnKeyDown(Int KeyCode)
 	If KeyCode == getInfoKey
 		
-		;WetFunctionRedux info
-		Debug.Notification("Wetness: "+StorageUtil.GetFloatValue(PlayerRef, "WetFunction_Actor_wetness", 0.0))
+		;/WetFunctionRedux info
+		If Game.GetModByName("WetFunction.esp") != 255
+			Debug.Notification("Wetness: "+StorageUtil.GetFloatValue(PlayerRef, "WetFunction_Actor_wetness", 0.0))
+		EndIf
+		/;
 		
 		;WeightMorphs info
 		If isWeightMorphsLoaded
@@ -766,14 +783,13 @@ Event OnKeyDown(Int KeyCode)
 		EndIf
 		Debug.Notification("itemsEquipedWeight="+itemsEquipedWeight+", allowedItemsEquipedWeight="+allowedItemsEquipedWeight)
 		Debug.Notification("muscleScore="+getMuscleValuePercent(muscleScore)+"%, normalsScore="+getMuscleValuePercent(normalsScore)+"%")
-		Debug.Notification("lostMuscle="+getMuscleValuePercent(lostMuscle)+"%, storedMuscle="+getMuscleValuePercent(storedMuscle)+"%")
+		;Debug.Notification("lostMuscle="+getMuscleValuePercent(lostMuscle)+"%, storedMuscle="+getMuscleValuePercent(storedMuscle)+"%")
 		
 		If !disableNormals
 			Debug.Notification("Normals="+getFinalNormalsPath())
 		EndIf
 	ElseIf KeyCode == npcMuscleKey && !UI.IsTextInputEnabled() && !Utility.IsInMenuMode()
-		 ;37 = K
-		applyNPCMuscle(npcMuscleScore)
+		applyNPCMuscle()
 	EndIf
 EndEvent
 
@@ -1009,19 +1025,10 @@ Function changeSpineBoneScale(Actor theActor, Float scaleValue)
 	;Debug.Trace("SNU - Going to update spine scale to: "+scaleValue+" (Prev value = "+currentScale+")")
 	If scaleValue - currentScale > 0.001 || scaleValue - currentScale < -0.001
 		;Debug.Trace("SNU - Updating spine scale")
-		;Debug.Trace("SNU - Updating spine scale from: "+currentScale+" to: "+scaleValue)
+		Debug.Trace("SNU - Updating spine scale from: "+currentScale+" to: "+scaleValue)
 		SetNodeScale(theActor, true, "NPC Spine2 [Spn2]", scaleValue, SNUSNU_KEY)
 		SetNodeScale(theActor, true, "CME Spine2 [Spn2]", 1.0 / scaleValue, SNUSNU_KEY)
 	EndIf
-	
-;/TLALOC-ToDo- Is not working, probably because the passed value is invalid. Check if need to be converted to radians
-	;TLALOC- Rotate boobs so that they look more like pecs
-	Float[] pos
-	pos = NiOverride.GetNodeTransformRotation(theActor, false, true, "NPC L Breast", SNUSNU_KEY)
-	pos[1] = pos[1] + (30 * scaleValue)
-	XPMSELib.SetNodeRotation(theActor, true, "NPC L Breast", pos, SNUSNU_KEY)
-	XPMSELib.SetNodeRotation(theActor, true, "NPC R Breast", pos, SNUSNU_KEY)
-/;
 EndFunction
 
 Function changeForearmBoneScale(Actor theActor, Float scaleValue)
@@ -1372,7 +1379,7 @@ Function UpdateEffects(Bool reAdd = True)
 			magStamina = (muscleScore / muscleScoreMax) * Stamina
 			magSpeed = (muscleScore / muscleScoreMax) * Speed
 		Else
-			magStamina = Stamina * 4
+			magStamina = 500;Was Stamina * 4
 			magSpeed = Speed * 2
 		EndIf
 		
@@ -2370,7 +2377,6 @@ Function initDefaultSliders()
 	maleValues[0] = 0.0 ;MultSamson
 	
 	
-	;ToDo- Add conditions to choose the slider set depending on selected body
 	IntListClear(PlayerRef, SNUSNU_KEY)
 	
 	IntListAdd(PlayerRef, SNUSNU_KEY, 33, false) ;Back
@@ -2723,7 +2729,7 @@ Float Function getCarryWeightPercent()
 	return newCarryWeight
 EndFunction
 
-Function addWerewolfBuild(Bool wasWerewolf = true)
+Function addWerewolfBuild()
 	Debug.Trace("SNU - addWerewolfBuild()")
 	If addWerewolfStrength > 0.0
 		;Werewolf characters should have a lean, muscular build, so that means:
@@ -2735,124 +2741,72 @@ Function addWerewolfBuild(Bool wasWerewolf = true)
 		updateMuscleScore(muscleScoreMax * addWerewolfStrength) ;Add 5% extra muscle
 		
 		If isWeightMorphsLoaded
-			Float weightBase = 0.075
-			If !wasWerewolf
-				weightBase = 0.0
-			EndIf
+			Float modFactor = 0.05
 			
 			WeightMorphsMCM WMCM = Game.GetFormFromFile(0x05000888, "WeightMorphs.esp") As WeightMorphsMCM
-			If WMCM.WMorphs.Weight <= weightBase - 0.05 ;0.025
-				WMCM.WMorphs.ChangeWeight(0.05, true)
-			ElseIf WMCM.WMorphs.Weight >= weightBase + 0.05 ;0.085
-				WMCM.WMorphs.ChangeWeight(-0.05, true)
+			If WMCM.WMorphs.Weight < 0.075
+				If WMCM.WMorphs.Weight + modFactor > 0.075
+					modFactor = 0.075 - WMCM.WMorphs.Weight
+				EndIf
+				WMCM.WMorphs.ChangeWeight(modFactor, true)
+			ElseIf WMCM.WMorphs.Weight > 0.075
+				modFactor = -modFactor
+				If WMCM.WMorphs.Weight + modFactor < 0.075
+					modFactor = -(WMCM.WMorphs.Weight - 0.075)
+				EndIf
+				
+				WMCM.WMorphs.ChangeWeight(modFactor, true)
 			EndIf
 		EndIf
 	EndIf
 EndFunction
 
 ;TLALOC- NPC Related functions
-Function applyNPCMuscle(Float howMuch)
-	Debug.Trace("SNU - applyNPCMuscle("+howMuch+")")
-	;Get a NPC on target
-	Actor crosshairActor = Game.GetCurrentCrosshairRef() as Actor
-	If crosshairActor && !crosshairActor.isdead()
-		If StorageUtil.GetIntValue(crosshairActor, "hasMuscle", 0) == 0 && howMuch > 0.0
-			Debug.Trace("SNU - Actor on crosshair is "+crosshairActor.GetBaseObject().getName())
-			howMuch = howMuch / muscleScoreMax
-			If crosshairActor.GetActorBase().GetSex() == 1
-				Debug.Trace("SNU - Actor is Female")
-				;Morphs for females
-				Int totalSliders = IntListCount(PlayerRef, SNUSNU_KEY)
-				Int slidersLoop = 0
-				while slidersLoop < totalSliders
-					Int currentSliderIndex = IntListGet(PlayerRef, SNUSNU_KEY, slidersLoop)
-					NiOverride.SetBodyMorph(crosshairActor, getSliderString(currentSliderIndex), SNUSNU_KEY, howMuch * getSliderValue(currentSliderIndex))
-					slidersLoop += 1
-				endWhile
-				
-				;TLALOC- Apply bone changes
-				changeSpineBoneScale(crosshairActor, getBoneSize(howMuch, bonesValues[0]))
-				changeForearmBoneScale(crosshairActor, getBoneSize(howMuch, bonesValues[1]))
-				
-				;Muscle Normals!
-				SnusnuMusclePowerNPCScript.forceSwitchMuscleNormals(crosshairActor, howMuch*100)
-				
-				NiOverride.UpdateModelWeight(crosshairActor)
-			Else
-				;Pending morphs for males
-			EndIf
+Function applyNPCMuscle()
+	Debug.Trace("SNU - Refreshing NPC muscle")
+	
+	Int totalNPCs = FormListCount(none, "MUSCLE_NPCS")
+	Debug.Trace("SNU - Total muscle NPCs: "+totalNPCs)
+	Int npcsLoop = 0
+	while npcsLoop < totalNPCs
+		Actor currentActor = FormListGet(none, "MUSCLE_NPCS", npcsLoop) as Actor
+		Float muscleScoreNPC = StorageUtil.GetFloatValue(currentActor, "hasMuscle", 0) / 100
+		;/
+		If muscleScoreNPC == 0.0
+			muscleScoreNPC = floatListGet(none, "MUSCLE_NPCS_SCORE", npcsLoop)
+		EndIf /;
+		Debug.Trace("SNU - Checking muscle on actor: "+currentActor.GetBaseObject().getName()+", Score: "+muscleScoreNPC)
+		
+		If currentActor.GetBaseObject().getName() == ""
+			Debug.Trace("SNU - Found invalid actor. Removing from list")
 			
-			If crosshairActor.GetBaseObject().getName() != ""
-				Debug.Trace("SNU - Actor is not generic. Adding to list.")
-				StorageUtil.SetIntValue(crosshairActor, "hasMuscle", (howMuch * 100) as int)
-				StorageUtil.FormListAdd(none, "MUSCLE_NPCS", crosshairActor, false)
-				;StorageUtil.FloatListAdd(none, "MUSCLE_NPCS_SCORE", howMuch, true)
+			StorageUtil.SetFloatValue(currentActor, "hasMuscle", 0)
+			If !StorageUtil.FormListRemoveAt(none, "MUSCLE_NPCS", npcsLoop)
+				Debug.Trace("SNU - ERROR! Actor could not be removed!!")
+				npcsLoop += 1
+			Else
+				StorageUtil.floatListRemoveAt(none, "MUSCLE_NPCS_SCORE", npcsLoop)
 			EndIf
 		Else
-			NiOverride.RemoveAllReferenceSkinOverrides(crosshairActor);For the custom normals
-			NiOverride.RemoveAllReferenceNodeOverrides(crosshairActor);For the custom normals
-			NiOverride.RemoveSkinOverride(crosshairActor, true, false, 0x04, 9, 1)
-			
-			NiOverride.ClearBodyMorphKeys(crosshairActor, SNUSNU_KEY)
-			clearBoneScales(crosshairActor)
-			NiOverride.UpdateModelWeight(crosshairActor)
-			
-			crosshairActor.QueueNiNodeUpdate()
-			
-			Int actorIndex = StorageUtil.FormListFind(none, "MUSCLE_NPCS", crosshairActor)
-			
-			StorageUtil.SetIntValue(crosshairActor, "hasMuscle", 0)
-			StorageUtil.FormListRemove(none, "MUSCLE_NPCS", crosshairActor, true)
-			;StorageUtil.floatListRemoveAt(none, "MUSCLE_NPCS_SCORE", actorIndex)
-			StorageUtil.FloatListClear(none, "MUSCLE_NPCS_SCORE")
-		EndIf
-	ElseIf crosshairActor == none
-		;Debug.Notification("No NPC found")
-		;Debug.Notification("Refreshing NPC muscle")
-		Debug.Trace("SNU - Refreshing NPC muscle")
-		Int totalNPCs = FormListCount(none, "MUSCLE_NPCS")
-		Debug.Trace("SNU - Total muscle NPCs: "+totalNPCs)
-		Int npcsLoop = 0
-		while npcsLoop < totalNPCs
-			Actor currentActor = FormListGet(none, "MUSCLE_NPCS", npcsLoop) as Actor
-			Float muscleScoreNPC = StorageUtil.GetIntValue(currentActor, "hasMuscle", 0) / 100
-			;/
 			If muscleScoreNPC == 0.0
-				muscleScoreNPC = floatListGet(none, "MUSCLE_NPCS_SCORE", npcsLoop)
-			EndIf /;
-			Debug.Trace("SNU - Checking muscle on actor: "+currentActor.GetBaseObject().getName()+", Score: "+muscleScoreNPC)
-			
-			If currentActor.GetBaseObject().getName() == ""
-				Debug.Trace("SNU - Found invalid actor. Removing from list")
-				
-				StorageUtil.SetIntValue(currentActor, "hasMuscle", 0)
-				If !StorageUtil.FormListRemoveAt(none, "MUSCLE_NPCS", npcsLoop)
-					Debug.Trace("SNU - ERROR! Actor could not be removed!!")
-					npcsLoop += 1
-				Else
-					StorageUtil.floatListRemoveAt(none, "MUSCLE_NPCS_SCORE", npcsLoop)
-				EndIf
-			Else
-				If muscleScoreNPC == 0.0
-					muscleScoreNPC = 0.3
-					;StorageUtil.FloatListAdd(none, "MUSCLE_NPCS_SCORE", muscleScoreNPC, true)
-					StorageUtil.SetIntValue(currentActor, "hasMuscle", (muscleScoreNPC * 100) as int)
-				EndIf
-				If currentActor && currentActor.is3dloaded() && muscleScoreNPC != 0
-					String skinOverride = NiOverride.GetSkinOverrideString(currentActor, true, false, 0x04, 9, 1)
-					Debug.Notification("Restoring normals to "+currentActor.GetBaseObject().getName())
-					Debug.Trace("SNU - Restoring normals to "+currentActor.GetBaseObject().getName()+": "+skinOverride)
-					If skinOverride == ""
-						SnusnuMusclePowerNPCScript.forceSwitchMuscleNormals(currentActor, muscleScoreNPC*100)
-					Else
-						NiOverride.AddSkinOverrideString(currentActor, true, false, 0x04, 9, 1, skinOverride, true)
-					EndIf
-					NiOverride.ApplySkinOverrides(currentActor)
-				EndIf
-				npcsLoop += 1
+				muscleScoreNPC = 0.3
+				;StorageUtil.FloatListAdd(none, "MUSCLE_NPCS_SCORE", muscleScoreNPC, true)
+				StorageUtil.SetFloatValue(currentActor, "hasMuscle", muscleScoreNPC)
 			EndIf
-		endWhile
-	EndIf
+			If currentActor && currentActor.is3dloaded() && muscleScoreNPC != 0
+				String skinOverride = NiOverride.GetSkinOverrideString(currentActor, true, false, 0x04, 9, 1)
+				Debug.Notification("Restoring normals to "+currentActor.GetBaseObject().getName())
+				Debug.Trace("SNU - Restoring normals to "+currentActor.GetBaseObject().getName()+": "+skinOverride)
+				If skinOverride == ""
+					SnusnuMusclePowerNPCScript.forceSwitchMuscleNormals(currentActor, muscleScoreNPC*100)
+				Else
+					NiOverride.AddSkinOverrideString(currentActor, true, false, 0x04, 9, 1, skinOverride, true)
+				EndIf
+				NiOverride.ApplySkinOverrides(currentActor)
+			EndIf
+			npcsLoop += 1
+		EndIf
+	endWhile
 EndFunction
 
 Bool Function saveAllMorphs(String profileName = "")

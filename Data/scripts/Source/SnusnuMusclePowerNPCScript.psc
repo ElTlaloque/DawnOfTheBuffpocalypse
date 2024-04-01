@@ -216,12 +216,10 @@ Function disTransformFMG(Actor fmgTarget)
 	
 	removeBuffEffects(fmgTarget)
 	
-	;TLALOC-ToDo- Change hair?
-	;switchBarbarianHair()
-	
-	;TLALOC-ToDo- Change skin?
-	;applyBarbarianSkin()
-	
+	If !fmgTarget.IsOnMount()
+		fmgTarget.QueueNiNodeUpdate()
+	EndIf
+	;/	
 	Armor currentArmor = fmgTarget.GetWornForm(Armor.GetMaskForSlot(32)) as Armor
 	If currentArmor
 		Utility.Wait(1)
@@ -229,6 +227,7 @@ Function disTransformFMG(Actor fmgTarget)
 		Utility.Wait(1)
 		fmgTarget.equipItem(currentArmor)
 	EndIf
+	/;
 	
 	StorageUtil.SetFloatValue(fmgTarget, "hasMuscle", 0)
 	StorageUtil.FormListRemove(none, "MUSCLE_NPCS", fmgTarget, true)

@@ -113,7 +113,7 @@ Function setMenuPages()
 EndFunction
 
 Event OnConfigInit()
-	If StorageUtil.GetIntValue(snusnuMain.PlayerRef, "SNU_UltraMuscle") > 0
+	If StorageUtil.GetIntValue(snusnuMain.PlayerRef, "SNU_UltraMuscle") > 0 && !snusnuMain.isTransforming
 		editFMGMorphs = True
 		switchFMGMorphs(True)
 	EndIf
@@ -155,6 +155,7 @@ Event OnConfigClose()
 		;Update body if PC is currently transformed
 		If StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle") != 0
 			StorageUtil.SetIntValue(PlayerRef, "SNU_UltraMuscle", 2)
+			snusnuMain.RegisterForSingleUpdate(1)
 		EndIf
 		
 		editFMGMorphs = False
@@ -681,15 +682,22 @@ Event OnOptionSelect(Int a_option)
 		
 		String Msg
 		If editFMGMorphs
-			Msg = "All morph changes you do while this option is selected will only affect the FMG body shape. To go back to normal muscle morphs just disable this option."
-			ShowMessage(Msg, False)
-			
-			;Load FMG morphs profile here. All changes to the morphs must be saved after this
-			;option is disabled or user exits this menu.
-			;NOTICE! Previous morphs should be saved to a temporal profile file!
-			String loadErrorMsg = switchFMGMorphs(True)
-			If loadErrorMsg
-				ShowMessage(loadErrorMsg, false)
+			If !snusnuMain.isTransforming
+				Msg = "All morph changes you do while this option is selected will only affect the FMG body shape. To go back to normal muscle morphs just disable this option."
+				ShowMessage(Msg, False)
+				
+				;Load FMG morphs profile here. All changes to the morphs must be saved after this
+				;option is disabled or user exits this menu.
+				;NOTICE! Previous morphs should be saved to a temporal profile file!
+				String loadErrorMsg = switchFMGMorphs(True)
+				If loadErrorMsg
+					ShowMessage(loadErrorMsg, false)
+				EndIf
+			Else
+				Msg = "You can not edit the FMG morphs while a FMG transformation is currently ongoing!"
+				ShowMessage(Msg, False)
+				editFMGMorphs = !editFMGMorphs
+				SetToggleOptionValue(a_option, editFMGMorphs)
 			EndIf
 		Else
 			Msg = "Going back to normal muscle morphs customization"
@@ -704,6 +712,7 @@ Event OnOptionSelect(Int a_option)
 			;Update body if PC is currently transformed
 			If StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle") != 0
 				StorageUtil.SetIntValue(PlayerRef, "SNU_UltraMuscle", 2)
+				snusnuMain.RegisterForSingleUpdate(1)
 			EndIf
 		EndIf
 		

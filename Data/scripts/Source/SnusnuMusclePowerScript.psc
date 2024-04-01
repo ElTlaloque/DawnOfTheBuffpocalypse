@@ -543,7 +543,7 @@ Function applyQuickGrowthAnim(Actor tfActor, Float magnitude)
 	snusnuMain.changeForearmBoneScale(tfActor, snusnuMain.getBoneSize(magnitude, bonesValuesFMG[1]))
 	
 	Debug.Trace("SNU - Finished growing to "+magnitude)
-	Debug.Notification("Finished growing to "+(magnitude*100)+"%")
+	;Debug.Notification("Finished growing to "+(magnitude*100)+"%")
 EndFunction
 
 Function applyBoobsPhysics()
@@ -719,14 +719,16 @@ Function applyBarbarianSkin(Actor target, Int skinIndex, Bool applyFix = true)
 	
 	If skinIndex > 0
 		String tempNormalsPath = "textures\\Snusnu\\Normals\\Ultra"+skinIndex+"\\"
+		
 		;Body
-		AddSkinOverrideString(target, true, false, 0x04, 9, 0, tempNormalsPath+"Body.dds", true)
-		AddSkinOverrideString(target, true, true, 0x04, 9, 0, tempNormalsPath+"Body.dds", true)
+		If !applyFix ;Fix for body textures messing up when trying to apply the hands fix on OnObjectUnequipped()
+			AddSkinOverrideString(target, true, false, 0x04, 9, 0, tempNormalsPath+"Body.dds", true)
+			AddSkinOverrideString(target, true, true, 0x04, 9, 0, tempNormalsPath+"Body.dds", true)
+		EndIf
 		
 		;Face
 		;AddSkinOverrideString(target, true, false, 0x04, 9, 0, tempNormalsPath+"Face.dds", true)
 		;AddSkinOverrideString(target, true, true, 0x04, 9, 0, tempNormalsPath+"Face.dds", true)
-		;target.RegenerateHead()
 		If skinIndex == 1
 			target.ChangeHeadPart(snusnuMain.MuscleHeadTan)
 		ElseIf skinIndex == 2
@@ -748,6 +750,7 @@ Function applyBarbarianSkin(Actor target, Int skinIndex, Bool applyFix = true)
 			target.QueueNiNodeUpdate()
 		EndIf
 	EndIf
+	
 	
 	if hasHandFix && applyFix
 		Debug.Trace("SNU - Finishing to apply hands fix!")

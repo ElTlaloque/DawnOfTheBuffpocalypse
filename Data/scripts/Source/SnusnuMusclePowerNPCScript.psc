@@ -147,7 +147,7 @@ Function transformFMG(Actor fmgTarget)
 		snusnuMain.changeSpineBoneScale(fmgTarget, snusnuMain.getBoneSize(snusnuMain.npcMuscleScore, bonesValuesFMG[0]))
 		snusnuMain.changeForearmBoneScale(fmgTarget, snusnuMain.getBoneSize(snusnuMain.npcMuscleScore, bonesValuesFMG[1]))
 		
-		switchMuscleNormals(fmgTarget, 4, snusnuMain.npcMuscleScore * 100 )
+		forceSwitchMuscleNormals(fmgTarget, snusnuMain.npcMuscleScore * 100)
 	EndIf
 	
 	If snusnuMain.useAltAnimsNPC
@@ -260,7 +260,7 @@ Int Function switchMuscleNormals(Actor buffTarget, Int currentStage, Float newWe
 	ElseIf currentStage == 2 && newWeight >= 55.0 && newWeight < 75.0
 		newStage = 3
 	ElseIf currentStage == 3 && newWeight >= 75.0 && newWeight < 100.0
-		newStage = 4
+		newStage = 5
 	ElseIf currentStage == 4 && newWeight == 100.0
 		newStage = 5
 	EndIf
@@ -275,12 +275,12 @@ EndFunction
 Int Function forceSwitchMuscleNormals(Actor buffTarget, Float newWeight) Global
 	Int newStage = 1
 
-	If newWeight >= 50.0 && newWeight < 70.0
+	If newWeight >= 30.0 && newWeight < 55.0
 		newStage = 2
-	ElseIf newWeight >= 70.0 && newWeight < 85.0
+	ElseIf newWeight >= 55.0 && newWeight < 75.0
 		newStage = 3
-	ElseIf newWeight >= 85.0
-		newStage = 4
+	ElseIf newWeight >= 75.0
+		newStage = 5
 	EndIf
 	
 	Debug.Trace("SNU - Going to switch normals? newStage="+newStage+", newWeight="+newWeight)

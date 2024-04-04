@@ -506,10 +506,10 @@ Event OnPageReset(String a_page)
 		_mySaveMorphs = AddToggleOption("Save Morphs", False, currentFlag)
 		_myLoadMorphs = AddToggleOption("Load Morphs", False, currentFlag)
 		SetCursorPosition(1)
-		_mySaveMorphsProfile = AddInputOption("Save Morphs Profile", "Default", currentFlag)
+		_mySaveMorphsProfile = AddInputOption("Save Morphs Profile", "Default")
 		
 		If LoadSavedProfiles()
-			_myLoadMorphsProfile = AddMenuOption("Load Morphs Profile", savedProfilesList[0], currentFlag)
+			_myLoadMorphsProfile = AddMenuOption("Load Morphs Profile", savedProfilesList[0])
 		Else
 			_myLoadMorphsProfile = AddMenuOption("Load Morphs Profile", "EMPTY", OPTION_FLAG_DISABLED)
 		EndIf
@@ -1565,7 +1565,7 @@ bool Function loadSettings()
 		EndIf
 		If snusnuMain.selectedBody != JsonUtil.GetIntValue(fileName, "selectedBody", snusnuMain.selectedBody)
 			snusnuMain.selectedBody = JsonUtil.GetIntValue(fileName, "selectedBody", snusnuMain.selectedBody)
-			applyBodyOption()
+			applyBodyOption(false)
 		EndIf
 		If snusnuMain.disableNormals != JsonUtil.GetIntValue(fileName, "disableNormals", snusnuMain.disableNormals as Int)
 			snusnuMain.disableNormals = JsonUtil.GetIntValue(fileName, "disableNormals", snusnuMain.disableNormals as Int)
@@ -1727,7 +1727,7 @@ State LoadDefaults
 		selectedDefaultMorphs = i+1
 		SetMenuOptionValueST(Option[i])
 		
-		if selectedDefaultMorphs == 2
+		if selectedDefaultMorphs == 3
 			snusnuMain.usePecs = true
 		Else
 			snusnuMain.usePecs = false
@@ -1784,16 +1784,26 @@ Function applyHardcoreOption()
 	EndIf
 EndFunction
 
-Function applyBodyOption()
-	if snusnuMain.selectedBody == 2
+Function applyBodyOption(Bool showMSG = true)
+	if snusnuMain.selectedBody == 2 ;Vanilla
+		snusnuMain.usePecs = false
 		snusnuMain.useWeightSlider = true
 	Else
 		snusnuMain.useWeightSlider = false
+		If snusnuMain.selectedBody == 0 ;UNP
+			snusnuMain.usePecs = false
+			snusnuMain.LoadDefaultProfile(1)
+		ElseIf snusnuMain.selectedBody == 1 ;CBBE
+			snusnuMain.usePecs = true
+			snusnuMain.LoadDefaultProfile(3)
+		EndIf
 	EndIf
 	
-	String Msg
-	Msg = "Doing a full menu reset."
-	ShowMessage(Msg, False)
+	If showMSG
+		String Msg
+		Msg = "Doing a full menu reset."
+		ShowMessage(Msg, False)
+	EndIf
 	
 	OpenConfig()
 	setPage(Pages[0], 0)
@@ -1803,7 +1813,9 @@ Function applyNormalsOption()
 	SetToggleOptionValue(_myDisableNormals, snusnuMain.disableNormals)
 
 	If snusnuMain.disableNormals
-		NiOverride.RemoveAllReferenceSkinOverrides(PlayerRef)
+		;NiOverride.RemoveAllReferenceSkinOverrides(PlayerRef)
+		NiOverride.RemoveSkinOverride(PlayerRef, true, false, 0x04, 9, 1)
+		NiOverride.RemoveSkinOverride(PlayerRef, true, true, 0x04, 9, 1)
 	Else
 		snusnuMain.checkBodyNormalsState()
 	EndIf

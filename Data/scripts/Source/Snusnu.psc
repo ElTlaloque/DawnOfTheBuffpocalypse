@@ -102,7 +102,6 @@ Bool Property tfAnimation = true Auto
 Bool Property useAltAnims = true Auto
 Bool Property tfAnimationNPC = true Auto
 Bool Property useAltAnimsNPC = true Auto
-Bool Property applyMoreChangesOvertime = true Auto
 Bool Property changeHeadPart = true Auto
 Bool Property playTFSound = true Auto
 HeadPart Property MuscleHead  Auto
@@ -110,7 +109,11 @@ HeadPart Property MuscleHeadTan  Auto
 HeadPart Property MuscleHeadTan2  Auto
 HeadPart Property originalHead Auto
 Sound Property snusnuTFSound  Auto
+Sound Property snusnuTFSoundShort  Auto
+Bool Property applyMoreChangesOvertime = true Auto
 Float Property moreChangesInterval = 1.0  Auto
+Float Property muscleMightAffinity = 0.0  Auto
+Float Property muscleMightProbability = 0.25  Auto
 
 ;Experimental custom NPC muscle.
 Float Property npcMuscleScore = 0.5 Auto
@@ -312,8 +315,9 @@ Event OnUpdate()
 			EndIf
 			
 			If justWakeUp
-				;ToDo- We might need to find a way to update the carry way in a non intrusive way without having to 
-				;      rely on specific events like sleep or eat.
+				;ToDo- We might need to find a way to update the carry weight in a non intrusive way without having to 
+				;      rely on specific events like sleep or eat. <--- That doesn't make sense. Specific events are exactly
+				;      for that.
 				updateCarryWeight()
 				
 				If hardcoreMode
@@ -340,7 +344,9 @@ Event OnUpdate()
 				finalNormalsPath = "EMPTY"
 				UpdateEffects()
 				If !disableNormals
-					NiOverride.RemoveAllReferenceSkinOverrides(PlayerRef)
+					;NiOverride.RemoveAllReferenceSkinOverrides(PlayerRef)
+					NiOverride.RemoveSkinOverride(PlayerRef, true, false, 0x04, 9, 1)
+					NiOverride.RemoveSkinOverride(PlayerRef, true, true, 0x04, 9, 1)
 				EndIf
 				If StorageUtil.GetIntValue(PlayerRef, "PSQ_HasMuscle") != 0
 					;TLALOC- PSQ still needs this to be called
@@ -557,6 +563,12 @@ EndFunction
 
 Event OnObjectEquipped(Form type, ObjectReference ref)
 	;Debug.Trace("SNU -----------------OnObjectEquipped()-----------------")
+	Potion iaExercise = Game.GetFormFromFile(0x05084235, "ImmersiveInteractions.esp") As Potion
+	If iaExercise && type == iaExercise
+		updateMuscleScore(0.75 * MultGainMisc)
+		Debug.Notification("I'm getting a little stronger")
+		return
+	EndIf
 	
 	If !hardcoreMode
 		return
@@ -574,6 +586,7 @@ Event OnObjectEquipped(Form type, ObjectReference ref)
 		FormListAdd(PlayerRef, SNU_EQUIP_WEIGHTS_KEY, type, true)
 		FloatListAdd(PlayerRef, SNU_EQUIP_WEIGHTS_KEY, newItemWeight, true)
 		;Debug.Trace("SNU - Full equiped weight is "+itemsEquipedWeight)
+		Debug.Notification("Equipped weight is "+itemsEquipedWeight)
 		
 		If itemsEquipedWeight > allowedItemsEquipedWeight && StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle") == 0
 			needEquipWeightUpdate = true
@@ -604,6 +617,7 @@ Event OnObjectUnequipped(Form type, ObjectReference ref)
 		;Debug.Trace("SNU - Item weight "+oldItemWeight)
 		itemsEquipedWeight = itemsEquipedWeight - oldItemWeight
 		;Debug.Trace("SNU - New full equiped weight is "+itemsEquipedWeight)
+		Debug.Notification("Equipped weight is now "+itemsEquipedWeight)
 	EndIf
 		
 	If heavyItemsEquiped && itemsEquipedWeight <= allowedItemsEquipedWeight && PlayerRef.GetActorValue("CarryWeight") < -100 && \
@@ -743,8 +757,28 @@ Event OnSleepStop(bool abInterrupted)
 	;LOGIC: storedMuscle records all of muscle gain on a day, but gets degraded over time so that if PC doesn't sleep regurarly
 	;       stored muscle will be lost. recoveredMuscle records how much muscle was lost and we use it so that we cannot recover
 	;       more muscle than what we lost
-	totalSleepTime = GameDaysPassed.GetValue() - startSleepTime
-	justWakeUp = true
+	
+	;NEW FEATURE: Randomly transform if muscle affinity is above the threshold
+	If StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle") > 0
+		muscleMightAffinity += 0.02
+		If muscleMightAffinity > 1.0
+			muscleMightAffinity = 1.0
+		EndIf
+	Else
+		muscleMightAffinity -= 0.005
+		If muscleMightAffinity < 0.0
+			muscleMightAffinity = 0.0
+		EndIf
+	EndIf
+		
+	If StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle") == 0 && muscleMightAffinity * muscleMightProbability > Utility.RandomFloat(0.0, 1.0)
+		Debug.Notification("I had a dream i was mighty unstoppable")
+		Utility.wait(1)
+		MusclePowerSpell.Cast(PlayerRef)
+	Else
+		totalSleepTime = GameDaysPassed.GetValue() - startSleepTime
+		justWakeUp = true
+	EndIf
 EndEvent
 
 Float Function getSleepBonus()
@@ -781,6 +815,7 @@ Event OnKeyDown(Int KeyCode)
 			Debug.Notification("ExtraCarryWeight="+currentExtraCarryWeight)
 			
 		EndIf
+		Debug.Notification("muscleMightAffinity="+muscleMightAffinity)
 		Debug.Notification("itemsEquipedWeight="+itemsEquipedWeight+", allowedItemsEquipedWeight="+allowedItemsEquipedWeight)
 		Debug.Notification("muscleScore="+getMuscleValuePercent(muscleScore)+"%, normalsScore="+getMuscleValuePercent(normalsScore)+"%")
 		;Debug.Notification("lostMuscle="+getMuscleValuePercent(lostMuscle)+"%, storedMuscle="+getMuscleValuePercent(storedMuscle)+"%")
@@ -849,9 +884,7 @@ Function UpdateWeight(Bool applyNow = True)
 				changeForearmBoneScale(PlayerRef, getBoneSize(muscleScore / muscleScoreMax, bonesValues[1]))
 				
 				;TLALOC- Custom Boobs physics
-				If useDynamicPhysics
-					updateBoobsPhysics()
-				EndIf
+				updateBoobsPhysics()
 			EndIf
 		Else
 			Int PlayerSex = PlayerRef.GetActorBase().GetSex()
@@ -896,9 +929,7 @@ Function UpdateWeight(Bool applyNow = True)
 				EndIf
 				
 				;TLALOC- Custom Boobs physics
-				If useDynamicPhysics
-					updateBoobsPhysics()
-				EndIf
+				updateBoobsPhysics()
 			; Male
 			ElseIf PlayerSex == 0
 				If maleValues[0] != 0.0
@@ -1114,6 +1145,10 @@ Function chooseBoobsPhysics(Int buildStage)
 EndFunction
 
 Function updateBoobsPhysics(Bool forceUpdate = false, Int newLevel = -1)
+	If !useDynamicPhysics
+		return
+	EndIf
+	
 	If checkSMPPhysics()
 		;Player is using SMP for body physics so we stop here
 		return
@@ -1124,7 +1159,6 @@ Function updateBoobsPhysics(Bool forceUpdate = false, Int newLevel = -1)
 		Mus3BPhysicsManager PhysicsManager = Game.GetFormFromFile(0x0500084A, "3BBB.esp") As Mus3BPhysicsManager
 		;Debug.Trace("SNU- Checking for boobs physics")
 		If PhysicsManager != none
-			;ToDo- Check if the SMP item is equiped to skip the breasts physics modification as this only works with CBPC
 			Int physicsLevel = PhysicsManager.getPhysicsLevel()
 			
 			If newLevel != -1
@@ -1467,7 +1501,7 @@ Function RegisterEvents(Bool _enable)
 		UnregisterForAnimationEvent(PlayerRef, "SoundPlay.NPCHumanBlacksmithRepairHammerDistant")
 		
 		;TLALOC- Experimental anim events!
-		;RegisterForAnimationEvent(PlayerRef, "XXX")
+		;RegisterForAnimationEvent(PlayerRef, "IdleGreybeardWordTeach");Immersive interactions Dummy training
 		;RegisterForAnimationEvent(PlayerRef, "XXX")
 		;RegisterForAnimationEvent(PlayerRef, "XXX")
 		;RegisterForAnimationEvent(PlayerRef, "XXX")
@@ -1573,7 +1607,9 @@ Function ResetWeight(Bool _enable)
 		EndIf
 	Else
 		UpdateEffects(False)
-		NiOverride.RemoveAllReferenceSkinOverrides(PlayerRef)
+		;NiOverride.RemoveAllReferenceSkinOverrides(PlayerRef)
+		NiOverride.RemoveSkinOverride(PlayerRef, true, false, 0x04, 9, 1)
+		NiOverride.RemoveSkinOverride(PlayerRef, true, true, 0x04, 9, 1)
 		ClearMorphs()
 	EndIf
 EndFunction
@@ -2770,7 +2806,7 @@ Function applyNPCMuscle()
 	Int npcsLoop = 0
 	while npcsLoop < totalNPCs
 		Actor currentActor = FormListGet(none, "MUSCLE_NPCS", npcsLoop) as Actor
-		Float muscleScoreNPC = StorageUtil.GetFloatValue(currentActor, "hasMuscle", 0) / 100
+		Float muscleScoreNPC = StorageUtil.GetFloatValue(currentActor, "hasMuscle", 0)
 		;/
 		If muscleScoreNPC == 0.0
 			muscleScoreNPC = floatListGet(none, "MUSCLE_NPCS_SCORE", npcsLoop)
@@ -2798,7 +2834,7 @@ Function applyNPCMuscle()
 				Debug.Notification("Restoring normals to "+currentActor.GetBaseObject().getName())
 				Debug.Trace("SNU - Restoring normals to "+currentActor.GetBaseObject().getName()+": "+skinOverride)
 				If skinOverride == ""
-					SnusnuMusclePowerNPCScript.forceSwitchMuscleNormals(currentActor, muscleScoreNPC*100)
+					SnusnuMusclePowerNPCScript.forceSwitchMuscleNormals(currentActor, muscleScoreNPC * 100)
 				Else
 					NiOverride.AddSkinOverrideString(currentActor, true, false, 0x04, 9, 1, skinOverride, true)
 				EndIf

@@ -3,20 +3,22 @@
 	{
 		"addwerewolfstrength" : 0.05000000074505806,
 		"carryweightboost" : 100.0,
-		"combatproficiency" : 10.0,
-		"malnourishmentvalue" : -0.93999999761581421,
+		"combatproficiency" : 15.0,
+		"malnourishmentvalue" : -0.95999997854232788,
+		"morechangesinterval" : 1.0,
 		"multgainarmor" : 1.0,
 		"multgainfight" : 1.0,
 		"multgainmisc" : 1.0,
-		"multloss" : 2.0,
+		"multloss" : 1.0,
 		"muscleanimslevel" : 2.0,
 		"musclescoremax" : 4000.0,
-		"npcmusclescore" : 1800.0,
+		"npcmusclescore" : 0.64999997615814209,
 		"speed" : 15.0,
 		"stamina" : 50.0
 	},
 	"int" : 
 	{
+		"applymorechangesovertime" : 1,
 		"changeheadpart" : 1,
 		"disablenormals" : 0,
 		"enabled" : 1,

@@ -133,8 +133,8 @@ Float Property allowedItemsEquipedWeight = -1.0 Auto
 Float Property maxItemsEquipedWeight = 150.0 Auto
 Float Property minItemsEquipedWeight = 15.0 Auto
 ;FIX: CarryWeight value doesn't get updated after switch equipping 2 heavy items
+Bool Property needEquipWeightUpdate = false Auto
 Bool isEquipWeightUpdating = false
-Bool needEquipWeightUpdate = false
 
 Bool Property isWerewolf = false Auto
 Float Property addWerewolfStrength = 0.05 Auto
@@ -237,7 +237,9 @@ Event OnPlayerLoadGame()
 		ReloadHotkeys()
 		
 		If allowedItemsEquipedWeight == -1.0 && hardcoreMode
-			updateAllowedItemsEquipedWeight()
+			If StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle") == 0
+				updateAllowedItemsEquipedWeight()
+			EndIf
 			getEquipedFullWeight()
 			isEquipWeightUpdating = false
 		EndIf
@@ -323,7 +325,9 @@ Event OnUpdate()
 				If hardcoreMode
 					;Cleanup equipped item weights
 					Debug.Notification("Refreshing hardcore weights")
-					updateAllowedItemsEquipedWeight()
+					If StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle") == 0
+						updateAllowedItemsEquipedWeight()
+					EndIf
 					getEquipedFullWeight()
 				EndIf
 			EndIf
@@ -358,9 +362,10 @@ Event OnUpdate()
 ;		EndIf
 		
 		If needEquipWeightUpdate
-			If !heavyItemsEquiped && itemsEquipedWeight > allowedItemsEquipedWeight && StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle") == 0
+			If !heavyItemsEquiped && itemsEquipedWeight > allowedItemsEquipedWeight
 				Debug.Notification("I'm too weak to equip all of this!")
 			
+				;ToDo- We need to check how this works with the dynamic weight changes during FMG
 				actualCarryWeight = PlayerRef.GetActorValue("CarryWeight")
 				Float modWeight = actualCarryWeight + 500.0
 				Debug.Trace("SNU - actualCarryWeight="+actualCarryWeight)
@@ -370,8 +375,7 @@ Event OnUpdate()
 				PlayerRef.ModActorValue("CarryWeight", -modWeight)
 				heavyItemsEquiped = 1
 				IsOverwhelmed.setValue(1)
-			ElseIf heavyItemsEquiped && itemsEquipedWeight <= allowedItemsEquipedWeight && PlayerRef.GetActorValue("CarryWeight") < -100 && \
-			StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle") == 0
+			ElseIf heavyItemsEquiped && itemsEquipedWeight <= allowedItemsEquipedWeight && PlayerRef.GetActorValue("CarryWeight") < -100
 				Debug.Trace("SNU - All heavy items were removed. Restoring carryWeight")
 				;Debug.Notification("Restoring carry weight: "+actualCarryWeight+"+500")
 				Debug.Notification("I can move freely now")
@@ -519,10 +523,6 @@ Float Function getEquipedFullWeight()
 
 	;We also need to check if weight is above character limits!
 	If itemsEquipedWeight > allowedItemsEquipedWeight
-		If StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle") != 0
-			return itemsEquipedWeight
-		EndIf
-	
 		actualCarryWeight = PlayerRef.GetActorValue("CarryWeight")
 		Float modWeight = actualCarryWeight + 500.0
 		;Debug.Trace("SNU - actualCarryWeight="+actualCarryWeight)
@@ -555,10 +555,20 @@ Float Function getItemWeight(Form theItem)
 	return 0.0
 EndFunction
 
-Function updateAllowedItemsEquipedWeight()
-	Float currentEquipRange = maxItemsEquipedWeight - minItemsEquipedWeight
-	Float musclePercent = muscleScore / muscleScoreMax
-	allowedItemsEquipedWeight = (currentEquipRange * musclePercent) + minItemsEquipedWeight
+Function updateAllowedItemsEquipedWeight(Float fmgMusclePercent = 1.0)
+	If StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle") == 0
+		Float currentEquipRange = maxItemsEquipedWeight - minItemsEquipedWeight
+		Float musclePercent = muscleScore / muscleScoreMax
+		allowedItemsEquipedWeight = (currentEquipRange * musclePercent) + minItemsEquipedWeight
+	Else
+		If fmgMusclePercent == 1.0
+			allowedItemsEquipedWeight = 300
+		ElseIf fmgMusclePercent == 0.75
+			allowedItemsEquipedWeight = 175
+		Else
+			allowedItemsEquipedWeight = 150
+		EndIf
+	EndIf
 EndFunction
 
 Event OnObjectEquipped(Form type, ObjectReference ref)
@@ -588,7 +598,7 @@ Event OnObjectEquipped(Form type, ObjectReference ref)
 		;Debug.Trace("SNU - Full equiped weight is "+itemsEquipedWeight)
 		Debug.Notification("Equipped weight is "+itemsEquipedWeight)
 		
-		If itemsEquipedWeight > allowedItemsEquipedWeight && StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle") == 0
+		If itemsEquipedWeight > allowedItemsEquipedWeight
 			needEquipWeightUpdate = true
 			RegisterForSingleUpdate(1)
 		EndIf
@@ -620,8 +630,7 @@ Event OnObjectUnequipped(Form type, ObjectReference ref)
 		Debug.Notification("Equipped weight is now "+itemsEquipedWeight)
 	EndIf
 		
-	If heavyItemsEquiped && itemsEquipedWeight <= allowedItemsEquipedWeight && PlayerRef.GetActorValue("CarryWeight") < -100 && \
-	StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle") == 0
+	If heavyItemsEquiped && itemsEquipedWeight <= allowedItemsEquipedWeight && PlayerRef.GetActorValue("CarryWeight") < -100
 		needEquipWeightUpdate = true
 		RegisterForSingleUpdate(1)
 	EndIf
@@ -643,6 +652,19 @@ Function cleanupHardcoreMode()
 	EndIf
 	
 	Debug.Trace("SNU - CarryWeight = "+PlayerRef.GetActorValue("CarryWeight"))
+EndFunction
+
+Bool Function hasHeavyEquipment()
+	If !hardcoreMode
+		Armor mainArmor = PlayerRef.GetWornForm(0x00000004) as Armor
+		If mainArmor && ( mainArmor.IsHeavyArmor() || mainArmor.GetWeightClass() == 1 )
+			Return true
+		EndIf
+	ElseIf itemsEquipedWeight > allowedItemsEquipedWeight * 0.9
+		Return true
+	EndIf
+	
+	Return false
 EndFunction
 
 Event OnAnimationEvent(ObjectReference akSource, string asEventName)
@@ -667,8 +689,7 @@ Event OnAnimationEvent(ObjectReference akSource, string asEventName)
 				prevPositionZ = PlayerRef.GetPositionZ()
 			EndIf
 			
-			Armor mainArmor = PlayerRef.GetWornForm(0x00000004) as Armor
-			If mainArmor && ( mainArmor.IsHeavyArmor() || mainArmor.GetWeightClass() == 1 )
+			If hasHeavyEquipment()
 				If isRunningUp
 					scoreAddition = scoreAddition + (0.3 * MultGainArmor)
 				Else
@@ -693,8 +714,7 @@ Event OnAnimationEvent(ObjectReference akSource, string asEventName)
 			prevPositionZ = PlayerRef.GetPositionZ()
 			
 			If asEventName == "JumpUp"
-				Armor mainArmor = PlayerRef.GetWornForm(0x00000004) as Armor
-				If mainArmor && ( mainArmor.IsHeavyArmor() || mainArmor.GetWeightClass() == 1 )
+				If hasHeavyEquipment()
 					scoreAddition = scoreAddition + (0.3 * MultGainArmor) ;Jumping while wearing heavy armor sure would lead to some muscle development
 					;Debug.Trace("SNU - Jumping extra muscle development for wearing heavy armor")
 				EndIf
@@ -709,8 +729,7 @@ Event OnAnimationEvent(ObjectReference akSource, string asEventName)
 		ElseIf asEventName == "SoundPlay.FSTSwimSwim"
 			scoreAddition = scoreAddition + (0.2 * MultGainMisc)
 			
-			Armor mainArmor = PlayerRef.GetWornForm(0x00000004) as Armor
-			If mainArmor && ( mainArmor.IsHeavyArmor() || mainArmor.GetWeightClass() == 1 )
+			If hasHeavyEquipment()
 				scoreAddition = scoreAddition + (0.3 * MultGainArmor) ;Swimming while wearing heavy armor sure would lead to some muscle development
 				;Debug.Trace("SNU - Swimming extra muscle development for wearing heavy armor")
 			EndIf
@@ -747,10 +766,6 @@ EndEvent
 Event OnSleepStop(bool abInterrupted)
 	;Debug.Trace("SNU - OnSleepStop()")
 	
-	;If StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle") != 0
-	;	return
-	;EndIf
-	
 	;TLALOC-ToDo- Check if sleep time was enough (7 hrs. could be configurable) and restore muscleScore with 
 	;           previously stored value (Around 0.291748 GameDaysPassed for 7 hrs)
 	
@@ -771,7 +786,12 @@ Event OnSleepStop(bool abInterrupted)
 		EndIf
 	EndIf
 		
-	If StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle") == 0 && muscleMightAffinity * muscleMightProbability > Utility.RandomFloat(0.0, 1.0)
+	Float affinityScore = muscleMightAffinity * muscleMightProbability
+	Float randomProbability = Utility.RandomFloat(0.0, 1.0)
+	Debug.Trace("SNU - Checking mighty dream probability:")
+	Debug.Trace("SNU -        affinityScore="+affinityScore)
+	Debug.Trace("SNU -        randomProbability="+randomProbability)
+	If StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle") == 0 && affinityScore > randomProbability
 		Debug.Notification("I had a dream i was mighty unstoppable")
 		Utility.wait(1)
 		MusclePowerSpell.Cast(PlayerRef)
@@ -860,38 +880,36 @@ Float Function getBoneSize(Float baseModifier, Float boneModifier)
 EndFunction
 
 Function UpdateWeight(Bool applyNow = True)
-	If HAS_NIOVERRIDE
+	If HAS_NIOVERRIDE && !isTransforming && StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle") == 0
 		;Debug.Trace("SNU - UpdateWeight()")
 		Float fightingMuscle = getfightingMuscle()
 		
 		If useWeightSlider
-			If StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle") == 0
-				FLoat newWeight = fightingMuscle * 100
-				Float tWeight = PlayerRef.GetLeveledActorBase().GetWeight()
-				Float tNeckdelta = (tWeight/100) - (newWeight/100)
-				
-				;Debug.Trace("SNU - currentWeight="+tWeight+", newWeight="+newWeight)
-				If newWeight - tWeight > 5.0 || newWeight - tWeight < -5.0
-					;TLALOC- The following code can produce small lags
-					PlayerRef.GetActorBase().SetWeight(newWeight)
-					PlayerRef.QueueNiNodeUpdate()
-					PlayerRef.UpdateWeight(tNeckdelta)
-					;Debug.Trace("SNU - New weight was set")
-				EndIf
-				
-				;TLALOC- Apply bone changes
-				changeSpineBoneScale(PlayerRef, getBoneSize(muscleScore / muscleScoreMax, bonesValues[0]))
-				changeForearmBoneScale(PlayerRef, getBoneSize(muscleScore / muscleScoreMax, bonesValues[1]))
-				
-				;TLALOC- Custom Boobs physics
-				updateBoobsPhysics()
+			FLoat newWeight = fightingMuscle * 100
+			Float tWeight = PlayerRef.GetLeveledActorBase().GetWeight()
+			Float tNeckdelta = (tWeight/100) - (newWeight/100)
+			
+			;Debug.Trace("SNU - currentWeight="+tWeight+", newWeight="+newWeight)
+			If newWeight - tWeight > 5.0 || newWeight - tWeight < -5.0
+				;TLALOC- The following code can produce small lags
+				PlayerRef.GetActorBase().SetWeight(newWeight)
+				PlayerRef.QueueNiNodeUpdate()
+				PlayerRef.UpdateWeight(tNeckdelta)
+				;Debug.Trace("SNU - New weight was set")
 			EndIf
+			
+			;TLALOC- Apply bone changes
+			changeSpineBoneScale(PlayerRef, getBoneSize(muscleScore / muscleScoreMax, bonesValues[0]))
+			changeForearmBoneScale(PlayerRef, getBoneSize(muscleScore / muscleScoreMax, bonesValues[1]))
+			
+			;TLALOC- Custom Boobs physics
+			updateBoobsPhysics()
 		Else
 			Int PlayerSex = PlayerRef.GetActorBase().GetSex()
 			
 			; Female
 			If PlayerSex == 1
-				If fightingMuscle > 0.0 && StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle") == 0
+				If fightingMuscle > 0.0
 					Int totalSliders = IntListCount(PlayerRef, SNUSNU_KEY)
 					;Debug.Trace("SNU - totalSliders="+totalSliders)
 					;Debug.Trace("SNU - currentSliderIndex="+IntListGet(PlayerRef, SNUSNU_KEY, 0))
@@ -948,9 +966,10 @@ Function UpdateWeight(Bool applyNow = True)
 		If applyNow
 			NiOverride.UpdateModelWeight(PlayerRef)
 		EndIf
+	
+		effectsChanged = True
 	EndIf
 	
-	effectsChanged = True
 EndFunction
 
 Function updateMuscleScore(float incValue)
@@ -1346,7 +1365,7 @@ Function checkBodyNormalsState()
 	ElseIf currentBuildStage == 4
 		tempNormalsPath = tempNormalsPath + buildCrusherString + "Extra"
 	EndIf
-	If currentSlimStage == 1 || usePecs
+	If currentSlimStage == 1 || (currentBuildStage >= 3 && usePecs)
 		tempNormalsPath = tempNormalsPath + slimStageString
 	EndIf
 	If currentPregStage == 1
@@ -1367,7 +1386,7 @@ Function checkBodyNormalsState()
 	;Debug.Trace("SNU - Temp normals path: "+tempNormalsPath)
 	;Debug.Trace("SNU - Final normals path: "+finalNormalsPath)
 	;TLALOC - Apply new normals
-	If finalNormalsPath == "" || StringUtil.Find(tempNormalsPath, finalNormalsPath) == -1
+	If finalNormalsPath == "EMPTY" || StringUtil.Find(tempNormalsPath, finalNormalsPath) == -1
 		finalNormalsPath = tempNormalsPath
 		
 		Debug.Trace("SNU - Updating normals path to "+finalNormalsPath)

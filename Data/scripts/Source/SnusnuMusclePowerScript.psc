@@ -236,10 +236,8 @@ event OnEffectStart(Actor akTarget, Actor akCaster)
 		snusnuMain.updateBoobsPhysics(true, 2)
 	EndIf
 	
-	If snusnuMain.heavyItemsEquiped && snusnuMain.PlayerRef.GetActorValue("CarryWeight") < -100
-		Debug.Trace("SNU - All heavy items were removed. Restoring carryWeight")
-		snusnuMain.PlayerRef.ModActorValue("CarryWeight", snusnuMain.actualCarryWeight + 500)
-	EndIf
+	snusnuMain.updateAllowedItemsEquipedWeight(currentMusclePercent)
+	snusnuMain.needEquipWeightUpdate = true
 	
 	Utility.wait(1.0)
 	
@@ -268,6 +266,17 @@ EndEvent
 
 Event OnUpdate()
 	If snusnuMain.isTransforming
+		;ToDo- We can put here the transforming code to make it more stable and saveable
+		
+		
+		;/
+		If goingUp
+			registerForSingleUpdate(0.04)
+		Else
+			registerForSingleUpdate(0.2)
+		EndIf
+		/;
+		registerForSingleUpdate(5)
 		return
 	EndIf
 	
@@ -287,7 +296,7 @@ Event OnUpdate()
 		Else
 			applyMuscleNormals(snusnuMain.PlayerRef, 5)
 			snusnuMain.updateBoobsPhysics(false, 1)
-			If snusnuMain.applyMoreChangesOvertime && moreChangesCount == 2
+			If snusnuMain.applyMoreChangesOvertime
 				applyBarbarianSkin(snusnuMain.PlayerRef, 2)
 			EndIf
 			
@@ -296,90 +305,14 @@ Event OnUpdate()
 				Game.SetGameSettingFloat("fJumpHeightMin", 180.0)
 			EndIf
 		EndIf
+		
+		snusnuMain.updateAllowedItemsEquipedWeight(currentMusclePercent)
+		snusnuMain.needEquipWeightUpdate = true
 	
 		reloadUpdate = false
 	EndIf
 	
-	;Debug.Trace("SNU - tfTime="+tfTime+", Days passed: "+(snusnuMain.GameDaysPassed.GetValue() - tfTime))
-	If snusnuMain.applyMoreChangesOvertime && tfTime > 0.0
-		If snusnuMain.GameDaysPassed.GetValue() - tfTime >= snusnuMain.moreChangesInterval && moreChangesCount == 0
-			Debug.Trace("SNU - Starting more changes stage 1")
-			If currentMusclePercent < 1.0
-				Float newCarryWeight = 400*currentMusclePercent
-				currentMusclePercent += 0.25
-				
-				snusnuMain.PlayerRef.ModActorValue("CarryWeight", -newCarryWeight)
-				Utility.wait(0.2)
-				snusnuMain.PlayerRef.ModActorValue("CarryWeight", 400*currentMusclePercent)
-				
-				;Apply more muscle morphs
-				Debug.Notification("Is my body growing again!?")
-				applyQuickGrowthAnim(snusnuMain.PlayerRef, currentMusclePercent)
-				applyMuscleNormals(snusnuMain.PlayerRef, 3)
-				
-				If currentMusclePercent == 1.0
-					snusnuMain.ClearMorphs(false)
-					
-					;Improved jump height
-					Game.SetGameSettingFloat("fJumpHeightMin", 180.0)
-				EndIf
-				
-				snusnuMain.updateBoobsPhysics(true, 1)
-				snusnuMain.updateAnimations(4)
-				
-				snusnuMain.PlayerRef.unequipItem(snusnuMain.FistsOfRage)
-				updateFistsPower(currentMusclePercent)
-				Utility.wait(0.1)
-				snusnuMain.PlayerRef.equipItem(snusnuMain.FistsOfRage)
-				
-				;We need to save the original head now!
-				ActorBase akTargetBase = snusnuMain.PlayerRef.getActorBase()
-				Int headIndex = akTargetBase.GetIndexOfHeadPartByType(1)
-				snusnuMain.originalHead = akTargetBase.GetNthHeadPart(headIndex)
-				Debug.Trace("SNU - Original head: "+snusnuMain.originalHead)
-			EndIf
-			
-			;Apply tan skin
-			;Barbarian skin cannot be applied if head cannot be changed
-			Debug.Notification("Im getting a nice tan")
-			applyBarbarianSkin(snusnuMain.PlayerRef, 1)
-			moreChangesCount += 1
-		ElseIf snusnuMain.GameDaysPassed.GetValue() - tfTime >= snusnuMain.moreChangesInterval*2 && moreChangesCount == 1
-			Debug.Trace("SNU - Starting more changes stage 2")
-			If currentMusclePercent < 1.0
-				Float newCarryWeight = 400*currentMusclePercent
-				currentMusclePercent += 0.25
-				
-				snusnuMain.PlayerRef.ModActorValue("CarryWeight", -newCarryWeight)
-				Utility.wait(0.5)
-				snusnuMain.PlayerRef.ModActorValue("CarryWeight", 400*currentMusclePercent)
-				
-				;Apply more muscle morphs
-				Debug.Notification("Gods i'm getting huge!")
-				applyQuickGrowthAnim(snusnuMain.PlayerRef, currentMusclePercent)
-				snusnuMain.ClearMorphs(false)
-				applyMuscleNormals(snusnuMain.PlayerRef, 5)
-				
-				;Improved jump height
-				Game.SetGameSettingFloat("fJumpHeightMin", 180.0)
-				
-				snusnuMain.PlayerRef.unequipItem(snusnuMain.FistsOfRage)
-				updateFistsPower(currentMusclePercent)
-				Utility.wait(0.1)
-				snusnuMain.PlayerRef.equipItem(snusnuMain.FistsOfRage)
-			EndIf
-			
-			Debug.Notification("Is my skin getting darker?")
-			applyBarbarianSkin(snusnuMain.PlayerRef, 2)
-			moreChangesCount += 1
-		ElseIf moreChangesCount == 2
-			;Break condition
-			Debug.Trace("SNU - More Changes Break condition!")
-			tfTime = -1.0
-		EndIf
-	EndIf
-	
-	If StorageUtil.GetIntValue(snusnuMain.PlayerRef, "SNU_UltraMuscle") == 2
+	If StorageUtil.GetIntValue(snusnuMain.PlayerRef, "SNU_UltraMuscle") == 12
 		;Changes were made!
 		If !loadFMGMorphs()
 			Debug.Trace("SNU - Could not load the FMG morphs!")
@@ -388,10 +321,78 @@ Event OnUpdate()
 			snusnuMain.changeSpineBoneScale(snusnuMain.PlayerRef, snusnuMain.getBoneSize(currentMusclePercent, bonesValuesFMG[0]))
 			snusnuMain.changeForearmBoneScale(snusnuMain.PlayerRef, snusnuMain.getBoneSize(currentMusclePercent, bonesValuesFMG[1]))
 			
+			snusnuMain.updateAllowedItemsEquipedWeight(currentMusclePercent)
+			snusnuMain.needEquipWeightUpdate = true
+			
 			Debug.Notification("FMG shape has been updated")
 			Debug.Trace("SNU - FMG shape has been updated")
 		EndIf
-		StorageUtil.SetIntValue(snusnuMain.PlayerRef, "SNU_UltraMuscle", 1)
+		StorageUtil.SetIntValue(snusnuMain.PlayerRef, "SNU_UltraMuscle", 1+moreChangesCount)
+	EndIf
+	
+	;Debug.Trace("SNU - tfTime="+tfTime+", Days passed: "+(snusnuMain.GameDaysPassed.GetValue() - tfTime))
+	If snusnuMain.applyMoreChangesOvertime && tfTime > 0.0 && snusnuMain.GameDaysPassed.GetValue() - tfTime >= snusnuMain.moreChangesInterval
+		Debug.Trace("SNU - Starting more changes stage "+moreChangesCount)
+		If currentMusclePercent < 1.0
+			Float newCarryWeight = 400*currentMusclePercent
+			currentMusclePercent += 0.25
+			snusnuMain.updateAllowedItemsEquipedWeight(currentMusclePercent)
+			snusnuMain.needEquipWeightUpdate = true
+			
+			If currentMusclePercent == 0.75
+				Debug.Notification("Is my body growing again!?")
+			ElseIf currentMusclePercent == 1.0
+				Debug.Notification("Gods i'm getting huge!")
+			EndIf
+			
+			snusnuMain.PlayerRef.ModActorValue("CarryWeight", -newCarryWeight)
+			Utility.wait(1.0)
+			snusnuMain.PlayerRef.ModActorValue("CarryWeight", 400*currentMusclePercent)
+			
+			;Apply more muscle morphs
+			applyQuickGrowthAnim(snusnuMain.PlayerRef, currentMusclePercent)
+			
+			If currentMusclePercent == 0.75
+				applyMuscleNormals(snusnuMain.PlayerRef, 3)
+				
+				snusnuMain.updateBoobsPhysics(true, 1)
+				snusnuMain.updateAnimations(4)
+			
+				;We need to save the original head now!
+				ActorBase akTargetBase = snusnuMain.PlayerRef.getActorBase()
+				Int headIndex = akTargetBase.GetIndexOfHeadPartByType(1)
+				snusnuMain.originalHead = akTargetBase.GetNthHeadPart(headIndex)
+				Debug.Trace("SNU - Original head: "+snusnuMain.originalHead)
+				
+				Debug.Notification("Im getting a nice tan")
+				applyBarbarianSkin(snusnuMain.PlayerRef, 1)
+			ElseIf currentMusclePercent == 1.0
+				applyMuscleNormals(snusnuMain.PlayerRef, 5)
+				snusnuMain.ClearMorphs(false)
+				
+				;Improved jump height
+				Game.SetGameSettingFloat("fJumpHeightMin", 180.0)
+				
+				Debug.Notification("Is my skin getting darker?")
+				applyBarbarianSkin(snusnuMain.PlayerRef, 2)		
+			EndIf
+			
+			
+			snusnuMain.PlayerRef.unequipItem(snusnuMain.FistsOfRage)
+			updateFistsPower(currentMusclePercent)
+			Utility.wait(0.1)
+			snusnuMain.PlayerRef.equipItem(snusnuMain.FistsOfRage)
+		EndIf
+		
+		moreChangesCount += 1
+		StorageUtil.SetIntValue(snusnuMain.PlayerRef, "SNU_UltraMuscle", 1+moreChangesCount)
+		If currentMusclePercent < 1.0
+			tfTime = snusnuMain.GameDaysPassed.GetValue()
+		Else
+			;Break condition
+			Debug.Trace("SNU - More Changes Break condition!")
+			tfTime = -1.0
+		EndIf
 	EndIf
 	
 	registerForSingleUpdate(10)
@@ -443,6 +444,7 @@ Event OnEffectFinish(Actor akTarget, Actor akCaster)
 	
 	
 	If snusnuMain.tfAnimation
+		Int normalsStage = 5
 		float deflateVal = currentMusclePercent
 		while deflateVal > 0.0
 			removeNormalMuscle(akTarget, deflateVal)
@@ -452,7 +454,12 @@ Event OnEffectFinish(Actor akTarget, Actor akCaster)
 			If (deflateVal * 100) as Int % 16 == 0
 				snusnuMain.changeSpineBoneScale(akTarget, snusnuMain.getBoneSize(deflateVal, bonesValuesFMG[0]))
 				snusnuMain.changeForearmBoneScale(akTarget, snusnuMain.getBoneSize(deflateVal, bonesValuesFMG[1]))
-			endIf
+				
+				normalsStage -= 1
+				If normalsStage >= snusnuMain.currentBuildStage
+					applyMuscleNormals(akTarget, normalsStage)
+				EndIf
+			EndIf
 			
 			deflateVal -= 0.02
 			Utility.wait(0.04)
@@ -472,10 +479,12 @@ Event OnEffectFinish(Actor akTarget, Actor akCaster)
 	;AddNodeOverrideFloat(akTarget, true, overlaySlot, 8, -1, growVal, true)
 	;RemoveAllReferenceSkinOverrides(akTarget);For the custom normals
 	;ApplySkinOverrides(akTarget)
-	NiOverride.RemoveSkinOverride(akTarget, true, false, 0x04, 9, 1)
-	NiOverride.RemoveSkinOverride(akTarget, true, true, 0x04, 9, 1)
-	If !akTarget.IsOnMount()
-		akTarget.QueueNiNodeUpdate()
+	If snusnuMain.currentBuildStage <= 1
+		NiOverride.RemoveSkinOverride(akTarget, true, false, 0x04, 9, 1)
+		NiOverride.RemoveSkinOverride(akTarget, true, true, 0x04, 9, 1)
+		If !akTarget.IsOnMount()
+			akTarget.QueueNiNodeUpdate()
+		EndIf
 	EndIf
 	
 	If snusnuMain.useAltAnims
@@ -507,15 +516,8 @@ Event OnEffectFinish(Actor akTarget, Actor akCaster)
 	
 	Utility.wait(1.0)
 	
-	If snusnuMain.itemsEquipedWeight > snusnuMain.allowedItemsEquipedWeight
-		snusnuMain.actualCarryWeight = snusnuMain.PlayerRef.GetActorValue("CarryWeight")
-		Float modWeight = snusnuMain.actualCarryWeight + 500.0
-		Debug.Trace("SNU - actualCarryWeight="+snusnuMain.actualCarryWeight)
-		
-		snusnuMain.PlayerRef.ModActorValue("CarryWeight", -modWeight)
-		snusnuMain.heavyItemsEquiped = 1
-		snusnuMain.IsOverwhelmed.setValue(1)
-	EndIf
+	snusnuMain.updateAllowedItemsEquipedWeight()
+	snusnuMain.needEquipWeightUpdate = true
 	
 	Debug.Trace("SNU - Finished removal of transformation effect")
 	Debug.Notification("My body is now back to normal")

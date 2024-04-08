@@ -154,7 +154,7 @@ Event OnConfigClose()
 				
 		;Update body if PC is currently transformed
 		If StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle") != 0
-			StorageUtil.SetIntValue(PlayerRef, "SNU_UltraMuscle", 2)
+			StorageUtil.SetIntValue(PlayerRef, "SNU_UltraMuscle", 12)
 			snusnuMain.RegisterForSingleUpdate(1)
 		EndIf
 		
@@ -372,7 +372,7 @@ Event OnPageReset(String a_page)
 			cbbeSESliders[14] = AddSliderOption(sliderHasValue(snusnuMain.cbbeSEValues[14])+"Shape Classic", snusnuMain.cbbeSEValues[14], "{2}")
 			cbbeSliders[37] = AddSliderOption(sliderHasValue(snusnuMain.cbbeValues[37])+"Shape Lower", snusnuMain.cbbeValues[37], "{2}")
 			cbbeSliders[34] = AddSliderOption(sliderHasValue(snusnuMain.cbbeValues[34])+"Crack (Inverted)", snusnuMain.cbbeValues[34], "{2}")
-			cbbeSliders[35] = AddSliderOption(sliderHasValue(snusnuMain.cbbeValues[34])+"Size (Inverted)", snusnuMain.cbbeValues[34], "{2}")
+			cbbeSliders[35] = AddSliderOption(sliderHasValue(snusnuMain.cbbeValues[35])+"Size (Inverted)", snusnuMain.cbbeValues[35], "{2}")
 			cbbeSliders[36] = AddSliderOption(sliderHasValue(snusnuMain.cbbeValues[36])+"Smaller (Inverted)", snusnuMain.cbbeValues[36], "{2}")
 			cbbeSliders[38] = AddSliderOption(sliderHasValue(snusnuMain.cbbeValues[38])+"Big", snusnuMain.cbbeValues[38], "{2}")
 			cbbeSliders[39] = AddSliderOption(sliderHasValue(snusnuMain.cbbeValues[39])+"Chubby", snusnuMain.cbbeValues[39], "{2}")
@@ -711,7 +711,7 @@ Event OnOptionSelect(Int a_option)
 			
 			;Update body if PC is currently transformed
 			If StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle") != 0
-				StorageUtil.SetIntValue(PlayerRef, "SNU_UltraMuscle", 2)
+				StorageUtil.SetIntValue(PlayerRef, "SNU_UltraMuscle", 12)
 				snusnuMain.RegisterForSingleUpdate(1)
 			EndIf
 		EndIf
@@ -942,6 +942,7 @@ Event OnOptionSliderOpen(Int a_option)
 				SetSliderDialogDefaultValue(0.0)
 				SetSliderDialogRange(-2.0, 2.0)
 				SetSliderDialogInterval(0.01)
+				;Debug.Trace("SNU - Changing value for slider: "+cbbeStrings[counter])
 				found = true
 			endIf
 			counter += 1

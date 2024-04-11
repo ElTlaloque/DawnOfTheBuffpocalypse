@@ -167,6 +167,7 @@ Float[] Property cbbe3BAValues Auto
 
 ;Bone related sliders
 ;XPMSEE Has 129 different bones. Not sure if all of them can be interacted with
+;48 usable sliders found in RaceMenu, from which 6 are female exclusive
 Float Property MultSpineBone = 1.05 Auto
 Float Property MultForearmBone = 1.05 Auto
 Float[] Property bonesValues Auto
@@ -556,17 +557,17 @@ Float Function getItemWeight(Form theItem)
 EndFunction
 
 Function updateAllowedItemsEquipedWeight(Float fmgMusclePercent = 1.0)
-	If StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle") == 0
-		Float currentEquipRange = maxItemsEquipedWeight - minItemsEquipedWeight
-		Float musclePercent = muscleScore / muscleScoreMax
-		allowedItemsEquipedWeight = (currentEquipRange * musclePercent) + minItemsEquipedWeight
-	Else
+	Float currentEquipRange = maxItemsEquipedWeight - minItemsEquipedWeight
+	Float musclePercent = muscleScore / muscleScoreMax
+	allowedItemsEquipedWeight = (currentEquipRange * musclePercent) + minItemsEquipedWeight
+	
+	If StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle") > 0
 		If fmgMusclePercent == 1.0
-			allowedItemsEquipedWeight = 300
+			allowedItemsEquipedWeight = allowedItemsEquipedWeight + 200
 		ElseIf fmgMusclePercent == 0.75
-			allowedItemsEquipedWeight = 175
+			allowedItemsEquipedWeight = allowedItemsEquipedWeight + 75
 		Else
-			allowedItemsEquipedWeight = 150
+			allowedItemsEquipedWeight = allowedItemsEquipedWeight + 50
 		EndIf
 	EndIf
 EndFunction
@@ -1103,6 +1104,40 @@ Function changeForearmBoneScale(Actor theActor, Float scaleValue)
 	EndIf
 EndFunction
 
+Function changeBoneScale(Actor theActor, Int boneIndex, Float scaleValue)
+	Bool actorIsFemale = theActor.GetActorBase().GetSex()
+	Float currentScale = NiOverride.GetNodeTransformScale(theActor, false, actorIsFemale, getBoneNameID(boneIndex), SNUSNU_KEY)
+	scaleValue = 1.0 + scaleValue
+	
+	If scaleValue - currentScale > 0.001 || scaleValue - currentScale < -0.001
+		If boneIndex == 0
+			Debug.Trace("SNU - Updating spine scale from: "+currentScale+" to: "+scaleValue)
+			SetNodeScale(theActor, actorIsFemale, "NPC Spine2 [Spn2]", scaleValue, SNUSNU_KEY)
+			SetNodeScale(theActor, actorIsFemale, "CME Spine2 [Spn2]", 1.0 / scaleValue, SNUSNU_KEY)
+		ElseIf boneIndex == 1
+			SetNodeScale(theActor, actorIsFemale, "NPC L Forearm [LLar]", scaleValue, SNUSNU_KEY)
+			SetNodeScale(theActor, actorIsFemale, "CME L Forearm [LLar]", 1.0 / scaleValue, SNUSNU_KEY)
+			SetNodeScale(theActor, actorIsFemale, "NPC L Forearm [RLar]", scaleValue, SNUSNU_KEY)
+			
+			SetNodeScale(theActor, actorIsFemale, "NPC R Forearm [RLar]", scaleValue, SNUSNU_KEY)
+			SetNodeScale(theActor, actorIsFemale, "CME R Forearm [RLar]", 1.0 / scaleValue, SNUSNU_KEY)
+			
+			SetNodeScale(theActor, actorIsFemale, "NPC L ForearmTwist2 [LLt2]", scaleValue, SNUSNU_KEY)
+			SetNodeScale(theActor, actorIsFemale, "NPC R ForearmTwist2 [RLt2]", scaleValue, SNUSNU_KEY)
+		EndIf
+	EndIf
+EndFunction
+
+String Function getBoneNameID(Int boneIndex)
+	If boneIndex == 0
+		return "NPC Spine2 [Spn2]"
+	ElseIf boneIndex == 1
+		return "NPC R Forearm [RLar]"
+	EndIf
+	
+	return ""
+EndFunction
+
 Function clearBoneScales(Actor theActor)
 	;Debug.Trace("SNU - clearBoneScales()")
 	SetNodeScale(theActor, true, "NPC Spine2 [Spn2]", 1.0, SNUSNU_KEY)
@@ -1380,6 +1415,11 @@ Function checkBodyNormalsState()
 		EndIf
 	EndIf
 	
+	If isTransforming
+		finalNormalsPath = "EMPTY"
+		return
+	EndIf
+	
 	tempNormalsPath = tempNormalsPath + ".dds"
 	;Debug.Trace("SNU - Normals path is now "+tempNormalsPath)
 	
@@ -1401,6 +1441,8 @@ Function checkBodyNormalsState()
 			hasHandFix = true
 		endIf
 		
+		;ToDo- We need to actually check for character's gender instead of always assuming female. 
+		;      This goes for every single call to NiOverride
 		NiOverride.AddSkinOverrideString(PlayerRef, true, false, 0x04, 9, 1, finalNormalsPath, true)
 		NiOverride.AddSkinOverrideString(PlayerRef, true, true, 0x04, 9, 1, finalNormalsPath, true)
 		
@@ -2167,7 +2209,8 @@ Function initDefaultSliders()
 	cbbeSEValues = new Float[27]
 	cbbe3BAValues = new Float[40]
 	
-	bonesValues = new Float[2]
+	;48 usable bones plus 20 overhead for future additions
+	bonesValues = new Float[68]
 	maleValues = new Float[2]
 	
 	

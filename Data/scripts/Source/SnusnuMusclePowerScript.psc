@@ -73,6 +73,7 @@ event OnEffectStart(Actor akTarget, Actor akCaster)
 	Debug.Trace("SNU - FMG Spell duration: "+GetDuration())
 	currentMusclePercent = 1.0
 	If snusnuMain.applyMoreChangesOvertime
+		;/This kind of behavior can make the game unpredictable and frustrating!!!
 		Float intervalSeconds = snusnuMain.moreChangesInterval * 86400 ;Number of seconds in a day
 		intervalSeconds = intervalSeconds / 20
 		
@@ -81,6 +82,9 @@ event OnEffectStart(Actor akTarget, Actor akCaster)
 		ElseIf GetDuration() >= intervalSeconds + 300 ;1 days ingame plus 5 real minutes overhead
 			currentMusclePercent = 0.75
 		EndIf
+		/;
+		
+		currentMusclePercent = 0.5
 	EndIf
 			
 	If snusnuMain.tfAnimation
@@ -141,7 +145,9 @@ event OnEffectStart(Actor akTarget, Actor akCaster)
 					
 					;TLALOC- Update normals if needed
 					currentStage = switchMuscleNormals(akTarget, currentStage, growVal * 100 )
-						
+					
+					;ToDo- We NEED to check for the changes the bones already have. Otherwise it will look
+					;      like the body does a big jump in size if the character already has a high muscle score
 					snusnuMain.changeSpineBoneScale(akTarget, snusnuMain.getBoneSize(growVal, bonesValuesFMG[0]))
 					snusnuMain.changeForearmBoneScale(akTarget, snusnuMain.getBoneSize(growVal, bonesValuesFMG[1]))
 				EndIf
@@ -212,10 +218,9 @@ event OnEffectStart(Actor akTarget, Actor akCaster)
 	akTarget.AddItem(snusnuMain.FistsOfRage, 1, True)
 	akTarget.EquipItem(snusnuMain.FistsOfRage, True, True)
 	
-	If currentMusclePercent == 1.0
-		;Improved jump height
-		Game.SetGameSettingFloat("fJumpHeightMin", 180.0)
-		
+	If currentMusclePercent == 0.5
+		snusnuMain.updateBoobsPhysics(true, 2)
+	ElseIf currentMusclePercent >= 0.75
 		snusnuMain.updateBoobsPhysics(true, 1)
 	
 		If snusnuMain.useAltAnims
@@ -232,10 +237,14 @@ event OnEffectStart(Actor akTarget, Actor akCaster)
 			akTarget.ChangeHeadPart(snusnuMain.MuscleHead)
 			akTarget.RegenerateHead()
 		EndIf
-	Else
-		snusnuMain.updateBoobsPhysics(true, 2)
 	EndIf
 	
+	If currentMusclePercent == 1.0
+		;Improved jump height
+		Game.SetGameSettingFloat("fJumpHeightMin", 180.0)
+	EndIf
+	
+	;ToDo- We really need to check for hardcoreMode flags before applying this kind of stuff
 	snusnuMain.updateAllowedItemsEquipedWeight(currentMusclePercent)
 	snusnuMain.needEquipWeightUpdate = true
 	
@@ -647,7 +656,9 @@ Function applyMuscleNormals(Actor buffTarget, int stage)
 	String tempNormalsPath = "textures\\Snusnu\\Normals\\"
 	;Debug.Trace("SNU - Normals path is now "+tempNormalsPath)
 	
-	If stage == 2
+	If stage == 1
+		tempNormalsPath = tempNormalsPath + "civilian"
+	ElseIf stage == 2
 		tempNormalsPath = tempNormalsPath + "athletic"
 	ElseIf stage == 3
 		tempNormalsPath = tempNormalsPath + "boneCrusher"
@@ -658,6 +669,7 @@ Function applyMuscleNormals(Actor buffTarget, int stage)
 	EndIf
 	
 	tempNormalsPath = tempNormalsPath + ".dds"
+	Debug.Trace("SNU - Switching to normals: "+tempNormalsPath)
 	
 	Bool hasHandFix = false
 	Armor handsArmor = buffTarget.GetWornForm(0x00000008) as Armor

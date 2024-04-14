@@ -111,7 +111,9 @@ HeadPart Property originalHead Auto
 Sound Property snusnuTFSound  Auto
 Sound Property snusnuTFSoundShort  Auto
 Bool Property applyMoreChangesOvertime = true Auto
-Float Property moreChangesInterval = 1.0  Auto
+Bool Property dynamicChangesCalculation = false Auto
+Float Property moreChangesInterval = 1.0  Auto ;When the next change will occour, in in-game days
+Float Property moreChangesIncrements = 0.35  Auto ;How much to change
 Float Property muscleMightAffinity = 0.0  Auto
 Float Property muscleMightProbability = 0.25  Auto
 
@@ -171,6 +173,7 @@ Float[] Property cbbe3BAValues Auto
 Float Property MultSpineBone = 1.05 Auto
 Float Property MultForearmBone = 1.05 Auto
 Float[] Property bonesValues Auto
+String[] boneSliders
 
 ; Male morphs
 ;HIMBO has 126 morphs
@@ -564,10 +567,8 @@ Function updateAllowedItemsEquipedWeight(Float fmgMusclePercent = 1.0)
 	If StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle") > 0
 		If fmgMusclePercent == 1.0
 			allowedItemsEquipedWeight = allowedItemsEquipedWeight + 200
-		ElseIf fmgMusclePercent == 0.75
-			allowedItemsEquipedWeight = allowedItemsEquipedWeight + 75
 		Else
-			allowedItemsEquipedWeight = allowedItemsEquipedWeight + 50
+			allowedItemsEquipedWeight = allowedItemsEquipedWeight + (100 * fmgMusclePercent)
 		EndIf
 	EndIf
 EndFunction
@@ -795,7 +796,11 @@ Event OnSleepStop(bool abInterrupted)
 	If StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle") == 0 && affinityScore > randomProbability
 		Debug.Notification("I had a dream i was mighty unstoppable")
 		Utility.wait(1)
-		MusclePowerSpell.Cast(PlayerRef)
+		If affinityScore <= muscleMightProbability * 0.9
+			MusclePowerSpell.Cast(PlayerRef)
+		Else
+			UltraMusclePowerSpell.Cast(PlayerRef)
+		EndIf
 	Else
 		totalSleepTime = GameDaysPassed.GetValue() - startSleepTime
 		justWakeUp = true
@@ -900,8 +905,8 @@ Function UpdateWeight(Bool applyNow = True)
 			EndIf
 			
 			;TLALOC- Apply bone changes
-			changeSpineBoneScale(PlayerRef, getBoneSize(muscleScore / muscleScoreMax, bonesValues[0]))
-			changeForearmBoneScale(PlayerRef, getBoneSize(muscleScore / muscleScoreMax, bonesValues[1]))
+			changeBoneScale(PlayerRef, 0, getBoneSize(muscleScore / muscleScoreMax, bonesValues[0]))
+			changeBoneScale(PlayerRef, 1, getBoneSize(muscleScore / muscleScoreMax, bonesValues[1]))
 			
 			;TLALOC- Custom Boobs physics
 			updateBoobsPhysics()
@@ -923,8 +928,8 @@ Function UpdateWeight(Bool applyNow = True)
 					endWhile
 					
 					;TLALOC- Apply bone changes
-					changeSpineBoneScale(PlayerRef, getBoneSize(muscleScore / muscleScoreMax, bonesValues[0]))
-					changeForearmBoneScale(PlayerRef, getBoneSize(muscleScore / muscleScoreMax, bonesValues[1]))
+					changeBoneScale(PlayerRef, 0, getBoneSize(muscleScore / muscleScoreMax, bonesValues[0]))
+					changeBoneScale(PlayerRef, 1, getBoneSize(muscleScore / muscleScoreMax, bonesValues[1]))
 					
 					;TLALOC- Werewolf body morph --------------------------------------------------------------------
 					;ToDo- Add slider support for all Werewolf morphs
@@ -1106,7 +1111,7 @@ EndFunction
 
 Function changeBoneScale(Actor theActor, Int boneIndex, Float scaleValue)
 	Bool actorIsFemale = theActor.GetActorBase().GetSex()
-	Float currentScale = NiOverride.GetNodeTransformScale(theActor, false, actorIsFemale, getBoneNameID(boneIndex), SNUSNU_KEY)
+	Float currentScale = NiOverride.GetNodeTransformScale(theActor, false, actorIsFemale, boneSliders[boneIndex], SNUSNU_KEY)
 	scaleValue = 1.0 + scaleValue
 	
 	If scaleValue - currentScale > 0.001 || scaleValue - currentScale < -0.001
@@ -1126,16 +1131,6 @@ Function changeBoneScale(Actor theActor, Int boneIndex, Float scaleValue)
 			SetNodeScale(theActor, actorIsFemale, "NPC R ForearmTwist2 [RLt2]", scaleValue, SNUSNU_KEY)
 		EndIf
 	EndIf
-EndFunction
-
-String Function getBoneNameID(Int boneIndex)
-	If boneIndex == 0
-		return "NPC Spine2 [Spn2]"
-	ElseIf boneIndex == 1
-		return "NPC R Forearm [RLar]"
-	EndIf
-	
-	return ""
 EndFunction
 
 Function clearBoneScales(Actor theActor)
@@ -1166,7 +1161,7 @@ Function chooseBoobsPhysics(Int buildStage)
 		return
 	EndIf
 	
-	Int boobsLevel = 3
+	Int boobsLevel = 4
 	
 	If buildStage >= 3
 		;Bone Crusher
@@ -1179,18 +1174,18 @@ Function chooseBoobsPhysics(Int buildStage)
 	If isWeightMorphsLoaded
 		WeightMorphsMCM WMCM = Game.GetFormFromFile(0x05000888, "WeightMorphs.esp") As WeightMorphsMCM
 		If boobsLevel > 1
-			If WMCM.WMorphs.Weight < -0.6 ;-0.7
+			If WMCM.WMorphs.Weight < -0.75 ;-0.7
 				;Boobs too small to have noticeable physics
 				boobsLevel = 1
-			ElseIf WMCM.WMorphs.Weight < 0.6 && boobsLevel > 2
-				;Was: WMCM.WMorphs.Weight < -0.25
+			ElseIf WMCM.WMorphs.Weight < -0.25 && boobsLevel > 2
+				;Was: WMCM.WMorphs.Weight < 0.0
 				;Boobs still too small to have full physics
 				boobsLevel = 2
-			ElseIf WMCM.WMorphs.Weight > 0.8
-				;Was WMCM.WMorphs.Weight > 0.4
-				;Boobs so big they need special physics treatment
-				;boobsLevel = 4
+			ElseIf WMCM.WMorphs.Weight < 0.5
 				boobsLevel = 3
+			ElseIf WMCM.WMorphs.Weight >= 0.5
+				;Was WMCM.WMorphs.Weight > 0.4
+				boobsLevel = 4
 			EndIf
 		EndIf
 	EndIf
@@ -1239,15 +1234,13 @@ Function updateBoobsPhysics(Bool forceUpdate = false, Int newLevel = -1)
 				Debug.Notification("Switching to breasts physics level 3")
 				Debug.Trace("Switching to breasts physics level 3")
 				PhysicsManager.CBPCBreasts(PlayerRef, true)
-				PhysicsManager.CBPCBreasts(PlayerRef)
+				PhysicsManager.CBPCBreastsBig(PlayerRef)
 			ElseIf physicsLevel == 4
 				;ToDo- Change physics to SMP if body weight (from WeightMorphs) is big enough
 				;NOTE: As of right now, CBPC physics are more than enough to simulate big breasts Physics,
 				;      so there is no need for complicated SMP switching
-				
-				;Temporal code to keep physics going, this must be removed when proper switching to SMP is implemented (is a little more complex than this)
-				Debug.Notification("Switching to breasts physics level 3")
-				Debug.Trace("Switching to breasts physics level 3")
+				Debug.Notification("Switching to breasts physics level 4")
+				Debug.Trace("Switching to breasts physics level 4")
 				PhysicsManager.CBPCBreasts(PlayerRef, true)
 				PhysicsManager.CBPCBreasts(PlayerRef)
 			EndIf
@@ -1734,10 +1727,12 @@ Function initSliderArrays()
 	cbbeSESliders = new String[27]
 	cbbe3BASliders = new String[40]
 	
+	boneSliders = new String[68]
+	
 	
 	;Check if new arrays havent been initialized
 	If !bonesValues
-		bonesValues = new Float[2]
+		bonesValues = new Float[68]
 		
 		bonesValues[0] = MultSpineBone ;1.05
 		bonesValues[1] = MultForearmBone ;1.0
@@ -2103,6 +2098,75 @@ Function initSliderArrays()
 	cbbe3BASliders[125] = "AnkleSize"
 	cbbe3BASliders[18] = "WristSize"
 	/;
+	
+	boneSliders[0] = "NPC Spine2 [Spn2]"
+	boneSliders[1] = "NPC R Forearm [RLar]"
+	boneSliders[2] = "XXX"
+	boneSliders[3] = "XXX"
+	boneSliders[4] = "XXX"
+	boneSliders[5] = "XXX"
+	boneSliders[6] = "XXX"
+	boneSliders[7] = "XXX"
+	boneSliders[8] = "XXX"
+	boneSliders[9] = "XXX"
+	boneSliders[10] = "XXX"
+	boneSliders[11] = "XXX"
+	boneSliders[12] = "XXX"
+	boneSliders[13] = "XXX"
+	boneSliders[14] = "XXX"
+	boneSliders[15] = "XXX"
+	boneSliders[16] = "XXX"
+	boneSliders[17] = "XXX"
+	boneSliders[18] = "XXX"
+	boneSliders[19] = "XXX"
+	boneSliders[20] = "XXX"
+	boneSliders[21] = "XXX"
+	boneSliders[22] = "XXX"
+	boneSliders[23] = "XXX"
+	boneSliders[24] = "XXX"
+	boneSliders[25] = "XXX"
+	boneSliders[26] = "XXX"
+	boneSliders[27] = "XXX"
+	boneSliders[28] = "XXX"
+	boneSliders[29] = "XXX"
+	boneSliders[30] = "XXX"
+	boneSliders[31] = "XXX"
+	boneSliders[32] = "XXX"
+	boneSliders[33] = "XXX"
+	boneSliders[34] = "XXX"
+	boneSliders[35] = "XXX"
+	boneSliders[36] = "XXX"
+	boneSliders[37] = "XXX"
+	boneSliders[38] = "XXX"
+	boneSliders[39] = "XXX"
+	boneSliders[40] = "XXX"
+	boneSliders[41] = "XXX"
+	boneSliders[42] = "XXX"
+	boneSliders[43] = "XXX"
+	boneSliders[44] = "XXX"
+	boneSliders[45] = "XXX"
+	boneSliders[46] = "XXX"
+	boneSliders[47] = "XXX"
+	boneSliders[48] = "XXX"
+	boneSliders[49] = "XXX"
+	boneSliders[50] = "XXX"
+	boneSliders[51] = "XXX"
+	boneSliders[52] = "XXX"
+	boneSliders[53] = "XXX"
+	boneSliders[54] = "XXX"
+	boneSliders[55] = "XXX"
+	boneSliders[56] = "XXX"
+	boneSliders[57] = "XXX"
+	boneSliders[58] = "XXX"
+	boneSliders[59] = "XXX"
+	boneSliders[60] = "XXX"
+	boneSliders[61] = "XXX"
+	boneSliders[62] = "XXX"
+	boneSliders[63] = "XXX"
+	boneSliders[64] = "XXX"
+	boneSliders[65] = "XXX"
+	boneSliders[66] = "XXX"
+	boneSliders[67] = "XXX"
 EndFunction
 
 Function clearSliderData(Int group, Int position)

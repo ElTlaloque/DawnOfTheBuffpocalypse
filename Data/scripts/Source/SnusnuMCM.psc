@@ -33,7 +33,9 @@ Int _myplayTFSound
 Int _myUseWeightSlider
 Int _myDisableNormals
 Int _myApplyMoreChanges
+Int _myDynamicChanges
 Int _myChangesInterval
+Int _myChangesIncrements
 
 Int _myZeroSliders
 Int _myApplyDefault
@@ -261,6 +263,8 @@ Event OnPageReset(String a_page)
 		_myplayTFSound = AddToggleOption("$SNUSNU_PLAYTFSOUND", snusnuMain.playTFSound)
 		_myApplyMoreChanges = AddToggleOption("More changes while TF", snusnuMain.applyMoreChangesOvertime)
 		_myChangesInterval = AddSliderOption("More changes interval", snusnuMain.moreChangesInterval, "{2}")
+		_myChangesIncrements = AddSliderOption("More changes growth increments", snusnuMain.moreChangesIncrements, "{2}")
+		_myDynamicChanges = AddToggleOption("Dynamic changes calculation", snusnuMain.dynamicChangesCalculation)
 		_myNPCMuscleScore = AddSliderOption("NPC Custom Muscle", snusnuMain.npcMuscleScore*100, "{0}%")
 		AddKeyMapOptionST("SnusnuNPCMuscle","Reload NPC muscles", snusnuMain.npcMuscleKey)
 		
@@ -598,9 +602,13 @@ Event OnOptionHighlight(Int a_option)
 	ElseIf a_option == _myuseAltAnimsNPC
 		SetInfoText("$SNUSNU_USEALTANIMSNPC_DESC")
 	ElseIf a_option == _myApplyMoreChanges
-		SetInfoText("Apply more visual changes during FMG transformation. Right now the only change is the body skin will change to a darker tan-like version.")
+		SetInfoText("Apply gradual changes during FMG transformation. Muscle mass will start at 50% and it will grow in increments of 25% until it reaches 100%. Darker skin textures will also be applied every time a new increment is reached.")
+	ElseIf a_option == _myDynamicChanges
+		SetInfoText("Use dynamic calculations for gradual changes. Gradual changes will be applied only if spell duration is longh enough. If it's not, then apply the full transformation since the begining.")
 	ElseIf a_option == _myChangesInterval
-		SetInfoText("How much to wait for the next change to be applied, in in-game days.")
+		SetInfoText("How much to wait for the next change increment to be applied, in in-game days.")
+	ElseIf a_option == _myChangesIncrements
+		SetInfoText("How much muscles will grow with each change interval. Changes go in two stages, so if you choose 0.25 then the initial FMG muscle will be at 50%, then the first change stage will be to 75% and the final stage will always be to 100%")
 	ElseIf a_option == _myCustomizeFMG
 		SetInfoText("Toggle FMG morphs customization.")
 	ElseIf a_option == _myRemoveWeightMorphs
@@ -676,6 +684,9 @@ Event OnOptionSelect(Int a_option)
 	ElseIf a_option == _myApplyMoreChanges
 		snusnuMain.applyMoreChangesOvertime = !snusnuMain.applyMoreChangesOvertime
 		SetToggleOptionValue(a_option, snusnuMain.applyMoreChangesOvertime)
+	ElseIf a_option == _myDynamicChanges
+		snusnuMain.dynamicChangesCalculation = !snusnuMain.dynamicChangesCalculation
+		SetToggleOptionValue(a_option, snusnuMain.dynamicChangesCalculation)
 	ElseIf a_option == _myCustomizeFMG
 		editFMGMorphs = !editFMGMorphs
 		SetToggleOptionValue(a_option, editFMGMorphs)
@@ -903,6 +914,11 @@ Event OnOptionSliderOpen(Int a_option)
 		SetSliderDialogDefaultValue(1.0)
 		SetSliderDialogRange(0.1, 5.0)
 		SetSliderDialogInterval(0.01)
+	ElseIf a_option == _myChangesIncrements
+		SetSliderDialogStartValue(snusnuMain.moreChangesIncrements)
+		SetSliderDialogDefaultValue(0.25)
+		SetSliderDialogRange(0.05, 0.45)
+		SetSliderDialogInterval(0.01)
 	ElseIf a_option == _myMuscleAnimsLevel
 		SetSliderDialogStartValue(snusnuMain.muscleAnimsLevel.getValue())
 		SetSliderDialogDefaultValue(2.0)
@@ -1046,6 +1062,9 @@ Event OnOptionSliderAccept(Int a_option, Float a_value)
 	ElseIf a_option == _myChangesInterval	
 		snusnuMain.moreChangesInterval = a_value
 		SetSliderOptionValue(a_option, snusnuMain.moreChangesInterval, "{2}")
+	ElseIf a_option == _myChangesIncrements
+		snusnuMain.moreChangesIncrements = a_value
+		SetSliderOptionValue(a_option, snusnuMain.moreChangesIncrements, "{2}")
 	ElseIf a_option == _myMuscleAnimsLevel
 		applyMuscleAnimsLevelValue(a_value)
 		
@@ -1523,7 +1542,9 @@ Bool Function saveSettings()
 	JsonUtil.SetIntValue(fileName, "playTFSound", snusnuMain.playTFSound as Int)
 	JsonUtil.SetIntValue(fileName, "removeWeightMorphs", snusnuMain.removeWeightMorphs as Int)
 	JsonUtil.SetIntValue(fileName, "applyMoreChangesOvertime", snusnuMain.applyMoreChangesOvertime as Int)
+	JsonUtil.SetIntValue(fileName, "dynamicChangesCalculation", snusnuMain.dynamicChangesCalculation as Int)
 	JsonUtil.SetFloatValue(fileName, "moreChangesInterval", snusnuMain.moreChangesInterval)
+	JsonUtil.SetFloatValue(fileName, "moreChangesIncrements", snusnuMain.moreChangesIncrements)
 	JsonUtil.SetIntValue(fileName, "getInfoKey", snusnuMain.getInfoKey)
 	JsonUtil.SetIntValue(fileName, "npcMuscleKey", snusnuMain.npcMuscleKey)
 	JsonUtil.SetFloatValue(fileName, "npcMuscleScore", snusnuMain.npcMuscleScore)
@@ -1602,7 +1623,9 @@ bool Function loadSettings()
 		snusnuMain.playTFSound = JsonUtil.GetIntValue(fileName, "playTFSound", snusnuMain.playTFSound as Int)
 		snusnuMain.removeWeightMorphs = JsonUtil.GetIntValue(fileName, "removeWeightMorphs", snusnuMain.removeWeightMorphs as Int)
 		snusnuMain.applyMoreChangesOvertime = JsonUtil.GetIntValue(fileName, "applyMoreChangesOvertime", snusnuMain.applyMoreChangesOvertime as Int)
+		snusnuMain.dynamicChangesCalculation = JsonUtil.GetIntValue(fileName, "dynamicChangesCalculation", snusnuMain.dynamicChangesCalculation as Int)
 		snusnuMain.moreChangesInterval = JsonUtil.GetFloatValue(fileName, "moreChangesInterval", snusnuMain.moreChangesInterval as Float)
+		snusnuMain.moreChangesIncrements = JsonUtil.GetFloatValue(fileName, "moreChangesIncrements", snusnuMain.moreChangesIncrements as Float)
 		
 		If snusnuMain.getInfoKey != JsonUtil.GetIntValue(fileName, "getInfoKey", snusnuMain.getInfoKey)
 			snusnuMain.getInfoKey = JsonUtil.GetIntValue(fileName, "getInfoKey", snusnuMain.getInfoKey)
@@ -1828,7 +1851,7 @@ Function applyDynamicPhysicsOption()
 	If snusnuMain.useDynamicPhysics
 		snusnuMain.checkBodyNormalsState()
 	Else
-		snusnuMain.updateBoobsPhysics(true, 3)
+		snusnuMain.updateBoobsPhysics(true, 4)
 	EndIf
 EndFunction
 Function applyChangeAnimsOption()

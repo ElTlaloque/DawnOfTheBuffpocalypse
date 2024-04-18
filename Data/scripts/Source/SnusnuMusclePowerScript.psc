@@ -51,6 +51,7 @@ event OnEffectStart(Actor akTarget, Actor akCaster)
 	EndIf
 	
 	snusnuMain.originalHead = none
+	snusnuMain.totalMuscleToAdd = 0.01
 	moreChangesCount = 0
 	
 	StorageUtil.SetIntValue(akTarget, "SNU_UltraMuscle", 1)
@@ -149,8 +150,7 @@ event OnEffectStart(Actor akTarget, Actor akCaster)
 					
 					;ToDo- We NEED to check for the changes the bones already have. Otherwise it will look
 					;      like the body does a big jump in size if the character already has a high muscle score
-					snusnuMain.changeBoneScale(akTarget, 0, snusnuMain.getBoneSize(growVal, bonesValuesFMG[0]))
-					snusnuMain.changeBoneScale(akTarget, 1, snusnuMain.getBoneSize(growVal, bonesValuesFMG[1]))
+					updateBones(akTarget, growVal)
 				EndIf
 			Else
 				growVal = growVal - 0.01
@@ -159,8 +159,7 @@ event OnEffectStart(Actor akTarget, Actor akCaster)
 					
 					growVal = growSteps ;TLALOC - Break condition
 					
-					snusnuMain.changeBoneScale(akTarget, 0, snusnuMain.getBoneSize(growVal, bonesValuesFMG[0]))
-					snusnuMain.changeBoneScale(akTarget, 1, snusnuMain.getBoneSize(growVal, bonesValuesFMG[1]))
+					updateBones(akTarget, growVal)
 				ElseIf growVal <= (growStage * 0.1) - 0.05
 					If !((growStage * 0.1) - 0.05 > growSteps) ;TLALOC - Fix for special case where the target size is skipped
 						goingUp = true
@@ -208,9 +207,7 @@ event OnEffectStart(Actor akTarget, Actor akCaster)
 		
 		removeNormalMuscle(akTarget, maxGrowth)
 		muscleChange(akTarget, maxGrowth )
-		
-		snusnuMain.changeBoneScale(akTarget, 0, snusnuMain.getBoneSize(maxGrowth, bonesValuesFMG[0]))
-		snusnuMain.changeBoneScale(akTarget, 1, snusnuMain.getBoneSize(maxGrowth, bonesValuesFMG[1]))
+		updateBones(akTarget, maxGrowth, False)
 		
 		switchMuscleNormals(akTarget, 4, 100 )
 	EndIf
@@ -226,7 +223,11 @@ event OnEffectStart(Actor akTarget, Actor akCaster)
 		snusnuMain.updateBoobsPhysics(true, 1)
 	
 		If snusnuMain.useAltAnims
-			snusnuMain.updateAnimations(4)
+			If currentMusclePercent != 1.0
+				snusnuMain.updateAnimations(3)
+			Else
+				snusnuMain.updateAnimations(4)
+			EndIf
 		EndIf
 		
 		switchHeads(akTarget, 1)
@@ -283,8 +284,7 @@ Event OnUpdate()
 	EndIf
 	
 	If reloadUpdate
-		snusnuMain.changeBoneScale(snusnuMain.PlayerRef, 0, snusnuMain.getBoneSize(currentMusclePercent, bonesValuesFMG[0]))
-		snusnuMain.changeBoneScale(snusnuMain.PlayerRef, 1, snusnuMain.getBoneSize(currentMusclePercent, bonesValuesFMG[1]))
+		updateBones(snusnuMain.PlayerRef, currentMusclePercent, False)
 			
 		If currentMusclePercent == 1.0 - (snusnuMain.moreChangesIncrements * 2)
 			applyMuscleNormals(snusnuMain.PlayerRef, 2)
@@ -320,8 +320,7 @@ Event OnUpdate()
 			Debug.Trace("SNU - Could not load the FMG morphs!")
 		Else
 			muscleChange(snusnuMain.PlayerRef, currentMusclePercent )
-			snusnuMain.changeBoneScale(snusnuMain.PlayerRef, 0, snusnuMain.getBoneSize(currentMusclePercent, bonesValuesFMG[0]))
-			snusnuMain.changeBoneScale(snusnuMain.PlayerRef, 1, snusnuMain.getBoneSize(currentMusclePercent, bonesValuesFMG[1]))
+			updateBones(snusnuMain.PlayerRef, currentMusclePercent, False)
 			
 			snusnuMain.updateAllowedItemsEquipedWeight(currentMusclePercent)
 			snusnuMain.needEquipWeightUpdate = true
@@ -364,13 +363,15 @@ Event OnUpdate()
 				;Improved jump height
 				Game.SetGameSettingFloat("fJumpHeightMin", 180.0)
 				
+				snusnuMain.updateAnimations(4)
+				
 				Debug.Notification("Is my skin getting darker?")
 				applyBarbarianSkin(snusnuMain.PlayerRef, 2)
 			ElseIf currentMusclePercent == 1.0 - snusnuMain.moreChangesIncrements
 				applyMuscleNormals(snusnuMain.PlayerRef, 3)
 				
 				snusnuMain.updateBoobsPhysics(true, 1)
-				snusnuMain.updateAnimations(4)
+				snusnuMain.updateAnimations(3)
 				
 				Debug.Notification("Im getting a nice tan")
 				applyBarbarianSkin(snusnuMain.PlayerRef, 1)
@@ -414,7 +415,8 @@ Event OnEffectFinish(Actor akTarget, Actor akCaster)
 	Debug.Notification("The muscle spell is starting to wear off!")
 	
 	;Add some muscle
-	snusnuMain.updateMuscleScore(snusnuMain.muscleScoreMax * snusnuMain.addWerewolfStrength)
+	snusnuMain.updateMuscleScore(snusnuMain.muscleScoreMax * snusnuMain.totalMuscleToAdd)
+	Debug.Notification("You get "+(snusnuMain.totalMuscleToAdd * 100)+"% extra muscle")
 	
 	If snusnuMain.isWeightMorphsLoaded
 		WeightMorphsMCM WMCM = Game.GetFormFromFile(0x05000888, "WeightMorphs.esp") As WeightMorphsMCM
@@ -451,8 +453,7 @@ Event OnEffectFinish(Actor akTarget, Actor akCaster)
 			muscleChange(akTarget, deflateVal)
 			
 			If (deflateVal * 100) as Int % 16 == 0
-				snusnuMain.changeBoneScale(akTarget, 0, snusnuMain.getBoneSize(deflateVal, bonesValuesFMG[0]))
-				snusnuMain.changeBoneScale(akTarget, 1, snusnuMain.getBoneSize(deflateVal, bonesValuesFMG[1]))
+				updateBones(akTarget, deflateVal, False)
 		
 				normalsStage -= 1
 				If normalsStage >= snusnuMain.currentBuildStage
@@ -464,8 +465,7 @@ Event OnEffectFinish(Actor akTarget, Actor akCaster)
 			Utility.wait(0.04)
 		endWhile
 		
-		snusnuMain.changeBoneScale(akTarget, 0, snusnuMain.getBoneSize(0, bonesValuesFMG[0]))
-		snusnuMain.changeBoneScale(akTarget, 1, snusnuMain.getBoneSize(0, bonesValuesFMG[1]))
+		updateBones(akTarget, 0, False)
 		
 		clearMuscleMorphs(akTarget)
 		snusnuMain.clearBoneScales(akTarget)
@@ -521,8 +521,8 @@ Event OnEffectFinish(Actor akTarget, Actor akCaster)
 EndEvent
 
 Bool Function canPlayAnimation(Actor animatedDude)
-	If animatedDude.isInCombat() || animatedDude.IsOnMount() || animatedDude.IsSwimming() || \
-	animatedDude.GetSitState() != 0 || !Game.IsMovementControlsEnabled()
+	If animatedDude.isInCombat() || animatedDude.IsOnMount() || animatedDude.IsSwimming() || animatedDude.IsSprinting() || \
+	animatedDude.GetSleepState() != 0 || animatedDude.GetSitState() != 0 || !Game.IsMovementControlsEnabled()
 		return false
 	EndIf
 	
@@ -544,8 +544,7 @@ Function applyQuickGrowthAnim(Actor tfActor, Float magnitude)
 			muscleChange(tfActor, growthVal)
 			
 			If (growthVal * 100) as Int % 16 == 0
-				snusnuMain.changeBoneScale(tfActor, 0, snusnuMain.getBoneSize(growthVal, bonesValuesFMG[0]))
-				snusnuMain.changeBoneScale(tfActor, 1, snusnuMain.getBoneSize(growthVal, bonesValuesFMG[1]))
+				updateBones(tfActor, growthVal)
 			endIf
 			
 			growthVal += 0.02
@@ -561,11 +560,27 @@ Function applyQuickGrowthAnim(Actor tfActor, Float magnitude)
 	removeNormalMuscle(tfActor, magnitude)
 	muscleChange(tfActor, magnitude )
 	
-	snusnuMain.changeBoneScale(tfActor, 0, snusnuMain.getBoneSize(magnitude, bonesValuesFMG[0]))
-	snusnuMain.changeBoneScale(tfActor, 1, snusnuMain.getBoneSize(magnitude, bonesValuesFMG[1]))
+	updateBones(tfActor, magnitude)
 	
 	Debug.Trace("SNU - Finished growing to "+magnitude)
 	;Debug.Notification("Finished growing to "+(magnitude*100)+"%")
+EndFunction
+
+Function updateBones(Actor theActor, Float magnitude, Bool goingUp = true)
+	;/ToDo- Check if the current bone scale is actually smaller than what we want to change it to
+	Bool actorIsFemale = theActor.GetActorBase().GetSex()
+	Float currentScale = NiOverride.GetNodeTransformScale(theActor, false, actorIsFemale, snusnuMain.boneSliders[0], snusnuMain.SNUSNU_KEY)
+	Float scaleValue = 1.0 + magnitude
+	/;
+	
+	Int boneCounter = 0
+	;While boneCounter < 68
+	While boneCounter < 2
+		If bonesValuesFMG[boneCounter] != 0.0
+			snusnuMain.changeBoneScale(theActor, boneCounter, snusnuMain.getBoneSize(magnitude, bonesValuesFMG[boneCounter]))
+		EndIf
+		boneCounter += 1
+	EndWhile
 EndFunction
 
 ;Head index: 0=Original, 1=Muscle, 2=Muscle tan, 3=Muscle tan 2
@@ -601,7 +616,7 @@ Function updateFistsPower(Float magnitude)
 	
 	Int counter = 0
 	While counter < fistEffects.GetNumEffects()
-		Debug.Trace("SNU - Fists effect "+counter+" magnitude: "+fistEffects.GetNthEffectMagnitude(counter))
+		;Debug.Trace("SNU - Fists effect "+counter+" magnitude: "+fistEffects.GetNthEffectMagnitude(counter))
 		
 		If counter == 0
 			fistEffects.SetNthEffectMagnitude(counter, 150 * magnitude)

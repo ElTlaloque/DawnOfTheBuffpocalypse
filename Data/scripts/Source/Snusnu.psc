@@ -116,6 +116,7 @@ Float Property moreChangesInterval = 1.0  Auto ;When the next change will occour
 Float Property moreChangesIncrements = 0.35  Auto ;How much to change
 Float Property muscleMightAffinity = 0.0  Auto
 Float Property muscleMightProbability = 0.25  Auto
+Float Property totalMuscleToAdd = 0.01 Auto
 
 ;Experimental custom NPC muscle.
 Float Property npcMuscleScore = 0.5 Auto
@@ -132,7 +133,7 @@ Bool Property hardcoreMode = false Auto
 int Property heavyItemsEquiped = 0 Auto
 Float Property itemsEquipedWeight = -1.0 Auto
 Float Property allowedItemsEquipedWeight = -1.0 Auto
-Float Property maxItemsEquipedWeight = 150.0 Auto
+Float Property maxItemsEquipedWeight = 140.0 Auto
 Float Property minItemsEquipedWeight = 15.0 Auto
 ;FIX: CarryWeight value doesn't get updated after switch equipping 2 heavy items
 Bool Property needEquipWeightUpdate = false Auto
@@ -173,6 +174,7 @@ Float[] Property cbbe3BAValues Auto
 Float Property MultSpineBone = 1.05 Auto
 Float Property MultForearmBone = 1.05 Auto
 Float[] Property bonesValues Auto
+Int Property totalCurrentBones Auto
 String[] boneSliders
 
 ; Male morphs
@@ -241,6 +243,9 @@ Event OnPlayerLoadGame()
 		ReloadHotkeys()
 		
 		If allowedItemsEquipedWeight == -1.0 && hardcoreMode
+			;ToDo- Hardcoded value. We need to add a MCM option to set this
+			maxItemsEquipedWeight = 140.0
+			
 			If StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle") == 0
 				updateAllowedItemsEquipedWeight()
 			EndIf
@@ -351,15 +356,16 @@ Event OnUpdate()
 				;Clean all morphs so that MuscleSpell can apply their own
 				finalNormalsPath = "EMPTY"
 				UpdateEffects()
-				If !disableNormals
+				
+				;This causes a bug where if your PC already has muscle normals, the FMG spell will not need to override them
+				;but then they will be removed by this code here. I'm really trying to think why i did add this in the first
+				;place
+				;/If !disableNormals
 					;NiOverride.RemoveAllReferenceSkinOverrides(PlayerRef)
 					NiOverride.RemoveSkinOverride(PlayerRef, true, false, 0x04, 9, 1)
 					NiOverride.RemoveSkinOverride(PlayerRef, true, true, 0x04, 9, 1)
 				EndIf
-				If StorageUtil.GetIntValue(PlayerRef, "PSQ_HasMuscle") != 0
-					;TLALOC- PSQ still needs this to be called
-					ClearMorphs()
-				EndIf
+				/;
 			EndIf
 ;		Else
 ;			LastDegradationTime = GameDaysPassed.GetValue()
@@ -781,6 +787,8 @@ Event OnSleepStop(bool abInterrupted)
 		If muscleMightAffinity > 1.0
 			muscleMightAffinity = 1.0
 		EndIf
+		
+		totalMuscleToAdd += 0.01
 	Else
 		muscleMightAffinity -= 0.005
 		If muscleMightAffinity < 0.0
@@ -905,8 +913,7 @@ Function UpdateWeight(Bool applyNow = True)
 			EndIf
 			
 			;TLALOC- Apply bone changes
-			changeBoneScale(PlayerRef, 0, getBoneSize(muscleScore / muscleScoreMax, bonesValues[0]))
-			changeBoneScale(PlayerRef, 1, getBoneSize(muscleScore / muscleScoreMax, bonesValues[1]))
+			applyBoneMorphs(PlayerRef)
 			
 			;TLALOC- Custom Boobs physics
 			updateBoobsPhysics()
@@ -928,8 +935,7 @@ Function UpdateWeight(Bool applyNow = True)
 					endWhile
 					
 					;TLALOC- Apply bone changes
-					changeBoneScale(PlayerRef, 0, getBoneSize(muscleScore / muscleScoreMax, bonesValues[0]))
-					changeBoneScale(PlayerRef, 1, getBoneSize(muscleScore / muscleScoreMax, bonesValues[1]))
+					applyBoneMorphs(PlayerRef)
 					
 					;TLALOC- Werewolf body morph --------------------------------------------------------------------
 					;ToDo- Add slider support for all Werewolf morphs
@@ -1109,17 +1115,27 @@ Function changeForearmBoneScale(Actor theActor, Float scaleValue)
 	EndIf
 EndFunction
 
+Function applyBoneMorphs(Actor theActor)
+	Int boneCounter = 0
+	While boneCounter < 68
+		If bonesValues[boneCounter] != 0.0
+			changeBoneScale(theActor, boneCounter, getBoneSize(muscleScore / muscleScoreMax, bonesValues[boneCounter]))
+		EndIf
+		boneCounter += 1
+	EndWhile
+EndFunction
+
 Function changeBoneScale(Actor theActor, Int boneIndex, Float scaleValue)
 	Bool actorIsFemale = theActor.GetActorBase().GetSex()
 	Float currentScale = NiOverride.GetNodeTransformScale(theActor, false, actorIsFemale, boneSliders[boneIndex], SNUSNU_KEY)
 	scaleValue = 1.0 + scaleValue
 	
 	If scaleValue - currentScale > 0.001 || scaleValue - currentScale < -0.001
-		If boneIndex == 0
+		If boneIndex == 0 ;Upper spine
 			Debug.Trace("SNU - Updating spine scale from: "+currentScale+" to: "+scaleValue)
 			SetNodeScale(theActor, actorIsFemale, "NPC Spine2 [Spn2]", scaleValue, SNUSNU_KEY)
 			SetNodeScale(theActor, actorIsFemale, "CME Spine2 [Spn2]", 1.0 / scaleValue, SNUSNU_KEY)
-		ElseIf boneIndex == 1
+		ElseIf boneIndex == 1 ;Advanced forearms
 			SetNodeScale(theActor, actorIsFemale, "NPC L Forearm [LLar]", scaleValue, SNUSNU_KEY)
 			SetNodeScale(theActor, actorIsFemale, "CME L Forearm [LLar]", 1.0 / scaleValue, SNUSNU_KEY)
 			SetNodeScale(theActor, actorIsFemale, "NPC L Forearm [RLar]", scaleValue, SNUSNU_KEY)
@@ -1129,6 +1145,49 @@ Function changeBoneScale(Actor theActor, Int boneIndex, Float scaleValue)
 			
 			SetNodeScale(theActor, actorIsFemale, "NPC L ForearmTwist2 [LLt2]", scaleValue, SNUSNU_KEY)
 			SetNodeScale(theActor, actorIsFemale, "NPC R ForearmTwist2 [RLt2]", scaleValue, SNUSNU_KEY)
+		ElseIf boneIndex == 2 ;Upperarms
+			SetNodeScale(theActor, actorIsFemale, "NPC L UpperArm [LUar]", scaleValue, SNUSNU_KEY)
+			SetNodeScale(theActor, actorIsFemale, "CME L UpperArm [LUar]", 1/scaleValue, SNUSNU_KEY)
+			SetNodeScale(theActor, actorIsFemale, "NPC L UpperArm [RUar]", scaleValue, SNUSNU_KEY)
+			
+			SetNodeScale(theActor, actorIsFemale, "NPC R UpperArm [RUar]", scaleValue, SNUSNU_KEY)
+			SetNodeScale(theActor, actorIsFemale, "CME R UpperArm [RUar]", 1/scaleValue, SNUSNU_KEY)
+		ElseIf boneIndex == 3
+			
+		ElseIf boneIndex == 4
+			
+		ElseIf boneIndex == 5
+			
+		ElseIf boneIndex == 6
+			
+		ElseIf boneIndex == 7
+			
+		ElseIf boneIndex == 8
+			
+		ElseIf boneIndex == 9
+			
+		ElseIf boneIndex == 10
+			
+		ElseIf boneIndex == 11
+			
+		ElseIf boneIndex == 12
+			
+		ElseIf boneIndex == 13
+			
+		ElseIf boneIndex == 14
+			
+		ElseIf boneIndex == 15
+			
+		ElseIf boneIndex == 16
+			
+		ElseIf boneIndex == 17
+			
+		ElseIf boneIndex == 18
+			
+		ElseIf boneIndex == 19
+			
+		ElseIf boneIndex == 20
+			
 		EndIf
 	EndIf
 EndFunction
@@ -1728,6 +1787,7 @@ Function initSliderArrays()
 	cbbe3BASliders = new String[40]
 	
 	boneSliders = new String[68]
+	totalCurrentBones = 24 ;This is meant to be updated as we add support for more bones
 	
 	
 	;Check if new arrays havent been initialized
@@ -1736,6 +1796,12 @@ Function initSliderArrays()
 		
 		bonesValues[0] = MultSpineBone ;1.05
 		bonesValues[1] = MultForearmBone ;1.0
+		
+		Int boneCounter = 2
+		While boneCounter < 68
+			bonesValues[boneCounter] = 0.0
+			boneCounter += 1
+		EndWhile
 	EndIf
 	
 	If !maleValues
@@ -2099,30 +2165,30 @@ Function initSliderArrays()
 	cbbe3BASliders[18] = "WristSize"
 	/;
 	
-	boneSliders[0] = "NPC Spine2 [Spn2]"
-	boneSliders[1] = "NPC R Forearm [RLar]"
-	boneSliders[2] = "XXX"
-	boneSliders[3] = "XXX"
-	boneSliders[4] = "XXX"
-	boneSliders[5] = "XXX"
-	boneSliders[6] = "XXX"
-	boneSliders[7] = "XXX"
-	boneSliders[8] = "XXX"
-	boneSliders[9] = "XXX"
-	boneSliders[10] = "XXX"
-	boneSliders[11] = "XXX"
-	boneSliders[12] = "XXX"
-	boneSliders[13] = "XXX"
-	boneSliders[14] = "XXX"
-	boneSliders[15] = "XXX"
-	boneSliders[16] = "XXX"
-	boneSliders[17] = "XXX"
-	boneSliders[18] = "XXX"
-	boneSliders[19] = "XXX"
-	boneSliders[20] = "XXX"
-	boneSliders[21] = "XXX"
-	boneSliders[22] = "XXX"
-	boneSliders[23] = "XXX"
+	boneSliders[0] = "NPC Spine2 [Spn2]" ;Original upper back FMG enhancement
+	boneSliders[1] = "NPC L Forearm [LLar]" ;UUNP forearm FMG enhancement
+	boneSliders[2] = "NPC L UpperArm [LUar]" ;Upper arm
+	boneSliders[3] = "NPC L Hand [LHnd]" ;Hand
+	boneSliders[4] = "NPC L Clavicle [LClv]" ;Clavicle
+	boneSliders[5] = "NPC Pelvis [Pelv]" ;Pelvis
+	boneSliders[6] = "CME Spine [Spn0]" ;Waist
+	boneSliders[7] = "NPC Spine [Spn0]" ;Lower Spine
+	boneSliders[8] = "NPC Spine1 [Spn1]" ;Middle Spine
+	boneSliders[9] = "NPC L Thigh [LThg]" ;Thighs
+	boneSliders[10] = "NPC L Calf [LClf]" ;Calfs
+	boneSliders[11] = "NPC L Foot [Lft ]" ;Feet
+	boneSliders[12] = "NPC L Breast P1" ;Breast scale (3BBB)
+	boneSliders[13] = "NPC L Breast01 P1" ;Breast Forward
+	boneSliders[14] = "NPC L Breast" ;Breast scale (HDT)
+	boneSliders[15] = "NPC L PreBreast" ;Breast fullness (HDT)
+	boneSliders[16] = "CME L PreBreast" ;Breast sagness (HDT)
+	boneSliders[17] = "NPC Belly" ;Belly
+	boneSliders[18] = "NPC L Butt" ;Butt
+	boneSliders[19] = "NPC" ;Height
+	boneSliders[20] = "NPC Head [Head]" ;Head
+	boneSliders[21] = "NPC L Breast01" ;Breast curve
+	boneSliders[22] = "NPC L UpperarmTwist1 [LUt1]" ;Biceps
+	boneSliders[23] = "NPC L UpperarmTwist2 [LUt2]" ;Biceps2
 	boneSliders[24] = "XXX"
 	boneSliders[25] = "XXX"
 	boneSliders[26] = "XXX"
@@ -2534,6 +2600,11 @@ Function initDefaultSliders()
 	;Male and Unisex Bone sliders
 	bonesValues[0] = 1.05 ;MultSpineBone
 	bonesValues[0] = 1.0 ;MultForearmBone
+	Int boneCounter = 2
+	While boneCounter < 68
+		bonesValues[boneCounter] = 0.0
+		boneCounter += 1
+	EndWhile
 	
 	maleValues[0] = 1.0 ;MultSamuel
 	maleValues[0] = 0.0 ;MultSamson
@@ -2586,132 +2657,6 @@ Function LoadDefaultProfile(Int profileID)
 	Else
 		Debug.Trace("SNU - ERROR Default profile index not recognized!")
 	EndIf
-	
-	;/ OLD CODE
-	ClearMorphs(true)
-	IntListClear(PlayerRef, SNUSNU_KEY)
-	;setSliderValue(Int position, Float value, Bool updateWeightNow = true)
-	If profileID == 1 ;UUNP
-		setSliderValue(117, 0.5, false) ;MultMCBMHigh
-		setSliderValue(89, 0.5, false) ;MultUNPSHHigh
-		setSliderValue(47, 0.2, false) ;MultChubbyLegs
-		setSliderValue(15, -0.4, false) ;MultNippleLength
-		setSliderValue(50, -0.25, false) ;MultCalfSize
-		setSliderValue(40, -0.6, false) ;MultAppleCheeks
-		setSliderValue(38, 0.8, false) ;MultBigButt
-		setSliderValue(45, 0.7, false) ;MultSlimThighs
-		setSliderValue(51, -0.25, false) ;MultCalfSmooth
-		setSliderValue(8, 1.1, false) ;MultBreastGravity
-		setSliderValue(33, 0.4, false) ;MultBack
-		setSliderValue(29, 0.5, false) ;MultBigTorso
-		setSliderValue(35, -0.1, false) ;MultButt
-		setSliderValue(32, -0.6, false) ;MultChubbyWaist
-		setSliderValue(23, 0.1, false) ;MultShoulderSmooth
-		setSliderValue(24, 0.5, false) ;MultShoulderWidth
-		setSliderValue(31, 0.05, false) ;MultWideWaistLine
-		setSliderValue(9, -0.4, false) ;MultPushUp
-		setSliderValue(3, -0.8, false) ;MultBreastsSSH
-		setSliderValue(11, -1.2, false) ;MultBreastPerkiness
-		setSliderValue(13, -0.6, false) ;MultNippleDistance
-		setSliderValue(30, -0.45, false) ;MultWaist
-		setSliderValue(37, 0.4, false) ;MultButtShape2
-		setSliderValue(46, -0.5, false) ;MultThighs
-		setSliderValue(4, -1.0, false) ;MultBreastsFantasy
-		setSliderValue(5, 0.7, false) ;MultDoubleMelon
-		setSliderValue(18, -1.0, false) ;MultNippleUp
-		setSliderValue(19, 0.2, false) ;MultNippleDown
-		setSliderValue(10, 1.6, false) ;MultBreastHeight
-		setSliderValue(7, -0.1, false) ;MultBreastFlatness
-		setSliderValue(12, 1.2, false) ;MultBreastWidth
-		setSliderValue(22, 1.1, false) ;MultChubbyArms
-		
-		bonesValues[0] = 1.05 ;MultSpineBone
-		bonesValues[1] = 1.05 ;MultForearmBone
-	ElseIf profileID == 2 ;CBBE 3BA
-		setSliderValue(33, 0.5, false) ;Back
-		setSliderValue(211, 1.0, false) ;BackValley_v2
-		setSliderValue(212, 0.4, false) ;BackWing_v2
-		setSliderValue(127, 1.0, false) ;BreastCenter
-		setSliderValue(10, 1.1, false) ;BreastHeight
-		setSliderValue(175, -1.0, false) ;BreastSideShape
-		setSliderValue(172, 0.6, false) ;BreastTopSlope
-		setSliderValue(12, 0.6, false) ;BreastWidth
-		setSliderValue(1, 0.2, false) ;BreastsSmall
-		setSliderValue(35, 0.5, false) ;Butt
-		setSliderValue(34, -0.3, false) ;ButtCrack
-		setSliderValue(184, 1.0, false) ;ButtDimples
-		setSliderValue(215, 0.8, false) ;ButtNarrow_v2
-		setSliderValue(51, -0.5, false) ;CalfSmooth
-		setSliderValue(137, 0.1, false) ;ChestWidth
-		setSliderValue(22, 0.6, false) ;ChubbyArms
-		setSliderValue(47, 0.1, false) ;ChubbyLegs
-		setSliderValue(154, 0.6, false) ;ForearmSize
-		setSliderValue(227, -0.1, false) ;HipNarrow_v2
-		setSliderValue(220, 0.1, false) ;LegSpread_v2
-		setSliderValue(148, 1.5, false) ;MuscleArms
-		setSliderValue(226, 0.6, false) ;MuscleBack_v2
-		setSliderValue(150, 1.0, false) ;MuscleLegs
-		setSliderValue(223, 1.0, false) ;MuscleMoreAbs_v2
-		setSliderValue(224, 0.5, false) ;MuscleMoreArms_v2
-		setSliderValue(225, 1.0, false) ;MuscleMoreLegs_v2
-		setSliderValue(19, 1.0, false) ;NippleDown
-		setSliderValue(18, -0.5, false) ;NippleUp
-		setSliderValue(9, -0.1, false) ;PushUp
-		setSliderValue(219, 0.3, false) ;ThighFBThicc_v2
-		setSliderValue(217, 0.3, false) ;ThighOutsideThicc_v2
-		setSliderValue(190, -1.0, false) ;WristSize
-		setSliderValue(189, -1.0, false) ;AnkleSize
-		setSliderValue(187, -0.6, false) ;LegShapeClassic
-		
-		bonesValues[0] = 1.05 ;MultSpineBone
-		bonesValues[1] = 1.0 ;MultForearmBone
-	Else ;CBBE 3BA Pecs
-		setSliderValue(33, 0.5, false) ;Back
-		setSliderValue(211, 1.0, false) ;BackValley_v2
-		setSliderValue(212, 0.4, false) ;BackWing_v2
-		setSliderValue(10, 1.1, false) ;BreastHeight
-		setSliderValue(175, -1.0, false) ;BreastSideShape
-		setSliderValue(172, -0.4, false) ;BreastTopSlope
-		setSliderValue(12, 0.6, false) ;BreastWidth
-		setSliderValue(1, 0.2, false) ;BreastsSmall
-		setSliderValue(35, 0.5, false) ;Butt
-		setSliderValue(34, -0.3, false) ;ButtCrack
-		setSliderValue(184, 1.0, false) ;ButtDimples
-		setSliderValue(215, 0.8, false) ;ButtNarrow_v2
-		setSliderValue(51, -0.5, false) ;CalfSmooth
-		setSliderValue(137, 0.1, false) ;ChestWidth
-		setSliderValue(22, 0.6, false) ;ChubbyArms
-		setSliderValue(47, 0.1, false) ;ChubbyLegs
-		setSliderValue(154, 0.6, false) ;ForearmSize
-		setSliderValue(227, -0.1, false) ;HipNarrow_v2
-		setSliderValue(220, 0.1, false) ;LegSpread_v2
-		setSliderValue(148, 1.5, false) ;MuscleArms
-		setSliderValue(226, 0.6, false) ;MuscleBack_v2
-		setSliderValue(150, 1.0, false) ;MuscleLegs
-		setSliderValue(223, 1.0, false) ;MuscleMoreAbs_v2
-		setSliderValue(224, 0.5, false) ;MuscleMoreArms_v2
-		setSliderValue(225, 1.0, false) ;MuscleMoreLegs_v2
-		setSliderValue(19, 1.0, false) ;NippleDown
-		setSliderValue(18, -0.5, false) ;NippleUp
-		setSliderValue(9, -0.1, false) ;PushUp
-		setSliderValue(219, 0.3, false) ;ThighFBThicc_v2
-		setSliderValue(217, 0.3, false) ;ThighOutsideThicc_v2
-		setSliderValue(190, -1.0, false) ;WristSize
-		setSliderValue(189, -1.0, false) ;AnkleSize
-		setSliderValue(187, -0.6, false) ;LegShapeClassic
-		
-		;Pecs Shape
-		setSliderValue(20, -0.2, false) ;NippleTip
-		setSliderValue(131, 0.4, false) ;BreastsGone
-		setSliderValue(126, 0.1, false) ;BreastsTogether
-		
-		
-		bonesValues[0] = 1.05 ;MultSpineBone
-		bonesValues[1] = 1.0 ;MultForearmBone
-	EndIf
-	
-	UpdateWeight()
-	/;
 EndFunction
 
 Function ForceNewWeight(Float newScore = 500.0)

@@ -92,9 +92,7 @@ Function transformFMG(Actor fmgTarget)
 					
 					;TLALOC- Update normals if needed
 					currentStage = switchMuscleNormals(fmgTarget, currentStage, growVal * 100 )
-					
-					snusnuMain.changeSpineBoneScale(fmgTarget, snusnuMain.getBoneSize(growVal, bonesValuesFMG[0]))
-					snusnuMain.changeForearmBoneScale(fmgTarget, snusnuMain.getBoneSize(growVal, bonesValuesFMG[1]))
+					updateBones(fmgTarget, growVal)
 				EndIf
 			Else
 				growVal = growVal - 0.01
@@ -103,8 +101,7 @@ Function transformFMG(Actor fmgTarget)
 					
 					growVal = growSteps ;TLALOC - Break condition
 					
-					snusnuMain.changeSpineBoneScale(fmgTarget, snusnuMain.getBoneSize(growVal, bonesValuesFMG[0]))
-					snusnuMain.changeForearmBoneScale(fmgTarget, snusnuMain.getBoneSize(growVal, bonesValuesFMG[1]))
+					updateBones(fmgTarget, growVal)
 				ElseIf growVal <= (growStage * 0.1) - 0.05
 					If !((growStage * 0.1) - 0.05 > growSteps) ;TLALOC - Fix for special case where the target size is skipped
 						goingUp = true
@@ -143,10 +140,7 @@ Function transformFMG(Actor fmgTarget)
 		fmgTarget.ClearExpressionOverride()
 	Else
 		muscleChange(fmgTarget, snusnuMain.npcMuscleScore )
-		
-		snusnuMain.changeSpineBoneScale(fmgTarget, snusnuMain.getBoneSize(snusnuMain.npcMuscleScore, bonesValuesFMG[0]))
-		snusnuMain.changeForearmBoneScale(fmgTarget, snusnuMain.getBoneSize(snusnuMain.npcMuscleScore, bonesValuesFMG[1]))
-		
+		updateBones(fmgTarget, snusnuMain.npcMuscleScore)
 		forceSwitchMuscleNormals(fmgTarget, snusnuMain.npcMuscleScore * 100)
 	EndIf
 	
@@ -183,16 +177,14 @@ Function disTransformFMG(Actor fmgTarget)
 				muscleChange(fmgTarget, deflateVal)
 				
 				If (deflateVal * 100) as Int % 16 == 0
-					snusnuMain.changeSpineBoneScale(fmgTarget, snusnuMain.getBoneSize(deflateVal, bonesValuesFMG[0]))
-					snusnuMain.changeForearmBoneScale(fmgTarget, snusnuMain.getBoneSize(deflateVal, bonesValuesFMG[1]))
+					updateBones(fmgTarget, deflateVal)
 				endIf
 				
 				deflateVal -= 0.02
 				Utility.wait(0.04)
 			endWhile
 			
-			snusnuMain.changeSpineBoneScale(fmgTarget, snusnuMain.getBoneSize(0, bonesValuesFMG[0]))
-			snusnuMain.changeForearmBoneScale(fmgTarget, snusnuMain.getBoneSize(0, bonesValuesFMG[1]))
+			updateBones(fmgTarget, 0)
 			
 			clearMuscleMorphs(fmgTarget)
 			snusnuMain.clearBoneScales(fmgTarget)
@@ -250,6 +242,16 @@ EndFunction
 Function clearMuscleMorphs(Actor buffTarget)
 	NiOverride.ClearBodyMorphKeys(buffTarget, SNUSNU_BUFF_KEY)
 	NiOverride.UpdateModelWeight(buffTarget)
+EndFunction
+
+Function updateBones(Actor theActor, Float magnitude, Bool goingUp = true)
+	Int boneCounter = 0
+	While boneCounter < 68
+		If bonesValuesFMG[boneCounter] != 0.0
+			snusnuMain.changeBoneScale(theActor, boneCounter, snusnuMain.getBoneSize(magnitude, bonesValuesFMG[boneCounter]))
+		EndIf
+		boneCounter += 1
+	EndWhile
 EndFunction
 
 Int Function switchMuscleNormals(Actor buffTarget, Int currentStage, Float newWeight) Global
@@ -348,7 +350,7 @@ Function initFMGSliders()
 	bhunpValuesFMG = new Float[43]
 	cbbeSEValuesFMG = new Float[27]
 	cbbe3BAValuesFMG = new Float[40]
-	bonesValuesFMG = new Float[2]
+	bonesValuesFMG = new Float[68]
 	maleValuesFMG = new Float[2]
 EndFunction
 

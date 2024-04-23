@@ -1,0 +1,6 @@
+textures\actors\character\female\femalebody_1.dds
+textures\Snusnu\Normals\Ultra\Body.dds
+textures\Snusnu\Normals\TMP\CBBE Female Texture Replacer.dds
+textures\Snusnu\Normals\TMP\Women of Skyrim.dds
+textures\Snusnu\Normals\TMP\Real Girls.dds
+textures\Snusnu\Normals\TMP\CBBE skin texture.dds

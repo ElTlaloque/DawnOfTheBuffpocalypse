@@ -74,6 +74,8 @@ String[] cbbe3BAStrings
 ;TLALOC - Bone sliders
 Int _myMultSpineBone
 Int _myMultForearmBone
+Int[] boneSliders
+String[] boneStrings
 
 ; Male morphs
 Int _myMultSamuel
@@ -115,7 +117,7 @@ Function setMenuPages()
 EndFunction
 
 Event OnConfigInit()
-	If StorageUtil.GetIntValue(snusnuMain.PlayerRef, "SNU_UltraMuscle") > 0 && !snusnuMain.isTransforming
+	If StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle", 0) > 0 && !snusnuMain.isTransforming
 		editFMGMorphs = True
 		switchFMGMorphs(True)
 	EndIf
@@ -128,12 +130,14 @@ Event OnConfigInit()
 	bhunpSliders = new Int[43]
 	cbbeSESliders = new Int[27]
 	cbbe3BASliders = new Int[40]
+	boneSliders = new Int[68]
 	
 	cbbeStrings = new String[52]
 	uunpStrings = new String[74]
 	bhunpStrings = new String[43]
 	cbbeSEStrings = new String[27]
 	cbbe3BAStrings = new String[40]
+	boneStrings = new String[68]
 	
 	initStringArrays()
 EndEvent
@@ -155,12 +159,14 @@ Event OnConfigClose()
 		EndIf
 				
 		;Update body if PC is currently transformed
-		If StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle") != 0
+		If StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle", 0) != 0
 			StorageUtil.SetIntValue(PlayerRef, "SNU_UltraMuscle", 12)
 			snusnuMain.RegisterForSingleUpdate(1)
 		EndIf
 		
 		editFMGMorphs = False
+	Else
+		snusnuMain.UpdateWeight() ;Fix for bone morphs
 	EndIf
 EndEvent
 
@@ -483,19 +489,39 @@ Event OnPageReset(String a_page)
 		EndIf
 	ElseIf ((a_page == Pages[4] && snusnuMain.selectedBody != 2) || (a_page == Pages[1] && snusnuMain.selectedBody == 2))
 		SetCursorFillMode(LEFT_TO_RIGHT)
-		AddHeaderOption(pageNames[9])
+		AddHeaderOption("BONE MORPHS")
 		AddEmptyOption()
-		
-		;ToDo- Need to remove everything related to this:
-		_myMultSamuel = AddSliderOption("Samuel", snusnuMain.maleValues[0], "{2}", OPTION_FLAG_DISABLED)
-		_myMultSamson = AddSliderOption("Samson", snusnuMain.maleValues[1], "{2}", OPTION_FLAG_DISABLED)
-		
+		AddHeaderOption("Legacy Bones")
+		AddEmptyOption()
+		boneSliders[0] = AddSliderOption(boneSliderHasValue(snusnuMain.bonesValues[0])+boneStrings[0], snusnuMain.bonesValues[0], "{3}");Upper spine
+		boneSliders[1] = AddSliderOption(boneSliderHasValue(snusnuMain.bonesValues[1])+boneStrings[1], snusnuMain.bonesValues[1], "{3}");Advanced forearms
 		AddEmptyOption()
 		AddEmptyOption()
-		AddHeaderOption("$SNUSNU_MORPHS_BONES")
+		AddHeaderOption("New Bones")
 		AddEmptyOption()
-		_myMultSpineBone = AddSliderOption("Upper Spine", snusnuMain.bonesValues[0], "{3}")
-		_myMultForearmBone = AddSliderOption("Forearms", snusnuMain.bonesValues[1], "{3}")
+		boneSliders[2] = AddSliderOption(boneSliderHasValue(snusnuMain.bonesValues[2])+boneStrings[2], snusnuMain.bonesValues[2], "{3}");Upperarms
+		boneSliders[18] = AddSliderOption(boneSliderHasValue(snusnuMain.bonesValues[18])+boneStrings[18], snusnuMain.bonesValues[18], "{3}");Biceps
+		boneSliders[19] = AddSliderOption(boneSliderHasValue(snusnuMain.bonesValues[19])+boneStrings[19], snusnuMain.bonesValues[19], "{3}");Biceps2
+		boneSliders[4] = AddSliderOption(boneSliderHasValue(snusnuMain.bonesValues[4])+boneStrings[4], snusnuMain.bonesValues[4], "{3}");Clavicle
+		boneSliders[3] = AddSliderOption(boneSliderHasValue(snusnuMain.bonesValues[3])+boneStrings[3], snusnuMain.bonesValues[3], "{3}");Hands
+		boneSliders[9] = AddSliderOption(boneSliderHasValue(snusnuMain.bonesValues[9])+boneStrings[9], snusnuMain.bonesValues[9], "{3}");Thighs
+		boneSliders[10] = AddSliderOption(boneSliderHasValue(snusnuMain.bonesValues[10])+boneStrings[10], snusnuMain.bonesValues[10], "{3}");Calfs
+		boneSliders[11] = AddSliderOption(boneSliderHasValue(snusnuMain.bonesValues[11])+boneStrings[11], snusnuMain.bonesValues[11], "{3}");Feet
+		boneSliders[5] = AddSliderOption(boneSliderHasValue(snusnuMain.bonesValues[5])+boneStrings[5], snusnuMain.bonesValues[5], "{3}");Pelvis
+		boneSliders[6] = AddSliderOption(boneSliderHasValue(snusnuMain.bonesValues[6])+boneStrings[6], snusnuMain.bonesValues[6], "{3}");Waist
+		boneSliders[7] = AddSliderOption(boneSliderHasValue(snusnuMain.bonesValues[7])+boneStrings[7], snusnuMain.bonesValues[7], "{3}");Lower Spine
+		boneSliders[8] = AddSliderOption(boneSliderHasValue(snusnuMain.bonesValues[8])+boneStrings[8], snusnuMain.bonesValues[8], "{3}");Middle Spine
+		boneSliders[17] = AddSliderOption(boneSliderHasValue(snusnuMain.bonesValues[17])+boneStrings[17], snusnuMain.bonesValues[17], "{3}");Head
+		boneSliders[16] = AddSliderOption(boneSliderHasValue(snusnuMain.bonesValues[16])+boneStrings[16], snusnuMain.bonesValues[16], "{3}");Height
+		AddEmptyOption()
+		AddEmptyOption()
+		;Female Only
+		AddHeaderOption("Female only bones")
+		AddEmptyOption()
+		boneSliders[12] = AddSliderOption(boneSliderHasValue(snusnuMain.bonesValues[12])+boneStrings[12], snusnuMain.bonesValues[12], "{3}");Breasts (HDT)
+		boneSliders[13] = AddSliderOption(boneSliderHasValue(snusnuMain.bonesValues[13])+boneStrings[13], snusnuMain.bonesValues[13], "{3}");Breast Fullness (3BBB)
+		boneSliders[14] = AddSliderOption(boneSliderHasValue(snusnuMain.bonesValues[14])+boneStrings[14], snusnuMain.bonesValues[14], "{3}");Belly
+		boneSliders[15] = AddSliderOption(boneSliderHasValue(snusnuMain.bonesValues[15])+boneStrings[15], snusnuMain.bonesValues[15], "{3}");Butt
 	ElseIf ((a_page == Pages[5] && snusnuMain.selectedBody != 2) || (a_page == Pages[2] && snusnuMain.selectedBody == 2))
 		Int currentFlag = OPTION_FLAG_NONE
 		If editFMGMorphs
@@ -700,6 +726,7 @@ Event OnOptionSelect(Int a_option)
 				;Load FMG morphs profile here. All changes to the morphs must be saved after this
 				;option is disabled or user exits this menu.
 				;NOTICE! Previous morphs should be saved to a temporal profile file!
+				snusnuMain.UpdateWeight() ;Fix for bone morphs
 				String loadErrorMsg = switchFMGMorphs(True)
 				If loadErrorMsg
 					ShowMessage(loadErrorMsg, false)
@@ -721,7 +748,7 @@ Event OnOptionSelect(Int a_option)
 			EndIf
 			
 			;Update body if PC is currently transformed
-			If StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle") != 0
+			If StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle", 0) != 0
 				StorageUtil.SetIntValue(PlayerRef, "SNU_UltraMuscle", 12)
 				snusnuMain.RegisterForSingleUpdate(1)
 			EndIf
@@ -1019,6 +1046,20 @@ Event OnOptionSliderOpen(Int a_option)
 				counter += 1
 			endWhile
 		endIf
+		if !found
+			counter = 0
+			;BONE SLIDERS
+			while(counter < snusnuMain.totalCurrentBones && !found)
+				if a_option == boneSliders[counter]
+					SetSliderDialogStartValue(snusnuMain.bonesValues[counter])
+					SetSliderDialogDefaultValue(1.0)
+					SetSliderDialogRange(0.01, 2.0)
+					SetSliderDialogInterval(0.005)
+					found = true
+				endIf
+				counter += 1
+			endWhile
+		endIf
 	EndIf
 EndEvent
 
@@ -1160,6 +1201,20 @@ Event OnOptionSliderAccept(Int a_option, Float a_value)
 				counter += 1
 				sliderIndex += 1
 			endWhile
+		EndIf
+		if !found
+			counter = 0
+			;BONE SLIDERS
+			while(counter < snusnuMain.totalCurrentBones && !found)
+				If a_option == boneSliders[counter]
+					SetSliderOptionValue(a_option, a_value, "{3}")
+					;ForcePageReset()
+					snusnuMain.bonesValues[counter] = a_value
+					found = true
+				EndIf
+				counter += 1
+				sliderIndex += 1
+			endWhile
 		EndIf	
 	EndIf
 EndEvent
@@ -1251,6 +1306,14 @@ EndFunction
 
 String Function sliderHasValue(Float sliderVal)
 	If sliderVal != 0.0
+		Return "*"
+	Else
+		Return ""
+	EndIf
+EndFunction
+
+String Function boneSliderHasValue(Float sliderVal)
+	If sliderVal != 1.0
 		Return "*"
 	Else
 		Return ""
@@ -1513,6 +1576,27 @@ Function initStringArrays()
 	cbbe3BAStrings[37] = "BellySideDownFat_v2"
 	cbbe3BAStrings[38] = "BellyUnder_v2"
 	cbbe3BAStrings[39] = "HipBone"
+	
+	boneStrings[0] = "Upper spine"
+	boneStrings[1] = "Advanced forearms"
+	boneStrings[2] = "Upperarms"
+	boneStrings[3] = "Hands"
+	boneStrings[4] = "Clavicle"
+	boneStrings[5] = "Pelvis"
+	boneStrings[6] = "Waist"
+	boneStrings[7] = "Lower Spine"
+	boneStrings[8] = "Middle Spine"
+	boneStrings[9] = "Thighs"
+	boneStrings[10] = "Calfs"
+	boneStrings[11] = "Feet"
+	boneStrings[12] = "Breasts (HDT)"
+	boneStrings[13] = "Breast Fullness (3BBB)"
+	boneStrings[14] = "Belly"
+	boneStrings[15] = "Butt"
+	boneStrings[16] = "Height"
+	boneStrings[17] = "Head"
+	boneStrings[18] = "Biceps"
+	boneStrings[19] = "Biceps2"
 EndFunction
 
 ;SAVE & LOAD
@@ -1784,6 +1868,7 @@ Function applyEnabledOption(Bool askHardcore)
 	
 	If snusnuMain.Enabled && askHardcore && ShowMessage("Enable Hardcore Mode?\n\nIn Hardcore Mode your initial muscle score will be set depending on your race\n(Orc: 50%, Nord: 35%, WoodElf/Redguard/Khajiit/Imperial: 25%, HighElf/DarkElf/Breton/Argonian: 0%),\nand it also restricts the usage of armor and weapons depending on your muscle score.", true, "Activate", "Don't")
 		snusnuMain.hardcoreMode = true
+		applyHardcoreOption()
 		SetToggleOptionValue(_myHardcoreMode, snusnuMain.hardcoreMode)
 	EndIf
 	
@@ -1801,6 +1886,11 @@ Function applyHardcoreOption()
 	SetToggleOptionValue(_myHardcoreMode, snusnuMain.hardcoreMode)
 	
 	If snusnuMain.hardcoreMode
+		;ToDo- Hardcoded value. We need to add a MCM option to set this
+		;      Temporarly reducing it to 100. Maximum vanilla equipment is 138, but skills will bring that down to 50%, so
+		;      it would be a nice incentive to keep improving the relevant skills.
+		snusnuMain.maxItemsEquipedWeight = 100.0 ;140.0
+		
 		snusnuMain.updateAllowedItemsEquipedWeight()
 		snusnuMain.getEquipedFullWeight()
 	Else
@@ -1837,9 +1927,10 @@ Function applyNormalsOption()
 	SetToggleOptionValue(_myDisableNormals, snusnuMain.disableNormals)
 
 	If snusnuMain.disableNormals
+		Bool isFemale = PlayerRef.GetActorBase().GetSex() != 0
 		;NiOverride.RemoveAllReferenceSkinOverrides(PlayerRef)
-		NiOverride.RemoveSkinOverride(PlayerRef, true, false, 0x04, 9, 1)
-		NiOverride.RemoveSkinOverride(PlayerRef, true, true, 0x04, 9, 1)
+		NiOverride.RemoveSkinOverride(PlayerRef, isFemale, false, 0x04, 9, 1)
+		NiOverride.RemoveSkinOverride(PlayerRef, isFemale, true, 0x04, 9, 1)
 	Else
 		snusnuMain.checkBodyNormalsState()
 	EndIf

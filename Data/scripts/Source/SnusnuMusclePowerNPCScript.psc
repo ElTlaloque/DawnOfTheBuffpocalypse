@@ -141,7 +141,7 @@ Function transformFMG(Actor fmgTarget)
 	Else
 		muscleChange(fmgTarget, snusnuMain.npcMuscleScore )
 		updateBones(fmgTarget, snusnuMain.npcMuscleScore)
-		forceSwitchMuscleNormals(fmgTarget, snusnuMain.npcMuscleScore * 100)
+		forceSwitchMuscleNormals(fmgTarget, snusnuMain.npcMuscleScore * 100, snusnuMain.getNormalsByBodyType(fmgTarget))
 	EndIf
 	
 	If snusnuMain.useAltAnimsNPC
@@ -198,7 +198,8 @@ Function disTransformFMG(Actor fmgTarget)
 	;AddNodeOverrideFloat(fmgTarget, true, overlaySlot, 8, -1, growVal, true)
 	;RemoveAllReferenceSkinOverrides(fmgTarget);For the custom normals
 	;RemoveAllReferenceNodeOverrides(fmgTarget);For the custom normals
-	NiOverride.RemoveSkinOverride(fmgTarget, true, false, 0x04, 9, 1)
+	Bool isFemale = fmgTarget.GetActorBase().GetSex() != 0
+	NiOverride.RemoveSkinOverride(fmgTarget, isFemale, false, 0x04, 9, 1)
 	
 	If snusnuMain.useAltAnimsNPC
 		snusnuMain.setMuscleAnimations(fmgTarget, true)
@@ -246,15 +247,15 @@ EndFunction
 
 Function updateBones(Actor theActor, Float magnitude, Bool goingUp = true)
 	Int boneCounter = 0
-	While boneCounter < 68
-		If bonesValuesFMG[boneCounter] != 0.0
+	While boneCounter < snusnuMain.totalCurrentBones
+		If bonesValuesFMG[boneCounter] != 1.0
 			snusnuMain.changeBoneScale(theActor, boneCounter, snusnuMain.getBoneSize(magnitude, bonesValuesFMG[boneCounter]))
 		EndIf
 		boneCounter += 1
 	EndWhile
 EndFunction
 
-Int Function switchMuscleNormals(Actor buffTarget, Int currentStage, Float newWeight) Global
+Int Function switchMuscleNormals(Actor buffTarget, Int currentStage, Float newWeight)
 	Int newStage = currentStage
 
 	If currentStage == 1 && newWeight >= 30.0 && newWeight < 55.0
@@ -269,12 +270,12 @@ Int Function switchMuscleNormals(Actor buffTarget, Int currentStage, Float newWe
 	
 	;Debug.Trace("SNU - Going to switch normals? currentStage="+currentStage+", newStage="+newStage+", newWeight="+newWeight)
 	If newStage != currentStage
-		applyMuscleNormals(buffTarget, newStage)
+		applyMuscleNormals(buffTarget, newStage, snusnuMain.getNormalsByBodyType(buffTarget))
 	EndIf
 	return newStage
 EndFunction
 
-Int Function forceSwitchMuscleNormals(Actor buffTarget, Float newWeight) Global
+Int Function forceSwitchMuscleNormals(Actor buffTarget, Float newWeight, String bodyType) Global
 	Int newStage = 1
 
 	If newWeight >= 30.0 && newWeight < 55.0
@@ -287,7 +288,7 @@ Int Function forceSwitchMuscleNormals(Actor buffTarget, Float newWeight) Global
 	
 	Debug.Trace("SNU - Going to switch normals? newStage="+newStage+", newWeight="+newWeight)
 	;If newStage > 1
-		applyMuscleNormals(buffTarget, newStage)
+		applyMuscleNormals(buffTarget, newStage, bodyType)
 	;/Else
 		;TLALOC- For some reason normals still get fucked up on NPCs sometimes so we need to regenerate their textures
 		RemoveAllReferenceSkinOverrides(buffTarget);For the custom normals
@@ -298,8 +299,8 @@ Int Function forceSwitchMuscleNormals(Actor buffTarget, Float newWeight) Global
 	return newStage
 EndFunction
 
-Function applyMuscleNormals(Actor buffTarget, int stage) Global
-	String tempNormalsPath = "textures\\Snusnu\\Normals\\"
+Function applyMuscleNormals(Actor buffTarget, int stage, String bodyType) Global
+	String tempNormalsPath = "textures\\Snusnu\\Normals\\" + bodyType
 	;Debug.Trace("SNU - Normals path is now "+tempNormalsPath)
 	
 	If stage == 1
@@ -317,7 +318,8 @@ Function applyMuscleNormals(Actor buffTarget, int stage) Global
 	tempNormalsPath = tempNormalsPath + ".dds"
 	
 	Debug.Trace("SNU - Normals path is now "+tempNormalsPath)
-	NiOverride.AddSkinOverrideString(buffTarget, true, false, 0x04, 9, 1, tempNormalsPath, true)
+	Bool isFemale = buffTarget.GetActorBase().GetSex() != 0
+	NiOverride.AddSkinOverrideString(buffTarget, isFemale, false, 0x04, 9, 1, tempNormalsPath, true)
 EndFunction
 
 Function removeBuffEffects(Actor buffTarget)

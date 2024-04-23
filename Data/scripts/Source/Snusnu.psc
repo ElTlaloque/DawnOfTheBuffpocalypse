@@ -61,13 +61,15 @@ Float Property storedMuscle = 0.0 Auto
 Float Property muscleScore = 500.0 Auto
 Float Property muscleScoreMax = 1000.0 Auto
 Float Property normalsScore = 450.0 Auto ;This will change along with muscleScore, but with a faster pace.
+Float prevMuscleScore = 0.0 ;Save the previous value so we can decide to apply changes based on difference
 
 ;TLALOC - Normals related values
 Int Property currentBuildStage = 1 Auto
 Int Property currentPregStage = 0 Auto
 Int Property currentSlimStage = 0 Auto
 String finalNormalsPath = "EMPTY"
-String normalsPath = "textures\\Snusnu\\Normals\\"
+;ToDo- Put normals in 2 different folders, one for CBBE and the other for UNP. Same with the Ultra skin textures
+String Property normalsPath = "textures\\Snusnu\\Normals\\" Auto
 String buildCivilianString = "civilian"
 String buildAthleticString = "athletic"
 String buildCrusherString = "boneCrusher"
@@ -107,6 +109,8 @@ Bool Property playTFSound = true Auto
 HeadPart Property MuscleHead  Auto
 HeadPart Property MuscleHeadTan  Auto
 HeadPart Property MuscleHeadTan2  Auto
+HeadPart Property MuscleHeadTanUNP  Auto
+HeadPart Property MuscleHeadTan2UNP  Auto
 HeadPart Property originalHead Auto
 Sound Property snusnuTFSound  Auto
 Sound Property snusnuTFSoundShort  Auto
@@ -155,6 +159,7 @@ int Property snuCRC Auto
 Bool Property useMuscleAnims = true Auto
 Bool Property useDARAnims = true Auto
 Bool Property isUsingFNIS = false Auto
+Bool Property isFNISLoaded = false Auto
 
 String[] cbbeSliders
 String[] uunpSliders
@@ -244,11 +249,11 @@ Event OnPlayerLoadGame()
 		
 		If allowedItemsEquipedWeight == -1.0 && hardcoreMode
 			;ToDo- Hardcoded value. We need to add a MCM option to set this
-			maxItemsEquipedWeight = 140.0
+			;      Temporarly reducing it to 100. Maximum vanilla equipment is 138, but skills will bring that down to 50%, so
+			;      it would be a nice incentive to keep improving the relevant skills.
+			maxItemsEquipedWeight = 100.0 ;140.0
 			
-			If StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle") == 0
-				updateAllowedItemsEquipedWeight()
-			EndIf
+			updateAllowedItemsEquipedWeight()
 			getEquipedFullWeight()
 			isEquipWeightUpdating = false
 		EndIf
@@ -256,6 +261,16 @@ Event OnPlayerLoadGame()
 		If !snuCRC
 			initFNISanims()
 		EndIf
+		
+		;Reset NPCs normals updated flags
+		Int totalNPCs = FormListCount(none, "MUSCLE_NPCS")
+		Int npcsLoop = 0
+		while npcsLoop < totalNPCs
+			StorageUtil.IntListAdd(none, "MUSCLE_NPCS", 0)
+			npcsLoop += 1
+		EndWhile
+		Utility.Wait(4)
+		applyNPCMuscle()
 	EndIf
 EndEvent
 
@@ -271,6 +286,16 @@ Event OnRaceSwitchComplete()
 			addWerewolfBuild()
 		EndIf
 	EndIf
+EndEvent
+
+; Event received when every object in this object's parent cell is loaded (TODO: Find restrictions)
+Event OnCellLoad()
+	;This will be used to refresh normal maps on NPCs
+	;LOGIC: Have a new boolean array to store if an NPC has been refreshed. Reset the array to all false in OnPlayerLoadGame.
+	;Loop on the NPCs list and check if they have their 3d loaded and the refreshed flag is false, then refresh their normal maps
+	;Debug.Notification("Cell finished loading!")
+	Utility.Wait(1)
+	applyNPCMuscle()
 EndEvent
 
 Event OnUpdate()
@@ -309,7 +334,7 @@ Event OnUpdate()
 				EndIf
 			EndIf
 			
-			If StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle") == 0
+			If StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle", 0) == 0
 				;TLALOC- Muscle score degradation
 				Float DegradationTimer = GameDaysPassed.GetValue() - LastDegradationTime
 				Float totalDegradation = degradationBase * MultLoss * DegradationTimer
@@ -323,28 +348,27 @@ Event OnUpdate()
 					Debug.Trace("SNU -             finalDegradation="+totalDegradation)
 				EndIf
 				updateMuscleScore(totalDegradation)
-			EndIf
-			
-			If justWakeUp
-				;ToDo- We might need to find a way to update the carry weight in a non intrusive way without having to 
-				;      rely on specific events like sleep or eat. <--- That doesn't make sense. Specific events are exactly
-				;      for that.
-				updateCarryWeight()
 				
-				If hardcoreMode
-					;Cleanup equipped item weights
-					Debug.Notification("Refreshing hardcore weights")
-					If StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle") == 0
+				If justWakeUp
+					;ToDo- We might need to find a way to update the carry weight in a non intrusive way without having to 
+					;      rely on specific events like sleep or eat. <--- That doesn't make sense. Specific events are exactly
+					;      for that.
+					updateCarryWeight()
+					
+					If hardcoreMode
+						;Cleanup equipped item weights
+						Debug.Notification("Refreshing hardcore weights")
 						updateAllowedItemsEquipedWeight()
+						getEquipedFullWeight()
 					EndIf
-					getEquipedFullWeight()
 				EndIf
 			EndIf
+			
 			justWakeUp = false
 			;Debug.Trace("SNU - DegradationTimer="+DegradationTimer)
 			LastDegradationTime = GameDaysPassed.GetValue()
 			
-			If StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle") == 0
+			If StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle", 0) == 0
 				UpdateWeight(true)
 				checkBodyNormalsState()
 				
@@ -487,6 +511,7 @@ EndFunction
 ;         Sumar el peso de todos los items equipados en los slots principales (+Slot 49) mas las armas y escudos
 ;         y hacer el calculo con el rango de 10 como minimo y 150 como maximo
 Float Function getEquipedFullWeight()
+	;ToDo- Dont forget to add Papyrus Extender as a new requeriment for this mod
 	Form[] equipedItems = PO3_SKSEFunctions.AddAllEquippedItemsToArray(PlayerRef)
 	
 	FormListClear(PlayerRef, SNU_EQUIP_WEIGHTS_KEY)
@@ -552,6 +577,9 @@ Float Function getItemWeight(Form theItem)
 		skillHelp = (skillHelp/100) - 0.15
 		If skillHelp < 0.0
 			skillHelp = 0.0
+		ElseIf skillHelp > 0.5
+			;Maximum weight reduction by skill should be 50%. More than that would seem too unrealistic
+			skillHelp = 0.5
 		EndIf
 		
 		Float itemWeight = theItem.GetWeight()
@@ -570,7 +598,9 @@ Function updateAllowedItemsEquipedWeight(Float fmgMusclePercent = 1.0)
 	Float musclePercent = muscleScore / muscleScoreMax
 	allowedItemsEquipedWeight = (currentEquipRange * musclePercent) + minItemsEquipedWeight
 	
-	If StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle") > 0
+	Debug.Trace("SNU - Updating Allowed Equipped Weight. maxItemsEquipedWeight="+maxItemsEquipedWeight+", allowedItemsEquipedWeight="+allowedItemsEquipedWeight)
+	
+	If StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle", 0) > 0
 		If fmgMusclePercent == 1.0
 			allowedItemsEquipedWeight = allowedItemsEquipedWeight + 200
 		Else
@@ -676,7 +706,7 @@ Bool Function hasHeavyEquipment()
 EndFunction
 
 Event OnAnimationEvent(ObjectReference akSource, string asEventName)
-	If Enabled && akSource == PlayerRef && StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle") == 0
+	If Enabled && akSource == PlayerRef && StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle", 0) == 0
 		;Debug.Trace("SNU - OnAnimationEvent("+asEventName+")")
 		Float scoreAddition = 0.0
 		Bool isRunningUp = false
@@ -737,6 +767,7 @@ Event OnAnimationEvent(ObjectReference akSource, string asEventName)
 		ElseIf asEventName == "SoundPlay.FSTSwimSwim"
 			scoreAddition = scoreAddition + (0.2 * MultGainMisc)
 			
+			;ToDo- Due to SinkOrSwim changes, this event might never happen, so we need to change the way we detect being underwater
 			If hasHeavyEquipment()
 				scoreAddition = scoreAddition + (0.3 * MultGainArmor) ;Swimming while wearing heavy armor sure would lead to some muscle development
 				;Debug.Trace("SNU - Swimming extra muscle development for wearing heavy armor")
@@ -774,15 +805,8 @@ EndEvent
 Event OnSleepStop(bool abInterrupted)
 	;Debug.Trace("SNU - OnSleepStop()")
 	
-	;TLALOC-ToDo- Check if sleep time was enough (7 hrs. could be configurable) and restore muscleScore with 
-	;           previously stored value (Around 0.291748 GameDaysPassed for 7 hrs)
-	
-	;LOGIC: storedMuscle records all of muscle gain on a day, but gets degraded over time so that if PC doesn't sleep regurarly
-	;       stored muscle will be lost. recoveredMuscle records how much muscle was lost and we use it so that we cannot recover
-	;       more muscle than what we lost
-	
 	;NEW FEATURE: Randomly transform if muscle affinity is above the threshold
-	If StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle") > 0
+	If StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle", 0) > 0
 		muscleMightAffinity += 0.02
 		If muscleMightAffinity > 1.0
 			muscleMightAffinity = 1.0
@@ -801,9 +825,9 @@ Event OnSleepStop(bool abInterrupted)
 	Debug.Trace("SNU - Checking mighty dream probability:")
 	Debug.Trace("SNU -        affinityScore="+affinityScore)
 	Debug.Trace("SNU -        randomProbability="+randomProbability)
-	If StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle") == 0 && affinityScore > randomProbability
+	If StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle", 0) == 0 && affinityScore > randomProbability
+		Utility.wait(3)
 		Debug.Notification("I had a dream i was mighty unstoppable")
-		Utility.wait(1)
 		If affinityScore <= muscleMightProbability * 0.9
 			MusclePowerSpell.Cast(PlayerRef)
 		Else
@@ -815,6 +839,12 @@ Event OnSleepStop(bool abInterrupted)
 	EndIf
 EndEvent
 
+;TLALOC- Check if sleep time was enough (7 hrs. could be configurable) and restore muscleScore with 
+;        previously stored value (Around 0.291748 GameDaysPassed for 7 hrs)
+
+;LOGIC: storedMuscle records all of muscle gain on a day, but gets degraded over time so that if PC doesn't sleep regurarly
+;       stored muscle will be lost. recoveredMuscle records how much muscle was lost and we use it so that we cannot recover
+;       more muscle than what we lost
 Float Function getSleepBonus()
 	Float sleepBonus = 0.0
 	If storedMuscle > 0.0
@@ -890,11 +920,18 @@ Float Function getMuscleValuePercent(Float theValue)
 EndFunction
 
 Float Function getBoneSize(Float baseModifier, Float boneModifier)
-	return baseModifier * Math.abs( 1.0 - boneModifier )
+	If boneModifier > 1.0
+		return baseModifier * Math.abs( 1.0 - boneModifier )
+	Else
+		;Debug.Trace("SNU - Found bone smaller than 1.0, baseModifier="+baseModifier+", boneModifier="+boneModifier)
+		Float modifiedVal = baseModifier * (boneModifier - 1.0)
+		;Debug.Trace("SNU -            boneSize result: "+modifiedVal)
+		return modifiedVal
+	EndIf
 EndFunction
 
 Function UpdateWeight(Bool applyNow = True)
-	If HAS_NIOVERRIDE && !isTransforming && StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle") == 0
+	If HAS_NIOVERRIDE && !isTransforming && StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle", 0) == 0
 		;Debug.Trace("SNU - UpdateWeight()")
 		Float fightingMuscle = getfightingMuscle()
 		
@@ -962,16 +999,11 @@ Function UpdateWeight(Bool applyNow = True)
 				updateBoobsPhysics()
 			; Male
 			ElseIf PlayerSex == 0
-				If maleValues[0] != 0.0
-					NiOverride.SetBodyMorph(PlayerRef, "Samuel", SNUSNU_KEY, fightingMuscle * maleValues[0])
-				Else
-					NiOverride.ClearBodyMorph(PlayerRef, "Samuel", SNUSNU_KEY)
-				EndIf
-				If maleValues[1] != 0.0
-					NiOverride.SetBodyMorph(PlayerRef, "Samson", SNUSNU_KEY, fightingMuscle * maleValues[1])
-				Else
-					NiOverride.ClearBodyMorph(PlayerRef, "Samson", SNUSNU_KEY)
-				EndIf
+				;ToDo-...? This is a placeholder for future implementation of HIMBO or something like that... Some day
+				;applyMaleMorphs(PlayerRef)
+				
+				;TLALOC- Apply bone changes
+				applyBoneMorphs(PlayerRef)
 			EndIf
 		EndIf
 		
@@ -979,7 +1011,12 @@ Function UpdateWeight(Bool applyNow = True)
 			NiOverride.UpdateModelWeight(PlayerRef)
 		EndIf
 	
-		effectsChanged = True
+		;Check if changes are big enough
+		If fightingMuscle - prevMuscleScore > 0.01 || fightingMuscle - prevMuscleScore < -0.01
+			Debug.Trace("SNU - Changes are big enough, going to update effects. fightingMuscle="+fightingMuscle+", prevMuscleScore="+prevMuscleScore)
+			prevMuscleScore = fightingMuscle
+			effectsChanged = True
+		EndIf
 	EndIf
 	
 EndFunction
@@ -1076,53 +1113,24 @@ Function recalculateAllMuscleVars(Float factor)
 	storedMuscle = storedMuscle * factor
 EndFunction
 
-;TLALOC- BUG FIX: changes applied to main bones will cause a one frame glitch in the character animation, so we need to avoid it
-;         as much as we can and only apply it when the change difference is big enough
-Function changeSpineBoneScale(Actor theActor, Float scaleValue)
-	;Debug.Trace("SNU - changeSpineBoneScale()")
-	Float currentScale = NiOverride.GetNodeTransformScale(theActor, false, true, "NPC Spine2 [Spn2]", SNUSNU_KEY)
-	
-	scaleValue = 1.0 + scaleValue
-	
-	;Debug.Trace("SNU - Going to update spine scale to: "+scaleValue+" (Prev value = "+currentScale+")")
-	If scaleValue - currentScale > 0.001 || scaleValue - currentScale < -0.001
-		;Debug.Trace("SNU - Updating spine scale")
-		Debug.Trace("SNU - Updating spine scale from: "+currentScale+" to: "+scaleValue)
-		SetNodeScale(theActor, true, "NPC Spine2 [Spn2]", scaleValue, SNUSNU_KEY)
-		SetNodeScale(theActor, true, "CME Spine2 [Spn2]", 1.0 / scaleValue, SNUSNU_KEY)
-	EndIf
-EndFunction
-
-Function changeForearmBoneScale(Actor theActor, Float scaleValue)
-	;Debug.Trace("SNU - changeForearmBoneScale()")
-	Float currentScale = NiOverride.GetNodeTransformScale(theActor, false, true, "NPC R Forearm [RLar]", SNUSNU_KEY)
-	
-	scaleValue = 1.0 + scaleValue
-	
-	;Debug.Trace("SNU - Going to update forearm scale to: "+scaleValue+" (Prev value = "+currentScale+")")
-	If scaleValue - currentScale > 0.001 || scaleValue - currentScale < -0.001
-		;Debug.Trace("SNU - Updating forearm scale")
-		;TLALOC- BodySlide doesn't have slides for forearms, so we change the bones instead
-		SetNodeScale(theActor, true, "NPC L Forearm [LLar]", scaleValue, SNUSNU_KEY)
-		SetNodeScale(theActor, true, "CME L Forearm [LLar]", 1.0 / scaleValue, SNUSNU_KEY)
-		SetNodeScale(theActor, true, "NPC L Forearm [RLar]", scaleValue, SNUSNU_KEY)
-		
-		SetNodeScale(theActor, true, "NPC R Forearm [RLar]", scaleValue, SNUSNU_KEY)
-		SetNodeScale(theActor, true, "CME R Forearm [RLar]", 1.0 / scaleValue, SNUSNU_KEY)
-		
-		SetNodeScale(theActor, true, "NPC L ForearmTwist2 [LLt2]", scaleValue, SNUSNU_KEY)
-		SetNodeScale(theActor, true, "NPC R ForearmTwist2 [RLt2]", scaleValue, SNUSNU_KEY)
-	EndIf
-EndFunction
-
 Function applyBoneMorphs(Actor theActor)
 	Int boneCounter = 0
-	While boneCounter < 68
-		If bonesValues[boneCounter] != 0.0
-			changeBoneScale(theActor, boneCounter, getBoneSize(muscleScore / muscleScoreMax, bonesValues[boneCounter]))
-		EndIf
+	While boneCounter < totalCurrentBones
+		changeBoneScale(theActor, boneCounter, getBoneSize(muscleScore / muscleScoreMax, bonesValues[boneCounter]))
 		boneCounter += 1
 	EndWhile
+EndFunction
+
+Function SetNodePosition(Actor akActor, bool isFemale, string nodeName, float[] values)
+	If values[0] != 0.0 || values[1] != 0.0 || values[2] != 0.0
+        NiOverride.AddNodeTransformPosition(akActor, false, isFemale, nodeName, SNUSNU_KEY, values)
+        NiOverride.AddNodeTransformPosition(akActor, true, isFemale, nodeName, SNUSNU_KEY, values)
+    Else
+        NiOverride.RemoveNodeTransformPosition(akActor, false, isFemale, nodeName, SNUSNU_KEY)
+        NiOverride.RemoveNodeTransformPosition(akActor, true, isFemale, nodeName, SNUSNU_KEY)
+    Endif
+    NiOverride.UpdateNodeTransform(akActor, false, isFemale, nodeName)
+    NiOverride.UpdateNodeTransform(akActor, true, isFemale, nodeName)
 EndFunction
 
 Function changeBoneScale(Actor theActor, Int boneIndex, Float scaleValue)
@@ -1130,6 +1138,8 @@ Function changeBoneScale(Actor theActor, Int boneIndex, Float scaleValue)
 	Float currentScale = NiOverride.GetNodeTransformScale(theActor, false, actorIsFemale, boneSliders[boneIndex], SNUSNU_KEY)
 	scaleValue = 1.0 + scaleValue
 	
+	;TLALOC- BUG FIX: changes applied to main bones will cause a one frame glitch in the character animation, so we need to avoid it
+	;         as much as we can and only apply it when the change difference is big enough
 	If scaleValue - currentScale > 0.001 || scaleValue - currentScale < -0.001
 		If boneIndex == 0 ;Upper spine
 			Debug.Trace("SNU - Updating spine scale from: "+currentScale+" to: "+scaleValue)
@@ -1152,67 +1162,180 @@ Function changeBoneScale(Actor theActor, Int boneIndex, Float scaleValue)
 			
 			SetNodeScale(theActor, actorIsFemale, "NPC R UpperArm [RUar]", scaleValue, SNUSNU_KEY)
 			SetNodeScale(theActor, actorIsFemale, "CME R UpperArm [RUar]", 1/scaleValue, SNUSNU_KEY)
-		ElseIf boneIndex == 3
 			
-		ElseIf boneIndex == 4
+			;/ It seems like this only lenghtents the bone itself but doesnt fix the overlap issue
+			;Test lenght fix
+			float[] _upperArm_Length
+			_upperArm_Length = NiOverride.GetNodeTransformPosition(theActor, false, actorIsFemale, "CME L UpperArm [LUar]", SNUSNU_KEY)
+			_upperArm_Length[2] = 1.0 - scaleValue
+			SetNodePosition(theActor, actorIsFemale, "CME L UpperArm [LUar]", _upperArm_Length)
+			SetNodePosition(theActor, actorIsFemale, "CME R UpperArm [RUar]", _upperArm_Length)
+			/;
+		ElseIf boneIndex == 3 ;Hand
+			SetNodeScale(theActor, actorIsFemale, "NPC L Hand [LHnd]", scaleValue, SNUSNU_KEY)
+			SetNodeScale(theActor, actorIsFemale, "NPC R Hand [RHnd]", scaleValue, SNUSNU_KEY)
+		ElseIf boneIndex == 4 ;Clavicle
+			SetNodeScale(theActor, actorIsFemale, "NPC L Clavicle [LClv]", scaleValue, SNUSNU_KEY)
+			SetNodeScale(theActor, actorIsFemale, "CME L Clavicle [LClv]", 1/scaleValue, SNUSNU_KEY)
+			SetNodeScale(theActor, actorIsFemale, "NPC L Clavicle [RClv]", scaleValue, SNUSNU_KEY)
 			
-		ElseIf boneIndex == 5
+			SetNodeScale(theActor, actorIsFemale, "NPC R Clavicle [RClv]", scaleValue, SNUSNU_KEY)
+			SetNodeScale(theActor, actorIsFemale, "CME R Clavicle [RClv]", 1/scaleValue, SNUSNU_KEY)
+		ElseIf boneIndex == 5 ;Pelvis
+			SetNodeScale(theActor, actorIsFemale, "NPC Pelvis [Pelv]", scaleValue, SNUSNU_KEY)
+			SetNodeScale(theActor, actorIsFemale, "CME Pelvis [Pelv]", 1/scaleValue, SNUSNU_KEY)
+		ElseIf boneIndex == 6 ;Waist
+			SetNodeScale(theActor, actorIsFemale, "CME Spine [Spn0]", scaleValue, SNUSNU_KEY)
+			SetNodeScale(theActor, actorIsFemale, "CME Spine1 [Spn1]", 1/scaleValue, SNUSNU_KEY)
+		ElseIf boneIndex == 7 ;Lower Spine
+			SetNodeScale(theActor, actorIsFemale, "NPC Spine [Spn0]", scaleValue, SNUSNU_KEY)
+			SetNodeScale(theActor, actorIsFemale, "CME Spine [Spn0]", 1/scaleValue, SNUSNU_KEY)
+		ElseIf boneIndex == 8 ;Middle Spine
+			SetNodeScale(theActor, actorIsFemale, "NPC Spine1 [Spn1]", scaleValue, SNUSNU_KEY)
+			SetNodeScale(theActor, actorIsFemale, "CME Spine1 [Spn1]", 1/scaleValue, SNUSNU_KEY)
+		ElseIf boneIndex == 9 ;Thighs
+			SetNodeScale(theActor, actorIsFemale, "NPC L Thigh [LThg]", scaleValue, SNUSNU_KEY)
+			SetNodeScale(theActor, actorIsFemale, "CME L Thigh [LThg]", 1/scaleValue, SNUSNU_KEY)		
 			
-		ElseIf boneIndex == 6
+			SetNodeScale(theActor, actorIsFemale, "NPC R Thigh [RThg]", scaleValue, SNUSNU_KEY)
+			SetNodeScale(theActor, actorIsFemale, "CME R Thigh [RThg]", 1/scaleValue, SNUSNU_KEY)	
+			SetNodeScale(theActor, actorIsFemale, "NPC R Thigh [LThg]", scaleValue, SNUSNU_KEY)
+		ElseIf boneIndex == 10 ;Calfs
+			SetNodeScale(theActor, actorIsFemale, "NPC L Calf [LClf]", scaleValue, SNUSNU_KEY)
+			SetNodeScale(theActor, actorIsFemale, "CME L Calf [LClf]", 1/scaleValue, SNUSNU_KEY)		
+		
+			SetNodeScale(theActor, actorIsFemale, "NPC R Calf [RClf]", scaleValue, SNUSNU_KEY)
+			SetNodeScale(theActor, actorIsFemale, "CME R Calf [RClf]", 1/scaleValue, SNUSNU_KEY)
+			SetNodeScale(theActor, actorIsFemale, "NPC R Calf [LClf]", scaleValue, SNUSNU_KEY)
+		ElseIf boneIndex == 11 ;Feet
+			SetNodeScale(theActor, actorIsFemale, "NPC L Foot [Lft ]", scaleValue, SNUSNU_KEY)
+			SetNodeScale(theActor, actorIsFemale, "CME L Foot [Lft ]", 1/scaleValue, SNUSNU_KEY)		
 			
-		ElseIf boneIndex == 7
-			
-		ElseIf boneIndex == 8
-			
-		ElseIf boneIndex == 9
-			
-		ElseIf boneIndex == 10
-			
-		ElseIf boneIndex == 11
-			
-		ElseIf boneIndex == 12
-			
-		ElseIf boneIndex == 13
-			
-		ElseIf boneIndex == 14
-			
-		ElseIf boneIndex == 15
-			
-		ElseIf boneIndex == 16
-			
-		ElseIf boneIndex == 17
-			
-		ElseIf boneIndex == 18
-			
-		ElseIf boneIndex == 19
-			
+			SetNodeScale(theActor, actorIsFemale, "NPC R Foot [Rft ]", scaleValue, SNUSNU_KEY)
+			SetNodeScale(theActor, actorIsFemale, "CME R Foot [Rft ]", 1/scaleValue, SNUSNU_KEY)
+			SetNodeScale(theActor, actorIsFemale, "NPC R Foot [Lft ]", scaleValue, SNUSNU_KEY)
+		ElseIf boneIndex == 12 ;Breasts
+			SetNodeScale(theActor, actorIsFemale, "NPC L Breast", scaleValue, SNUSNU_KEY)
+			SetNodeScale(theActor, actorIsFemale, "NPC R Breast", scaleValue, SNUSNU_KEY)
+			SetNodeScale(theActor, actorIsFemale, "NPC L Breast01", 1/scaleValue, SNUSNU_KEY)
+			SetNodeScale(theActor, actorIsFemale, "NPC R Breast01", 1/scaleValue, SNUSNU_KEY)
+		ElseIf boneIndex == 13 ;Breast Fullness
+			SetNodeScale(theActor, actorIsFemale, "NPC L PreBreast", scaleValue, SNUSNU_KEY)
+			SetNodeScale(theActor, actorIsFemale, "NPC R PreBreast", scaleValue, SNUSNU_KEY)
+		ElseIf boneIndex == 14 ;Belly
+			SetNodeScale(theActor, actorIsFemale, "NPC Belly", scaleValue, SNUSNU_KEY)
+		ElseIf boneIndex == 15 ;Butt
+			SetNodeScale(theActor, actorIsFemale, "NPC L Butt", scaleValue, SNUSNU_KEY)
+			SetNodeScale(theActor, actorIsFemale, "NPC R Butt", scaleValue, SNUSNU_KEY)
+		ElseIf boneIndex == 16 ;Height
+			SetNodeScale(theActor, actorIsFemale, "NPC", scaleValue, SNUSNU_KEY)
+		ElseIf boneIndex == 17 ;Head
+			SetNodeScale(theActor, actorIsFemale, "NPC Head [Head]", scaleValue, SNUSNU_KEY)
+		ElseIf boneIndex == 18 ;Biceps
+			SetNodeScale(theActor, actorIsFemale, "NPC L UpperarmTwist1 [LUt1]", scaleValue, SNUSNU_KEY)
+			SetNodeScale(theActor, actorIsFemale, "NPC R UpperarmTwist1 [RUt1]", scaleValue, SNUSNU_KEY)
+		ElseIf boneIndex == 19 ;Biceps2
+			SetNodeScale(theActor, actorIsFemale, "NPC L UpperarmTwist2 [LUt2]", scaleValue, SNUSNU_KEY)
+			SetNodeScale(theActor, actorIsFemale, "NPC R UpperarmTwist2 [RUt2]", scaleValue, SNUSNU_KEY)
 		ElseIf boneIndex == 20
-			
+			;Placeholder for future additions
 		EndIf
 	EndIf
 EndFunction
 
 Function clearBoneScales(Actor theActor)
 	;Debug.Trace("SNU - clearBoneScales()")
-	SetNodeScale(theActor, true, "NPC Spine2 [Spn2]", 1.0, SNUSNU_KEY)
-	SetNodeScale(theActor, true, "CME Spine2 [Spn2]", 1.0, SNUSNU_KEY)
+	Bool actorIsFemale = theActor.GetActorBase().GetSex()
 	
-	SetNodeScale(theActor, true, "NPC L Clavicle [LClv]", 1.0, SNUSNU_KEY)
-	SetNodeScale(theActor, true, "CME L Clavicle [LClv]", 1.0, SNUSNU_KEY)
-	SetNodeScale(theActor, true, "NPC L Clavicle [RClv]", 1.0, SNUSNU_KEY)
+	SetNodeScale(theActor, actorIsFemale, "NPC Spine2 [Spn2]", 1.0, SNUSNU_KEY)
+	SetNodeScale(theActor, actorIsFemale, "CME Spine2 [Spn2]", 1.0, SNUSNU_KEY)
 	
-	SetNodeScale(theActor, true, "NPC R Clavicle [RClv]", 1.0, SNUSNU_KEY)
-	SetNodeScale(theActor, true, "CME R Clavicle [RClv]", 1.0, SNUSNU_KEY)
+	SetNodeScale(theActor, actorIsFemale, "NPC L Clavicle [LClv]", 1.0, SNUSNU_KEY)
+	SetNodeScale(theActor, actorIsFemale, "CME L Clavicle [LClv]", 1.0, SNUSNU_KEY)
+	SetNodeScale(theActor, actorIsFemale, "NPC L Clavicle [RClv]", 1.0, SNUSNU_KEY)
 	
-	SetNodeScale(theActor, true, "NPC L Forearm [LLar]", 1.0, SNUSNU_KEY)
-	SetNodeScale(theActor, true, "CME L Forearm [LLar]", 1.0, SNUSNU_KEY)
-	SetNodeScale(theActor, true, "NPC L Forearm [RLar]", 1.0, SNUSNU_KEY)
+	SetNodeScale(theActor, actorIsFemale, "NPC R Clavicle [RClv]", 1.0, SNUSNU_KEY)
+	SetNodeScale(theActor, actorIsFemale, "CME R Clavicle [RClv]", 1.0, SNUSNU_KEY)
 	
-	SetNodeScale(theActor, true, "NPC R Forearm [RLar]", 1.0, SNUSNU_KEY)
-	SetNodeScale(theActor, true, "CME R Forearm [RLar]", 1.0, SNUSNU_KEY)
+	SetNodeScale(theActor, actorIsFemale, "NPC L Forearm [LLar]", 1.0, SNUSNU_KEY)
+	SetNodeScale(theActor, actorIsFemale, "CME L Forearm [LLar]", 1.0, SNUSNU_KEY)
+	SetNodeScale(theActor, actorIsFemale, "NPC L Forearm [RLar]", 1.0, SNUSNU_KEY)
 	
-	SetNodeScale(theActor, true, "NPC L ForearmTwist2 [LLt2]", 1.0, SNUSNU_KEY)
-	SetNodeScale(theActor, true, "NPC R ForearmTwist2 [RLt2]", 1.0, SNUSNU_KEY)
+	SetNodeScale(theActor, actorIsFemale, "NPC R Forearm [RLar]", 1.0, SNUSNU_KEY)
+	SetNodeScale(theActor, actorIsFemale, "CME R Forearm [RLar]", 1.0, SNUSNU_KEY)
+	
+	SetNodeScale(theActor, actorIsFemale, "NPC L ForearmTwist2 [LLt2]", 1.0, SNUSNU_KEY)
+	SetNodeScale(theActor, actorIsFemale, "NPC R ForearmTwist2 [RLt2]", 1.0, SNUSNU_KEY)
+	
+	;Overhaul additions
+	SetNodeScale(theActor, actorIsFemale, "NPC L UpperArm [LUar]", 1.0, SNUSNU_KEY)
+	SetNodeScale(theActor, actorIsFemale, "CME L UpperArm [LUar]", 1.0, SNUSNU_KEY)
+	SetNodeScale(theActor, actorIsFemale, "NPC L UpperArm [RUar]", 1.0, SNUSNU_KEY)
+	
+	SetNodeScale(theActor, actorIsFemale, "NPC R UpperArm [RUar]", 1.0, SNUSNU_KEY)
+	SetNodeScale(theActor, actorIsFemale, "CME R UpperArm [RUar]", 1.0, SNUSNU_KEY)
+	
+	SetNodeScale(theActor, actorIsFemale, "NPC L Hand [LHnd]", 1.0, SNUSNU_KEY)
+	SetNodeScale(theActor, actorIsFemale, "NPC R Hand [RHnd]", 1.0, SNUSNU_KEY)
+		
+	SetNodeScale(theActor, actorIsFemale, "NPC L Clavicle [LClv]", 1.0, SNUSNU_KEY)
+	SetNodeScale(theActor, actorIsFemale, "CME L Clavicle [LClv]", 1.0, SNUSNU_KEY)
+	SetNodeScale(theActor, actorIsFemale, "NPC L Clavicle [RClv]", 1.0, SNUSNU_KEY)
+	SetNodeScale(theActor, actorIsFemale, "NPC R Clavicle [RClv]", 1.0, SNUSNU_KEY)
+	SetNodeScale(theActor, actorIsFemale, "CME R Clavicle [RClv]", 1.0, SNUSNU_KEY)
+
+	SetNodeScale(theActor, actorIsFemale, "NPC Pelvis [Pelv]", 1.0, SNUSNU_KEY)
+	SetNodeScale(theActor, actorIsFemale, "CME Pelvis [Pelv]", 1.0, SNUSNU_KEY)
+
+	SetNodeScale(theActor, actorIsFemale, "CME Spine [Spn0]", 1.0, SNUSNU_KEY)
+	SetNodeScale(theActor, actorIsFemale, "CME Spine1 [Spn1]", 1.0, SNUSNU_KEY)
+
+	SetNodeScale(theActor, actorIsFemale, "NPC Spine [Spn0]", 1.0, SNUSNU_KEY)
+	SetNodeScale(theActor, actorIsFemale, "CME Spine [Spn0]", 1.0, SNUSNU_KEY)
+
+	SetNodeScale(theActor, actorIsFemale, "NPC Spine1 [Spn1]", 1.0, SNUSNU_KEY)
+	SetNodeScale(theActor, actorIsFemale, "CME Spine1 [Spn1]", 1.0, SNUSNU_KEY)
+
+	SetNodeScale(theActor, actorIsFemale, "NPC L Thigh [LThg]", 1.0, SNUSNU_KEY)
+	SetNodeScale(theActor, actorIsFemale, "CME L Thigh [LThg]", 1.0, SNUSNU_KEY)		
+	SetNodeScale(theActor, actorIsFemale, "NPC R Thigh [RThg]", 1.0, SNUSNU_KEY)
+	SetNodeScale(theActor, actorIsFemale, "CME R Thigh [RThg]", 1.0, SNUSNU_KEY)	
+	SetNodeScale(theActor, actorIsFemale, "NPC R Thigh [LThg]", 1.0, SNUSNU_KEY)
+
+	SetNodeScale(theActor, actorIsFemale, "NPC L Calf [LClf]", 1.0, SNUSNU_KEY)
+	SetNodeScale(theActor, actorIsFemale, "CME L Calf [LClf]", 1.0, SNUSNU_KEY)
+	SetNodeScale(theActor, actorIsFemale, "NPC R Calf [RClf]", 1.0, SNUSNU_KEY)
+	SetNodeScale(theActor, actorIsFemale, "CME R Calf [RClf]", 1.0, SNUSNU_KEY)
+	SetNodeScale(theActor, actorIsFemale, "NPC R Calf [LClf]", 1.0, SNUSNU_KEY)
+
+	SetNodeScale(theActor, actorIsFemale, "NPC L Foot [Lft ]", 1.0, SNUSNU_KEY)
+	SetNodeScale(theActor, actorIsFemale, "CME L Foot [Lft ]", 1.0, SNUSNU_KEY)		
+	SetNodeScale(theActor, actorIsFemale, "NPC R Foot [Rft ]", 1.0, SNUSNU_KEY)
+	SetNodeScale(theActor, actorIsFemale, "CME R Foot [Rft ]", 1.0, SNUSNU_KEY)
+	SetNodeScale(theActor, actorIsFemale, "NPC R Foot [Lft ]", 1.0, SNUSNU_KEY)
+
+	SetNodeScale(theActor, actorIsFemale, "NPC L Breast", 1.0, SNUSNU_KEY)
+	SetNodeScale(theActor, actorIsFemale, "NPC R Breast", 1.0, SNUSNU_KEY)
+	SetNodeScale(theActor, actorIsFemale, "NPC L Breast01", 1.0, SNUSNU_KEY)
+	SetNodeScale(theActor, actorIsFemale, "NPC R Breast01", 1.0, SNUSNU_KEY)
+
+	SetNodeScale(theActor, actorIsFemale, "NPC L PreBreast", 1.0, SNUSNU_KEY)
+	SetNodeScale(theActor, actorIsFemale, "NPC R PreBreast", 1.0, SNUSNU_KEY)
+
+	SetNodeScale(theActor, actorIsFemale, "NPC Belly", 1.0, SNUSNU_KEY)
+
+	SetNodeScale(theActor, actorIsFemale, "NPC L Butt", 1.0, SNUSNU_KEY)
+	SetNodeScale(theActor, actorIsFemale, "NPC R Butt", 1.0, SNUSNU_KEY)
+
+	SetNodeScale(theActor, actorIsFemale, "NPC", 1.0, SNUSNU_KEY)
+
+	SetNodeScale(theActor, actorIsFemale, "NPC Head [Head]", 1.0, SNUSNU_KEY)
+
+	SetNodeScale(theActor, actorIsFemale, "NPC L UpperarmTwist1 [LUt1]", 1.0, SNUSNU_KEY)
+	SetNodeScale(theActor, actorIsFemale, "NPC R UpperarmTwist1 [RUt1]", 1.0, SNUSNU_KEY)
+
+	SetNodeScale(theActor, actorIsFemale, "NPC L UpperarmTwist2 [LUt2]", 1.0, SNUSNU_KEY)
+	SetNodeScale(theActor, actorIsFemale, "NPC R UpperarmTwist2 [RUt2]", 1.0, SNUSNU_KEY)
 EndFunction
 
 Function chooseBoobsPhysics(Int buildStage)
@@ -1221,12 +1344,16 @@ Function chooseBoobsPhysics(Int buildStage)
 	EndIf
 	
 	Int boobsLevel = 4
-	
-	If buildStage >= 3
-		;Bone Crusher
+	;Debug.Trace("SNU - Choosing physics: buildStage="+buildStage+", usePecs="+usePecs)
+	If (buildStage >= 3 && usePecs) || (buildStage == 4 && !usePecs)
+		;BoneCrusherExtra
 		boobsLevel = 1
-	ElseIf buildStage == 2
+	ElseIf buildStage == 3 && !usePecs
+		;BoneCrusher
 		boobsLevel = 2
+	ElseIf buildStage == 2
+		;Athletic
+		boobsLevel = 3
 	EndIf
 	
 	;weightMorphs calculations
@@ -1240,7 +1367,7 @@ Function chooseBoobsPhysics(Int buildStage)
 				;Was: WMCM.WMorphs.Weight < 0.0
 				;Boobs still too small to have full physics
 				boobsLevel = 2
-			ElseIf WMCM.WMorphs.Weight < 0.5
+			ElseIf WMCM.WMorphs.Weight < 0.5 && boobsLevel > 3
 				boobsLevel = 3
 			ElseIf WMCM.WMorphs.Weight >= 0.5
 				;Was WMCM.WMorphs.Weight > 0.4
@@ -1362,21 +1489,30 @@ Function tempDebugSliders()
 	endWhile
 EndFunction
 
+String Function getNormalsByBodyType(Actor normalVictim)
+	If normalVictim.GetActorBase().GetSex() == 0
+		return "MALE\\"
+	ElseIf selectedBody == 0 || selectedBody == 2
+		return "UNP\\"
+	ElseIf selectedBody == 1
+		return "CBBE\\"
+	EndIf
+EndFunction
+
 ;     Muscle build stages = 1=Civilian, 2=Athletic, 3=Bone Crusher, 4=Extra Bone Crusher
 ;     Slim boobs stages = 0=Not slim, 1=Slim
 ;     Pregnancy stages = 0=Not preg, 1=Preg
 Function checkBodyNormalsState()
 	;Debug.Trace("SNU - checkBodyNormalsState()")
-	If disableNormals || StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle") != 0
+	If disableNormals || StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle", 0) != 0
 		return
 	EndIf
 	
-	String tempNormalsPath = normalsPath
+	String tempNormalsPath = normalsPath + getNormalsByBodyType(PlayerRef)
 	Float stage4Score = muscleScoreMax - (muscleScoreMax * 0.1)
 	Float stage3Score = muscleScoreMax - (muscleScoreMax * 0.3)
 	Float stage2Score = muscleScoreMax - (muscleScoreMax * 0.5)
-	
-	
+		
 	;Debug.Trace("SNU - muscleScore value from Snusnu is: "+muscleScore)
 	;Debug.Trace("SNU - normalsScore value from Snusnu is: "+normalsScore)
 	
@@ -1495,8 +1631,9 @@ Function checkBodyNormalsState()
 		
 		;ToDo- We need to actually check for character's gender instead of always assuming female. 
 		;      This goes for every single call to NiOverride
-		NiOverride.AddSkinOverrideString(PlayerRef, true, false, 0x04, 9, 1, finalNormalsPath, true)
-		NiOverride.AddSkinOverrideString(PlayerRef, true, true, 0x04, 9, 1, finalNormalsPath, true)
+		Bool isFemale = PlayerRef.GetActorBase().GetSex() != 0
+		NiOverride.AddSkinOverrideString(PlayerRef, isFemale, false, 0x04, 9, 1, finalNormalsPath, true)
+		NiOverride.AddSkinOverrideString(PlayerRef, isFemale, true, 0x04, 9, 1, finalNormalsPath, true)
 		
 		;TLALOC- Experimental messed up hand textures fix
 		if hasHandFix
@@ -1522,7 +1659,7 @@ Function UpdateEffects(Bool reAdd = True)
 		Float magStamina
 		Float magSpeed
 		
-		If StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle") == 0
+		If StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle", 0) == 0
 			magStamina = (muscleScore / muscleScoreMax) * Stamina
 			magSpeed = (muscleScore / muscleScoreMax) * Speed
 		Else
@@ -1541,11 +1678,10 @@ Function UpdateEffects(Bool reAdd = True)
 		EndIf
 		
 		If muscleScore > 10.0 && combatProficiency > 0.0
-			If StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle") == 0
+			If StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle", 0) == 0
 				Float halfMaxScore = muscleScoreMax / 2
 				If muscleScore > halfMaxScore
 					Float magCombat = ((muscleScore - halfMaxScore) / halfMaxScore) * combatProficiency
-					;TLALOC-ToDo- Don't apply it all the time, instead do it like with the bones and check for a bigger difference
 					;Debug.Trace("SNU - CombatMagnitude: "+magCombat)
 					AbilityCombat.SetNthEffectMagnitude(0, Math.abs(magCombat))
 					AbilityCombat.SetNthEffectMagnitude(1, Math.abs(magCombat))
@@ -1708,7 +1844,7 @@ Function ResetWeight(Bool _enable)
 		If PlayerRef.GetActorBase().GetSex() == 0
 			;Player is Male
 			useWeightSlider = true
-			disableNormals = true
+			;disableNormals = true
 		EndIf
 		UpdateEffects()
 		checkBodyNormalsState()
@@ -1721,8 +1857,9 @@ Function ResetWeight(Bool _enable)
 	Else
 		UpdateEffects(False)
 		;NiOverride.RemoveAllReferenceSkinOverrides(PlayerRef)
-		NiOverride.RemoveSkinOverride(PlayerRef, true, false, 0x04, 9, 1)
-		NiOverride.RemoveSkinOverride(PlayerRef, true, true, 0x04, 9, 1)
+		Bool isFemale = PlayerRef.GetActorBase().GetSex() != 0
+		NiOverride.RemoveSkinOverride(PlayerRef, isFemale, false, 0x04, 9, 1)
+		NiOverride.RemoveSkinOverride(PlayerRef, isFemale, true, 0x04, 9, 1)
 		ClearMorphs()
 	EndIf
 EndFunction
@@ -1787,11 +1924,11 @@ Function initSliderArrays()
 	cbbe3BASliders = new String[40]
 	
 	boneSliders = new String[68]
-	totalCurrentBones = 24 ;This is meant to be updated as we add support for more bones
+	totalCurrentBones = 20 ;This is meant to be updated as we add support for more bones
 	
 	
 	;Check if new arrays havent been initialized
-	If !bonesValues
+	If !bonesValues || bonesValues.length < totalCurrentBones
 		bonesValues = new Float[68]
 		
 		bonesValues[0] = MultSpineBone ;1.05
@@ -1799,7 +1936,7 @@ Function initSliderArrays()
 		
 		Int boneCounter = 2
 		While boneCounter < 68
-			bonesValues[boneCounter] = 0.0
+			bonesValues[boneCounter] = 1.0
 			boneCounter += 1
 		EndWhile
 	EndIf
@@ -2177,18 +2314,18 @@ Function initSliderArrays()
 	boneSliders[9] = "NPC L Thigh [LThg]" ;Thighs
 	boneSliders[10] = "NPC L Calf [LClf]" ;Calfs
 	boneSliders[11] = "NPC L Foot [Lft ]" ;Feet
-	boneSliders[12] = "NPC L Breast P1" ;Breast scale (3BBB)
-	boneSliders[13] = "NPC L Breast01 P1" ;Breast Forward
-	boneSliders[14] = "NPC L Breast" ;Breast scale (HDT)
-	boneSliders[15] = "NPC L PreBreast" ;Breast fullness (HDT)
-	boneSliders[16] = "CME L PreBreast" ;Breast sagness (HDT)
-	boneSliders[17] = "NPC Belly" ;Belly
-	boneSliders[18] = "NPC L Butt" ;Butt
-	boneSliders[19] = "NPC" ;Height
-	boneSliders[20] = "NPC Head [Head]" ;Head
-	boneSliders[21] = "NPC L Breast01" ;Breast curve
-	boneSliders[22] = "NPC L UpperarmTwist1 [LUt1]" ;Biceps
-	boneSliders[23] = "NPC L UpperarmTwist2 [LUt2]" ;Biceps2
+	boneSliders[12] = "NPC L Breast" ;Breasts
+	boneSliders[13] = "NPC L PreBreast" ;Breast Fullness
+	boneSliders[14] = "NPC Belly" ;Belly
+	boneSliders[15] = "NPC L Butt" ;Butt
+	boneSliders[16] = "NPC" ;Height
+	boneSliders[17] = "NPC Head [Head]" ;Head
+	boneSliders[18] = "NPC L UpperarmTwist1 [LUt1]" ;Biceps
+	boneSliders[19] = "NPC L UpperarmTwist2 [LUt2]" ;Biceps2
+	boneSliders[20] = "XXX"
+	boneSliders[21] = "XXX"
+	boneSliders[22] = "XXX"
+	boneSliders[23] = "XXX"
 	boneSliders[24] = "XXX"
 	boneSliders[25] = "XXX"
 	boneSliders[26] = "XXX"
@@ -2682,6 +2819,17 @@ Function ForceNewWeight(Float newScore = 500.0)
 EndFunction
 
 Function initFNISanims()
+	isFNISLoaded = (Game.GetModByName("FNIS.esp") != 255)
+	If !isFNISLoaded
+		isFNISLoaded = MiscUtil.FileExists("data/Scripts/FNIS_aa.pex")
+		If !isFNISLoaded
+			isUsingFNIS = false
+			return
+		Else
+			Debug.Trace("SNU - FNIS_aa found but not FNIS.esp. Probably using Nemesis...")
+		EndIf
+	EndIf
+	
 	snuCRC = FNIS_aa.GetInstallationCRC()
 	if ( snuCRC == 0 )
 		Debug.Trace("SNU - ERROR while loading custom animations. Where they generated correctly?")
@@ -2697,6 +2845,10 @@ Function initFNISanims()
 EndFunction
 
 Function setMuscleAnimations(Actor buffActor, Bool removeAnims = false)
+	If !isFNISLoaded
+		return
+	EndIf
+	
 	bool bOk
 	If isUsingFNIS && removeAnims
 		bOk = FNIS_aa.SetAnimGroup(buffActor, "_mt", 0, 0, "Snusnu", true)
@@ -2900,16 +3052,20 @@ Function applyNPCMuscle()
 				;StorageUtil.FloatListAdd(none, "MUSCLE_NPCS_SCORE", muscleScoreNPC, true)
 				StorageUtil.SetFloatValue(currentActor, "hasMuscle", muscleScoreNPC)
 			EndIf
-			If currentActor && currentActor.is3dloaded() && muscleScoreNPC != 0
-				String skinOverride = NiOverride.GetSkinOverrideString(currentActor, true, false, 0x04, 9, 1)
+			If currentActor && currentActor.is3dloaded() && muscleScoreNPC != 0 && StorageUtil.IntListGet(none, "MUSCLE_NPCS", npcsLoop) == 0
+				Bool isFemale = currentActor.GetActorBase().GetSex() != 0
+				String skinOverride = NiOverride.GetSkinOverrideString(currentActor, isFemale, false, 0x04, 9, 1)
 				Debug.Notification("Restoring normals to "+currentActor.GetBaseObject().getName())
 				Debug.Trace("SNU - Restoring normals to "+currentActor.GetBaseObject().getName()+": "+skinOverride)
 				If skinOverride == ""
-					SnusnuMusclePowerNPCScript.forceSwitchMuscleNormals(currentActor, muscleScoreNPC * 100)
+					SnusnuMusclePowerNPCScript.forceSwitchMuscleNormals(currentActor, muscleScoreNPC * 100, getNormalsByBodyType(currentActor))
 				Else
-					NiOverride.AddSkinOverrideString(currentActor, true, false, 0x04, 9, 1, skinOverride, true)
+					NiOverride.AddSkinOverrideString(currentActor, isFemale, false, 0x04, 9, 1, skinOverride, true)
 				EndIf
 				NiOverride.ApplySkinOverrides(currentActor)
+				
+				;Set a flag to know this NPC has already been refreshed
+				StorageUtil.IntListSet(none, "MUSCLE_NPCS", npcsLoop, 1)
 			EndIf
 			npcsLoop += 1
 		EndIf

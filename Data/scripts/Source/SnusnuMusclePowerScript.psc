@@ -31,8 +31,8 @@ event OnEffectStart(Actor akTarget, Actor akCaster)
 	EndIf
 	snusnuMain.isTransforming = true
 	
-	If StorageUtil.GetIntValue(akTarget, "SNU_UltraMuscle") > 0
-		;FMG is already ongoing, so we can skip the initial TF part
+	If StorageUtil.GetIntValue(akTarget, "SNU_UltraMuscle", 0) > 0
+		;ToDo- This is not how it works!!!
 		registerForSingleUpdate(10)
 		return
 	EndIf
@@ -81,7 +81,9 @@ event OnEffectStart(Actor akTarget, Actor akCaster)
 			
 			If GetDuration() >= (intervalSeconds * 2) + 300 ;2 days ingame plus 5 real minutes overhead
 				currentMusclePercent = 1.0 - (snusnuMain.moreChangesIncrements * 2)
-			ElseIf GetDuration() >= intervalSeconds + 300 ;1 days ingame plus 5 real minutes overhead
+			Else ;If GetDuration() >= intervalSeconds + 300 ;1 days ingame plus 5 real minutes overhead
+				;We never want to start at 100%, so we start at the next stage even if there is not enough time to reach 100%. Otherwise
+				;we might as well not use More Changes Overtime at all.
 				currentMusclePercent = 1.0 - snusnuMain.moreChangesIncrements
 			EndIf
 		Else
@@ -224,7 +226,7 @@ event OnEffectStart(Actor akTarget, Actor akCaster)
 	
 		If snusnuMain.useAltAnims
 			If currentMusclePercent != 1.0
-				snusnuMain.updateAnimations(3)
+				snusnuMain.updateAnimations(4) ;Was 3
 			Else
 				snusnuMain.updateAnimations(4)
 			EndIf
@@ -238,9 +240,10 @@ event OnEffectStart(Actor akTarget, Actor akCaster)
 		Game.SetGameSettingFloat("fJumpHeightMin", 180.0)
 	EndIf
 	
-	;ToDo- We really need to check for hardcoreMode flags before applying this kind of stuff
-	snusnuMain.updateAllowedItemsEquipedWeight(currentMusclePercent)
-	snusnuMain.needEquipWeightUpdate = true
+	If snusnuMain.hardcoreMode
+		snusnuMain.updateAllowedItemsEquipedWeight(currentMusclePercent)
+		snusnuMain.needEquipWeightUpdate = true
+	EndIf
 	
 	Utility.wait(1.0)
 	
@@ -254,6 +257,7 @@ event OnEffectStart(Actor akTarget, Actor akCaster)
 	Debug.Trace("SNU - Finished applying transformation effect")
 	Debug.Notification("My body has stopped growing")
 	registerForSingleUpdate(10)
+	RegisterForSleep()
 	
 	snusnuMain.isTransforming = false
 EndEvent
@@ -265,6 +269,7 @@ Event OnPlayerLoadGame()
 	
 	reloadUpdate = true
 	registerForSingleUpdate(12)
+	RegisterForSleep()
 EndEvent
 
 Event OnUpdate()
@@ -284,6 +289,9 @@ Event OnUpdate()
 	EndIf
 	
 	If reloadUpdate
+		If !loadFMGMorphs()
+			Debug.Notification("Could not load the FMG morphs!")
+		EndIf
 		updateBones(snusnuMain.PlayerRef, currentMusclePercent, False)
 			
 		If currentMusclePercent == 1.0 - (snusnuMain.moreChangesIncrements * 2)
@@ -314,7 +322,7 @@ Event OnUpdate()
 		reloadUpdate = false
 	EndIf
 	
-	If StorageUtil.GetIntValue(snusnuMain.PlayerRef, "SNU_UltraMuscle") == 12
+	If StorageUtil.GetIntValue(snusnuMain.PlayerRef, "SNU_UltraMuscle", 0) == 12
 		;Changes were made!
 		If !loadFMGMorphs()
 			Debug.Trace("SNU - Could not load the FMG morphs!")
@@ -322,8 +330,10 @@ Event OnUpdate()
 			muscleChange(snusnuMain.PlayerRef, currentMusclePercent )
 			updateBones(snusnuMain.PlayerRef, currentMusclePercent, False)
 			
-			snusnuMain.updateAllowedItemsEquipedWeight(currentMusclePercent)
-			snusnuMain.needEquipWeightUpdate = true
+			If snusnuMain.hardcoreMode
+				snusnuMain.updateAllowedItemsEquipedWeight(currentMusclePercent)
+				snusnuMain.needEquipWeightUpdate = true
+			EndIf
 			
 			Debug.Notification("FMG shape has been updated")
 			Debug.Trace("SNU - FMG shape has been updated")
@@ -339,9 +349,10 @@ Event OnUpdate()
 			
 			currentMusclePercent += snusnuMain.moreChangesIncrements
 			
-			snusnuMain.updateAllowedItemsEquipedWeight(currentMusclePercent)
-			snusnuMain.needEquipWeightUpdate = true
-			
+			If snusnuMain.hardcoreMode
+				snusnuMain.updateAllowedItemsEquipedWeight(currentMusclePercent)
+				snusnuMain.needEquipWeightUpdate = true
+			EndIf
 			
 			If currentMusclePercent == 1.0
 				Debug.Notification("Gods i'm getting huge!")
@@ -371,7 +382,7 @@ Event OnUpdate()
 				applyMuscleNormals(snusnuMain.PlayerRef, 3)
 				
 				snusnuMain.updateBoobsPhysics(true, 1)
-				snusnuMain.updateAnimations(3)
+				snusnuMain.updateAnimations(4) ;Was 3
 				
 				Debug.Notification("Im getting a nice tan")
 				applyBarbarianSkin(snusnuMain.PlayerRef, 1)
@@ -396,6 +407,16 @@ Event OnUpdate()
 	EndIf
 	
 	registerForSingleUpdate(10)
+	RegisterForSleep()
+EndEvent
+
+Event OnSleepStop(bool abInterrupted)
+	If snusnuMain.hardcoreMode
+		;Cleanup equipped item weights
+		Debug.Notification("Refreshing hardcore weights")
+		snusnuMain.updateAllowedItemsEquipedWeight()
+		snusnuMain.getEquipedFullWeight()
+	EndIf
 EndEvent
 
 Event OnObjectUnequipped(Form type, ObjectReference ref)
@@ -423,15 +444,15 @@ Event OnEffectFinish(Actor akTarget, Actor akCaster)
 		If WMCM != none && snusnuMain.removeWeightMorphs
 			If !WMCM.WMorphs.Enabled && wasWMEnabled
 				
-				If wmWeight < 0.0
+				If wmWeight < 0.08
 					wmWeight = wmWeight + 0.05
-					If wmWeight > 0.0
-						wmWeight = 0.0
+					If wmWeight > 0.08
+						wmWeight = 0.08
 					EndIf
-				ElseIf wmWeight > 0.0
+				ElseIf wmWeight > 0.08
 					wmWeight = wmWeight - 0.05
-					If wmWeight < 0.0
-						wmWeight = 0.0
+					If wmWeight < 0.08
+						wmWeight = 0.08
 					EndIf
 				EndIf
 				
@@ -479,8 +500,9 @@ Event OnEffectFinish(Actor akTarget, Actor akCaster)
 	;RemoveAllReferenceSkinOverrides(akTarget);For the custom normals
 	;ApplySkinOverrides(akTarget)
 	If snusnuMain.currentBuildStage <= 1
-		NiOverride.RemoveSkinOverride(akTarget, true, false, 0x04, 9, 1)
-		NiOverride.RemoveSkinOverride(akTarget, true, true, 0x04, 9, 1)
+		Bool isFemale = akTarget.GetActorBase().GetSex() != 0
+		NiOverride.RemoveSkinOverride(akTarget, isFemale, false, 0x04, 9, 1)
+		NiOverride.RemoveSkinOverride(akTarget, isFemale, true, 0x04, 9, 1)
 		If !akTarget.IsOnMount()
 			akTarget.QueueNiNodeUpdate()
 		EndIf
@@ -511,8 +533,10 @@ Event OnEffectFinish(Actor akTarget, Actor akCaster)
 	
 	Utility.wait(1.0)
 	
-	snusnuMain.updateAllowedItemsEquipedWeight()
-	snusnuMain.needEquipWeightUpdate = true
+	If snusnuMain.hardcoreMode
+		snusnuMain.updateAllowedItemsEquipedWeight()
+		snusnuMain.needEquipWeightUpdate = true
+	EndIf
 	
 	Debug.Trace("SNU - Finished removal of transformation effect")
 	Debug.Notification("My body is now back to normal")
@@ -574,9 +598,8 @@ Function updateBones(Actor theActor, Float magnitude, Bool goingUp = true)
 	/;
 	
 	Int boneCounter = 0
-	;While boneCounter < 68
-	While boneCounter < 2
-		If bonesValuesFMG[boneCounter] != 0.0
+	While boneCounter < snusnuMain.totalCurrentBones
+		If bonesValuesFMG[boneCounter] != 1.0
 			snusnuMain.changeBoneScale(theActor, boneCounter, snusnuMain.getBoneSize(magnitude, bonesValuesFMG[boneCounter]))
 		EndIf
 		boneCounter += 1
@@ -603,9 +626,17 @@ Function switchHeads(Actor headOwner, Int newHeadIndex)
 	ElseIf newHeadIndex == 1
 		headOwner.ChangeHeadPart(snusnuMain.MuscleHead)
 	ElseIf newHeadIndex == 2
-		headOwner.ChangeHeadPart(snusnuMain.MuscleHeadTan)
+		If StringUtil.Find(snusnuMain.getNormalsByBodyType(headOwner), "CBBE") != -1
+			headOwner.ChangeHeadPart(snusnuMain.MuscleHeadTan)
+		ElseIf StringUtil.Find(snusnuMain.getNormalsByBodyType(headOwner), "UNP") != -1
+			headOwner.ChangeHeadPart(snusnuMain.MuscleHeadTanUNP)
+		EndIf
 	ElseIf newHeadIndex == 3
-		headOwner.ChangeHeadPart(snusnuMain.MuscleHeadTan2)
+		If StringUtil.Find(snusnuMain.getNormalsByBodyType(headOwner), "CBBE") != -1
+			headOwner.ChangeHeadPart(snusnuMain.MuscleHeadTan2)
+		ElseIf StringUtil.Find(snusnuMain.getNormalsByBodyType(headOwner), "UNP") != -1
+			headOwner.ChangeHeadPart(snusnuMain.MuscleHeadTan2UNP)
+		EndIf
 	EndIf
 	
 	headOwner.RegenerateHead()
@@ -678,7 +709,7 @@ Int Function switchMuscleNormals(Actor buffTarget, Int currentStage, Float newWe
 EndFunction
 
 Function applyMuscleNormals(Actor buffTarget, int stage)
-	String tempNormalsPath = "textures\\Snusnu\\Normals\\"
+	String tempNormalsPath = snusnuMain.normalsPath+snusnuMain.getNormalsByBodyType(buffTarget)
 	;Debug.Trace("SNU - Normals path is now "+tempNormalsPath)
 	
 	If stage == 1
@@ -705,8 +736,9 @@ Function applyMuscleNormals(Actor buffTarget, int stage)
 		hasHandFix = true
 	endIf
 	
-	NiOverride.AddSkinOverrideString(buffTarget, true, false, 0x04, 9, 1, tempNormalsPath, true)
-	NiOverride.AddSkinOverrideString(buffTarget, true, true, 0x04, 9, 1, tempNormalsPath, true)
+	Bool isFemale = buffTarget.GetActorBase().GetSex() != 0
+	NiOverride.AddSkinOverrideString(buffTarget, isFemale, false, 0x04, 9, 1, tempNormalsPath, true)
+	NiOverride.AddSkinOverrideString(buffTarget, isFemale, true, 0x04, 9, 1, tempNormalsPath, true)
 	
 	if hasHandFix
 		Debug.Trace("SNU - Finishing to apply hands fix!")
@@ -718,7 +750,7 @@ EndFunction
 
 ;TLALOC- Blatantly ripped from Blush When Aroused
 string Function initOverlaySlot(Actor buffTarget) Global
-	String normalsPath = "textures\\Snusnu\\Normals\\"
+	;String normalsPath = snusnuMain.normalsPath+snusnuMain.getNormalsByBodyType(buffTarget)
 	string deftex = "Actors\\Character\\Overlays\\Default.dds"
 	string newOverlayID = "x"
 	int i = 0
@@ -761,17 +793,18 @@ EndFunction
 
 Function applyOverlayStrings(Actor target, String slot)
 	;string overlayID = "[Ovl" + index + "]"
-	String normalsPath = "textures\\Snusnu\\Normals\\Ultra\\"
+	String normalsPath = snusnuMain.normalsPath+snusnuMain.getNormalsByBodyType(target)+"Ultra2\\"
+	Bool isFemale = target.GetActorBase().GetSex() != 0
 	;TLALOC-ToDo- We need to find free slots for all the other body parts!!!!!!
-	NiOverride.AddNodeOverrideString(target, true, "Body "+slot, 9, 0, normalsPath+"Body.dds", true)
-	NiOverride.AddNodeOverrideString(target, true, "Body "+slot, 9, 1, normalsPath+"Ultra.dds", true)
+	NiOverride.AddNodeOverrideString(target, isFemale, "Body "+slot, 9, 0, normalsPath+"Body.dds", true)
+	NiOverride.AddNodeOverrideString(target, isFemale, "Body "+slot, 9, 1, normalsPath+"Ultra.dds", true)
 
-	NiOverride.AddNodeOverrideString(target, true, "Face "+slot, 9, 0, normalsPath+"Face.dds", true)
-	NiOverride.AddNodeOverrideString(target, true, "Face "+slot, 9, 1, normalsPath+"FaceMSN.dds", true)
+	NiOverride.AddNodeOverrideString(target, isFemale, "Face "+slot, 9, 0, normalsPath+"Face.dds", true)
+	NiOverride.AddNodeOverrideString(target, isFemale, "Face "+slot, 9, 1, normalsPath+"FaceMSN.dds", true)
 	
-	NiOverride.AddNodeOverrideString(target, true, "Hands "+slot, 9, 0, normalsPath+"Hands.dds", true)
+	NiOverride.AddNodeOverrideString(target, isFemale, "Hands "+slot, 9, 0, normalsPath+"Hands.dds", true)
 	
-	NiOverride.AddNodeOverrideString(target, true, "Feet "+slot, 9, 0, normalsPath+"Feet.dds", true)
+	NiOverride.AddNodeOverrideString(target, isFemale, "Feet "+slot, 9, 0, normalsPath+"Feet.dds", true)
 	
 EndFunction
 
@@ -786,16 +819,17 @@ Function applyBarbarianSkin(Actor target, Int skinIndex, Bool applyFix = true)
 		hasHandFix = true
 	endIf
 	
+	Bool isFemale = target.GetActorBase().GetSex() != 0
 	If skinIndex > 0
-		String tempNormalsPath = "textures\\Snusnu\\Normals\\Ultra"+skinIndex+"\\"
+		String tempNormalsPath = snusnuMain.normalsPath+snusnuMain.getNormalsByBodyType(target)+"Ultra"+skinIndex+"\\"
 		
 		;Body
-		NiOverride.AddSkinOverrideString(target, true, false, 0x04, 9, 0, tempNormalsPath+"Body.dds", true)
-		NiOverride.AddSkinOverrideString(target, true, true, 0x04, 9, 0, tempNormalsPath+"Body.dds", true)
+		NiOverride.AddSkinOverrideString(target, isFemale, false, 0x04, 9, 0, tempNormalsPath+"Body.dds", true)
+		NiOverride.AddSkinOverrideString(target, isFemale, true, 0x04, 9, 0, tempNormalsPath+"Body.dds", true)
 		
 		;Face
-		;NiOverride.AddSkinOverrideString(target, true, false, 0x04, 9, 0, tempNormalsPath+"Face.dds", true)
-		;NiOverride.AddSkinOverrideString(target, true, true, 0x04, 9, 0, tempNormalsPath+"Face.dds", true)
+		;NiOverride.AddSkinOverrideString(target, isFemale, false, 0x04, 9, 0, tempNormalsPath+"Face.dds", true)
+		;NiOverride.AddSkinOverrideString(target, isFemale, true, 0x04, 9, 0, tempNormalsPath+"Face.dds", true)
 		If skinIndex == 1
 			switchHeads(target, 2)
 		ElseIf skinIndex == 2
@@ -803,23 +837,23 @@ Function applyBarbarianSkin(Actor target, Int skinIndex, Bool applyFix = true)
 		EndIf
 		
 		;Hands
-		NiOverride.AddSkinOverrideString(target, true, false, 0x08, 9, 0, tempNormalsPath+"Hands.dds", true)
-		NiOverride.AddSkinOverrideString(target, true, true, 0x08, 9, 0, tempNormalsPath+"Hands.dds", true)
+		NiOverride.AddSkinOverrideString(target, isFemale, false, 0x08, 9, 0, tempNormalsPath+"Hands.dds", true)
+		NiOverride.AddSkinOverrideString(target, isFemale, true, 0x08, 9, 0, tempNormalsPath+"Hands.dds", true)
 		
 		;Feet
-		NiOverride.AddSkinOverrideString(target, true, false, 0x80, 9, 0, tempNormalsPath+"Body.dds", true)
-		NiOverride.AddSkinOverrideString(target, true, true, 0x80, 9, 0, tempNormalsPath+"Body.dds", true)
+		NiOverride.AddSkinOverrideString(target, isFemale, false, 0x80, 9, 0, tempNormalsPath+"Body.dds", true)
+		NiOverride.AddSkinOverrideString(target, isFemale, true, 0x80, 9, 0, tempNormalsPath+"Body.dds", true)
 	Else
 		;RemoveAllReferenceSkinOverrides(target)
 		;Body
-		NiOverride.RemoveSkinOverride(target, true, false, 0x04, 9, 0)
-		NiOverride.RemoveSkinOverride(target, true, true, 0x04, 9, 0)
+		NiOverride.RemoveSkinOverride(target, isFemale, false, 0x04, 9, 0)
+		NiOverride.RemoveSkinOverride(target, isFemale, true, 0x04, 9, 0)
 		;Hands
-		NiOverride.RemoveSkinOverride(target, true, false, 0x08, 9, 0)
-		NiOverride.RemoveSkinOverride(target, true, true, 0x08, 9, 0)
+		NiOverride.RemoveSkinOverride(target, isFemale, false, 0x08, 9, 0)
+		NiOverride.RemoveSkinOverride(target, isFemale, true, 0x08, 9, 0)
 		;Feet
-		NiOverride.RemoveSkinOverride(target, true, false, 0x80, 9, 0)
-		NiOverride.RemoveSkinOverride(target, true, true, 0x80, 9, 0)
+		NiOverride.RemoveSkinOverride(target, isFemale, false, 0x80, 9, 0)
+		NiOverride.RemoveSkinOverride(target, isFemale, true, 0x80, 9, 0)
 		
 		If !target.IsOnMount()
 			target.QueueNiNodeUpdate()
@@ -842,7 +876,7 @@ Function initFMGSliders()
 	bhunpValuesFMG = new Float[43]
 	cbbeSEValuesFMG = new Float[27]
 	cbbe3BAValuesFMG = new Float[40]
-	bonesValuesFMG = new Float[2]
+	bonesValuesFMG = new Float[68]
 	maleValuesFMG = new Float[2]
 EndFunction
 

@@ -62,13 +62,13 @@ Float Property muscleScore = 500.0 Auto
 Float Property muscleScoreMax = 1000.0 Auto
 Float Property normalsScore = 450.0 Auto ;This will change along with muscleScore, but with a faster pace.
 Float prevMuscleScore = 0.0 ;Save the previous value so we can decide to apply changes based on difference
+Float Property scoreAddition = 0.0 Auto
 
 ;TLALOC - Normals related values
 Int Property currentBuildStage = 1 Auto
 Int Property currentPregStage = 0 Auto
 Int Property currentSlimStage = 0 Auto
 String finalNormalsPath = "EMPTY"
-;ToDo- Put normals in 2 different folders, one for CBBE and the other for UNP. Same with the Ultra skin textures
 String Property normalsPath = "textures\\Snusnu\\Normals\\" Auto
 String buildCivilianString = "civilian"
 String buildAthleticString = "athletic"
@@ -122,6 +122,14 @@ Float Property muscleMightAffinity = 0.0  Auto
 Float Property muscleMightProbability = 0.25  Auto
 Float Property totalMuscleToAdd = 0.01 Auto
 
+;Alt FMG body. No morphs, just a different body mesh
+Bool Property useAltBody = false Auto
+Armor Property AltFMGBody Auto
+HeadPart Property AltFMGHead Auto
+TextureSet Property AltFMGFace Auto
+Armor Property originalBody Auto
+TextureSet Property originalFace Auto
+
 ;Experimental custom NPC muscle.
 Float Property npcMuscleScore = 0.5 Auto
 
@@ -145,6 +153,10 @@ Bool isEquipWeightUpdating = false
 
 Bool Property isWerewolf = false Auto
 Float Property addWerewolfStrength = 0.05 Auto
+
+Keyword Property isVampire Auto
+Bool Property isVampireLord = false Auto
+Bool Property useVampireMechanics = false Auto
 
 ;TLALOC- Custom animations
 int Property snuModID Auto
@@ -266,29 +278,39 @@ Event OnPlayerLoadGame()
 		Int totalNPCs = FormListCount(none, "MUSCLE_NPCS")
 		Int npcsLoop = 0
 		while npcsLoop < totalNPCs
-			StorageUtil.IntListAdd(none, "MUSCLE_NPCS", 0)
+			StorageUtil.IntListSet(none, "MUSCLE_NPCS", npcsLoop, 0)
 			npcsLoop += 1
 		EndWhile
-		Utility.Wait(4)
-		applyNPCMuscle()
 	EndIf
 EndEvent
 
 Event OnRaceSwitchComplete()
-	isWerewolf = !isWerewolf
-	If Enabled
-		Debug.Trace("SNU - OnRaceSwitchComplete(isWerewolf="+isWerewolf+")")
-		Debug.Trace("SNU - PC Race: "+PlayerRef.getRace().getName())
-		If !isWerewolf
+	If PlayerRef.getRace().getName() != "Werewolf" && PlayerRef.getRace().getName() != "Vampire Lord"
+		;Race is neither vampire or werewolf, so we assume whatever they were transformed into they reverted back
+		If Enabled
 			RegisterEvents(True)
 			UpdateEffects()
 			checkBodyNormalsState()
-			addWerewolfBuild()
 		EndIf
+		
+		If isWerewolf
+			isWerewolf = false
+			addWerewolfBuild()
+		ElseIf isVampireLord
+			isVampireLord = false
+		EndIf
+	ElseIf PlayerRef.getRace().getName() == "Werewolf"
+		isWerewolf = true
+	ElseIf PlayerRef.getRace().getName() == "Vampire Lord"
+		isVampireLord = true
 	EndIf
+	
+	Debug.Trace("SNU - OnRaceSwitchComplete(isWerewolf="+isWerewolf+")")
+	Debug.Trace("SNU - PC Race: "+PlayerRef.getRace().getName())
+	Debug.Trace("SNU - isVampire? "+PlayerRef.hasKeyword(isVampire))
 EndEvent
 
-; Event received when every object in this object's parent cell is loaded (TODO: Find restrictions)
+; Event received when every object in this object's parent cell is loaded
 Event OnCellLoad()
 	;This will be used to refresh normal maps on NPCs
 	;LOGIC: Have a new boolean array to store if an NPC has been refreshed. Reset the array to all false in OnPlayerLoadGame.
@@ -311,6 +333,11 @@ Event OnUpdate()
 		
 		If PlayerRef == none
 			PlayerRef = Game.getPlayer()
+		EndIf
+		
+		If scoreAddition != 0.0
+			updateMuscleScore(scoreAddition)
+			scoreAddition = 0.0
 		EndIf
 		
 ;		If !PlayerRef.hasSpell(UltraMusclePowerSpell) && !PlayerRef.hasSpell(MusclePowerSpell)
@@ -338,6 +365,13 @@ Event OnUpdate()
 				;TLALOC- Muscle score degradation
 				Float DegradationTimer = GameDaysPassed.GetValue() - LastDegradationTime
 				Float totalDegradation = degradationBase * MultLoss * DegradationTimer
+				
+				If PlayerRef.hasKeyword(isVampire)
+					;ToDo- If PC is vampire and they are outside in the day, degradation should be twice as bad
+					;For now, degradation is always ten times faster
+					totalDegradation = totalDegradation * 10
+				EndIf
+				
 				If justWakeUp
 					Debug.Trace("SNU - justWakeUp, totalDegradation="+totalDegradation)
 					Float sleepBonus = getSleepBonus()
@@ -433,9 +467,11 @@ EndEvent
 Bool Function IsValidSlotForEquipWeight(Armor itemArmor)
 	;31=Hair, 35=Amulet, 36=Ring, 40=Tail, 41=LongHair, 43=Earrings, 44=FaceCover, 45=Chokers, 
 	;47=Backpacks, 52=Underwear, 55=Wig, 57=Bras, 58=Armlets
-	return !Math.LogicalAnd(itemArmor.getSlotMask(), itemArmor.kSlotMask31) && !Math.LogicalAnd(itemArmor.getSlotMask(), itemArmor.kSlotMask35) && \
-		   !Math.LogicalAnd(itemArmor.getSlotMask(), itemArmor.kSlotMask36) && !Math.LogicalAnd(itemArmor.getSlotMask(), itemArmor.kSlotMask40) && \
-		   !Math.LogicalAnd(itemArmor.getSlotMask(), itemArmor.kSlotMask41) && !Math.LogicalAnd(itemArmor.getSlotMask(), itemArmor.kSlotMask43) && \
+	
+	;Helmets use slots 30, 31, 42 & 43
+	;!Math.LogicalAnd(itemArmor.getSlotMask(), itemArmor.kSlotMask31) && !Math.LogicalAnd(itemArmor.getSlotMask(), itemArmor.kSlotMask43) && \
+	return !Math.LogicalAnd(itemArmor.getSlotMask(), itemArmor.kSlotMask35) && !Math.LogicalAnd(itemArmor.getSlotMask(), itemArmor.kSlotMask36) && \
+	       !Math.LogicalAnd(itemArmor.getSlotMask(), itemArmor.kSlotMask40) && !Math.LogicalAnd(itemArmor.getSlotMask(), itemArmor.kSlotMask41) && \
 		   !Math.LogicalAnd(itemArmor.getSlotMask(), itemArmor.kSlotMask44) && !Math.LogicalAnd(itemArmor.getSlotMask(), itemArmor.kSlotMask45) && \
 		   !Math.LogicalAnd(itemArmor.getSlotMask(), itemArmor.kSlotMask47) && !Math.LogicalAnd(itemArmor.getSlotMask(), itemArmor.kSlotMask52) && \
 		   !Math.LogicalAnd(itemArmor.getSlotMask(), itemArmor.kSlotMask55) && !Math.LogicalAnd(itemArmor.getSlotMask(), itemArmor.kSlotMask57) && \
@@ -612,7 +648,7 @@ EndFunction
 Event OnObjectEquipped(Form type, ObjectReference ref)
 	;Debug.Trace("SNU -----------------OnObjectEquipped()-----------------")
 	Potion iaExercise = Game.GetFormFromFile(0x05084235, "ImmersiveInteractions.esp") As Potion
-	If iaExercise && type == iaExercise
+	If !PlayerRef.hasKeyword(isVampire) && iaExercise && type == iaExercise
 		updateMuscleScore(0.75 * MultGainMisc)
 		Debug.Notification("I'm getting a little stronger")
 		return
@@ -706,9 +742,9 @@ Bool Function hasHeavyEquipment()
 EndFunction
 
 Event OnAnimationEvent(ObjectReference akSource, string asEventName)
-	If Enabled && akSource == PlayerRef && StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle", 0) == 0
+	If Enabled && akSource == PlayerRef && StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle", 0) == 0 && !PlayerRef.hasKeyword(isVampire)
 		;Debug.Trace("SNU - OnAnimationEvent("+asEventName+")")
-		Float scoreAddition = 0.0
+		
 		Bool isRunningUp = false
 		If asEventName == "FootSprintLeft" || asEventName == "weaponSwing" || asEventName == "weaponLeftSwing"
 			If asEventName == "weaponSwing" || asEventName == "weaponLeftSwing"				
@@ -786,13 +822,12 @@ Event OnAnimationEvent(ObjectReference akSource, string asEventName)
 			;Debug.Notification("Drawing my bow to full charge surely requieres a certain ammount of strenght")
 			
 			;bowDrawTime = 0.0
+		ElseIf asEventName == "FootRight" && PlayerRef.IsOverEncumbered()
+			scoreAddition = scoreAddition + (0.05 * MultGainArmor)
+			;Debug.Notification("Moving heavy stuff is good excercise")
 		Else
 			;TLALOC- Experimental custom events debug
-			Debug.Notification(asEventName)
-		EndIf
-		
-		If scoreAddition != 0.0
-			updateMuscleScore(scoreAddition)
+			;Debug.Notification(asEventName)
 		EndIf
 	EndIf
 EndEvent
@@ -860,6 +895,13 @@ Float Function getSleepBonus()
 	
 	return sleepBonus
 EndFunction
+
+Event OnVampireFeed(Actor akTarget)
+	;ToDo- How much should we add (create toggle and slider options in MCM)
+	updateMuscleScore(muscleScoreMax*0.125) ;Was 0.075
+	Debug.Notification("I feel stronger now")
+	UpdateWeight(true)
+EndEvent
 
 Event OnKeyDown(Int KeyCode)
 	If KeyCode == getInfoKey
@@ -1038,7 +1080,6 @@ Function updateMuscleScore(float incValue)
 		;NEW IDEA: Change incValue depending on muscle score. Low score increases value, high score decreases value
 		;          This way it would feel like the traditional leveling system where the stronger you get, the longer
 		;          it takes to get even stronger.
-		;ToDo- We could add a toggle for this in the MCM, but it might not be necesary
 		Float medScoreMax = muscleScoreMax / 2
 		If muscleScore < medScoreMax
 			;Growth goes from 1:1 to 2:1
@@ -1338,6 +1379,18 @@ Function clearBoneScales(Actor theActor)
 	SetNodeScale(theActor, actorIsFemale, "NPC R UpperarmTwist2 [RUt2]", 1.0, SNUSNU_KEY)
 EndFunction
 
+Function SetNodeScale(Actor akActor, bool isFemale, string nodeName, float value, string modkey) global
+	If value != 1.0
+		NiOverride.AddNodeTransformScale(akActor, false, isFemale, nodeName, modkey, value)
+		NiOverride.AddNodeTransformScale(akActor, true, isFemale, nodeName, modkey, value)
+	Else
+		NiOverride.RemoveNodeTransformScale(akActor, false, isFemale, nodeName, modkey)
+		NiOverride.RemoveNodeTransformScale(akActor, true, isFemale, nodeName, modkey)
+	Endif
+	NiOverride.UpdateNodeTransform(akActor, false, isFemale, nodeName)
+	NiOverride.UpdateNodeTransform(akActor, true, isFemale, nodeName)
+EndFunction
+
 Function chooseBoobsPhysics(Int buildStage)
 	If !useDynamicPhysics
 		return
@@ -1629,8 +1682,6 @@ Function checkBodyNormalsState()
 			hasHandFix = true
 		endIf
 		
-		;ToDo- We need to actually check for character's gender instead of always assuming female. 
-		;      This goes for every single call to NiOverride
 		Bool isFemale = PlayerRef.GetActorBase().GetSex() != 0
 		NiOverride.AddSkinOverrideString(PlayerRef, isFemale, false, 0x04, 9, 1, finalNormalsPath, true)
 		NiOverride.AddSkinOverrideString(PlayerRef, isFemale, true, 0x04, 9, 1, finalNormalsPath, true)
@@ -1732,10 +1783,10 @@ Function RegisterEvents(Bool _enable)
 		
 		;TLALOC- Bow charge and release
 		RegisterForAnimationEvent(PlayerRef, "bowDrawStart")
-		UnregisterForAnimationEvent(PlayerRef, "Bow_Release")
-		UnregisterForAnimationEvent(PlayerRef, "BowLowered")
+		;RegisterForAnimationEvent(PlayerRef, "Bow_Release")
+		;RegisterForAnimationEvent(PlayerRef, "BowLowered")
 		RegisterForAnimationEvent(PlayerRef, "arrowRelease")
-		UnregisterForAnimationEvent(PlayerRef, "bowEnd")
+		;RegisterForAnimationEvent(PlayerRef, "bowEnd")
 		RegisterForAnimationEvent(PlayerRef, "bowDrawn");Happens after doing a full charge
 		
 		;TLALOC- Blacksmith work
@@ -1746,8 +1797,9 @@ Function RegisterEvents(Bool _enable)
 		RegisterForAnimationEvent(PlayerRef, "SoundPlay.NPCHumanBlacksmithHammer")
 		RegisterForAnimationEvent(PlayerRef, "SoundPlay.NPCHumanBlacksmithRepairHammer")
 		
-		UnregisterForAnimationEvent(PlayerRef, "SoundPlay.NPCHumanBlacksmithHammerDistant")
-		UnregisterForAnimationEvent(PlayerRef, "SoundPlay.NPCHumanBlacksmithRepairHammerDistant")
+		;Need to check if player is overencumbered while walking as it means it is carrying heavy stuff
+		;RegisterForAnimationEvent(PlayerRef, "FootLeft")
+		RegisterForAnimationEvent(PlayerRef, "FootRight")
 		
 		;TLALOC- Experimental anim events!
 		;RegisterForAnimationEvent(PlayerRef, "IdleGreybeardWordTeach");Immersive interactions Dummy training
@@ -1782,6 +1834,9 @@ Function RegisterEvents(Bool _enable)
 		UnregisterForAnimationEvent(PlayerRef, "SoundPlay.NPCHumanBlacksmithForgeTake")
 		UnregisterForAnimationEvent(PlayerRef, "SoundPlay.NPCHumanBlacksmithHammer")
 		UnregisterForAnimationEvent(PlayerRef, "SoundPlay.NPCHumanBlacksmithRepairHammer")
+		
+		UnregisterForAnimationEvent(PlayerRef, "FootLeft")
+		UnregisterForAnimationEvent(PlayerRef, "FootRight")
 		
 		UnRegisterForSleep()
 		UnregisterForUpdate()
@@ -1853,6 +1908,8 @@ Function ResetWeight(Bool _enable)
 		
 		If PlayerRef.getRace().getName() == "Werewolf"
 			isWerewolf = true
+		ElseIf PlayerRef.getRace().getName() == "Vampire Lord"
+			isVampireLord = true
 		EndIf
 	Else
 		UpdateEffects(False)
@@ -2896,18 +2953,6 @@ Function ReloadHotkeys()
 	RegisterForKey(npcMuscleKey);K
 EndFunction
 
-Function SetNodeScale(Actor akActor, bool isFemale, string nodeName, float value, string modkey) global
-	If value != 1.0
-		NiOverride.AddNodeTransformScale(akActor, false, isFemale, nodeName, modkey, value)
-		NiOverride.AddNodeTransformScale(akActor, true, isFemale, nodeName, modkey, value)
-	Else
-		NiOverride.RemoveNodeTransformScale(akActor, false, isFemale, nodeName, modkey)
-		NiOverride.RemoveNodeTransformScale(akActor, true, isFemale, nodeName, modkey)
-	Endif
-	NiOverride.UpdateNodeTransform(akActor, false, isFemale, nodeName)
-	NiOverride.UpdateNodeTransform(akActor, true, isFemale, nodeName)
-EndFunction
-
 Function updateCarryWeight()
 	If carryWeightBoost > 0.0
 		Float tempCarryWeight = getCarryWeightPercent()
@@ -2989,6 +3034,10 @@ Float Function getCarryWeightPercent()
 EndFunction
 
 Function addWerewolfBuild()
+	If !Enabled
+		return
+	EndIf
+	
 	Debug.Trace("SNU - addWerewolfBuild()")
 	If addWerewolfStrength > 0.0
 		;Werewolf characters should have a lean, muscular build, so that means:
@@ -3023,7 +3072,7 @@ EndFunction
 ;TLALOC- NPC Related functions
 Function applyNPCMuscle()
 	Debug.Trace("SNU - Refreshing NPC muscle")
-	
+	;ToDo- We need to add logic to customize and store morphs for male bodies
 	Int totalNPCs = FormListCount(none, "MUSCLE_NPCS")
 	Debug.Trace("SNU - Total muscle NPCs: "+totalNPCs)
 	Int npcsLoop = 0

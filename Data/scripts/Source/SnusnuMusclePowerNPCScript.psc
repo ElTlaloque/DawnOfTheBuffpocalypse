@@ -248,9 +248,7 @@ EndFunction
 Function updateBones(Actor theActor, Float magnitude, Bool goingUp = true)
 	Int boneCounter = 0
 	While boneCounter < snusnuMain.totalCurrentBones
-		If bonesValuesFMG[boneCounter] != 1.0
-			snusnuMain.changeBoneScale(theActor, boneCounter, snusnuMain.getBoneSize(magnitude, bonesValuesFMG[boneCounter]))
-		EndIf
+		snusnuMain.changeBoneScale(theActor, boneCounter, snusnuMain.getBoneSize(magnitude, bonesValuesFMG[boneCounter]))
 		boneCounter += 1
 	EndWhile
 EndFunction

@@ -10,6 +10,8 @@ Int Property originalSkinTint = 0 Auto
 Int Property moreChangesCount = 0 Auto
 Float Property tfTime = 0.0 Auto
 Float Property currentMusclePercent = 1.0 Auto
+Bool Property hasVampirism = false Auto ;Vampire race fix
+Race Property vampireRace Auto ;Vampire race fix
 
 ;FMG Morphs
 Float[] cbbeValuesFMG
@@ -30,24 +32,38 @@ event OnEffectStart(Actor akTarget, Actor akCaster)
 		return
 	EndIf
 	snusnuMain.isTransforming = true
-	
-	If StorageUtil.GetIntValue(akTarget, "SNU_UltraMuscle", 0) > 0
-		;ToDo- This is not how it works!!!
-		registerForSingleUpdate(10)
-		return
-	EndIf
-	
-	If snusnuMain.PlayerRef.GetActorBase().GetSex() == 0
+		
+	;ToDo- Test this spell on male characters
+	;/If snusnuMain.PlayerRef.GetActorBase().GetSex() == 0
 		Debug.Notification("This spell only works on female characters")
 		Dispel()
 		return
-	EndIf
+	EndIf/;
 	
 	initFMGSliders()
 	If !loadFMGMorphs()
 		Debug.Notification("Could not load the FMG morphs!")
 		Dispel()
 		return
+	EndIf
+	
+	While StorageUtil.GetIntValue(akTarget, "SNU_UltraMuscle", 0) > 0
+		;ToDo- Check if this logic works correctly
+		Utility.wait(0.1)
+	EndWhile
+	
+	If snusnuMain.PlayerRef.hasKeyword(snusnuMain.isVampire)
+		;Change to original race for the duration of the spell to avoid head texture mishaps
+		hasVampirism = true
+		
+		;ToDo- Check if this works. If it does, then remove all LYHD refs and implement our own race switching code
+		LetYourHairDown_MCM LYHD = Game.GetFormFromFile(0x05000D61, "LetYourHairDown.esp") As LetYourHairDown_MCM
+		If LYHD
+			vampireRace = LYHD.PlayerAlias.GetPlayerVampireRace()
+			if vampireRace
+				LYHD.PlayerAlias.SwitchPlayerToNonVampireForm(vampireRace);
+			endIf
+		EndIf
 	EndIf
 	
 	snusnuMain.originalHead = none
@@ -111,83 +127,89 @@ event OnEffectStart(Actor akTarget, Actor akCaster)
 		;TLALOC- First we check if overlay slot is available
 		;String overlaySlot = initOverlaySlot(akTarget)
 		
-		;ToDo- Move this loop to onUpdate(). Make functions to apply stuff before and after this animation. Call the after anim
-		;      function here if anim is disabled or in onUpdate if anim is enabled. Do the same with WeightMorphs
-		float growSteps = 1
-		float growVal = 0.01
-		int growStage = 1
-		bool goingUp = true
-		int currentStage = snusnuMain.currentBuildStage
-		originalMuscleScore = snusnuMain.getfightingMuscle()
-		
-		If snusnuMain.applyMoreChangesOvertime
-			growSteps = currentMusclePercent
-		EndIf
-		
-		while growVal != growSteps || goingUp
-			If goingUp
-				;TLALOC- Gradually remove normal muscle
-				removeNormalMuscle(akTarget, growVal)
-			EndIf
-			muscleChange(akTarget, growVal );NOTE- growVal should be a value between 0 and 1
-			;TLALOC-ToDo- Also gradually change normal muscle mass (snusnuMain.UpdateWeight())
+		If snusnuMain.useAltBody
+			;ToDo- Also add this to the NPC spell
+			Utility.wait(8)
+			swapBodyMesh(akTarget)
+		Else
+			;ToDo- Move this loop to onUpdate(). Make functions to apply stuff before and after this animation. Call the after anim
+			;      function here if anim is disabled or in onUpdate if anim is enabled. Do the same with WeightMorphs
+			float growSteps = 1
+			float growVal = 0.01
+			int growStage = 1
+			bool goingUp = true
+			int currentStage = snusnuMain.currentBuildStage
+			originalMuscleScore = snusnuMain.getfightingMuscle()
 			
-			;Apply the pulsating animation: Muscles will suddently grow a lot, then will shrink a little, then grow again, 
-			;                               then shrink again, until desired size is achieved
-			;
-			;                               ToDo- We can apply the shrinking of the normal morphs, and then the growing of the 
-			;                               FMG morphs. So we need to have the FMG morphs stored appart from the normal ones
-			If goingUp
-				growVal = growVal + 0.02
-				If growVal >= growStage * 0.1
-					goingUp = false
-					;Debug.Trace("SNU - growVal is "+growVal+", going back down")
-					
-					;ToDo- Instead of hard apply the normals, add an overlay with the final normal map and apply an alpha override
-					;      with growVal as value. When the TF finishes, first apply the actual normal map as a skin override,
-					;      wait for a second and then remove the overlay.
-					
-					;TLALOC- Update normals if needed
-					currentStage = switchMuscleNormals(akTarget, currentStage, growVal * 100 )
-					
-					;ToDo- We NEED to check for the changes the bones already have. Otherwise it will look
-					;      like the body does a big jump in size if the character already has a high muscle score
-					updateBones(akTarget, growVal)
+			If snusnuMain.applyMoreChangesOvertime
+				growSteps = currentMusclePercent
+			EndIf
+			
+			while growVal != growSteps || goingUp
+				If goingUp
+					;TLALOC- Gradually remove normal muscle
+					removeNormalMuscle(akTarget, growVal)
 				EndIf
-			Else
-				growVal = growVal - 0.01
-				If growVal >= growSteps - 0.01 && growVal <= growSteps + 0.01
-					;Debug.Trace("SNU - growVal has rested on "+growVal)
-					
-					growVal = growSteps ;TLALOC - Break condition
-					
-					updateBones(akTarget, growVal)
-				ElseIf growVal <= (growStage * 0.1) - 0.05
-					If !((growStage * 0.1) - 0.05 > growSteps) ;TLALOC - Fix for special case where the target size is skipped
-						goingUp = true
-						growStage = growStage + 1
-						;Debug.Trace("SNU - growVal is "+growVal+", going back up")
+				muscleChange(akTarget, growVal );NOTE- growVal should be a value between 0 and 1
+				;TLALOC-ToDo- Also gradually change normal muscle mass (snusnuMain.UpdateWeight())
+				
+				;Apply the pulsating animation: Muscles will suddently grow a lot, then will shrink a little, then grow again, 
+				;                               then shrink again, until desired size is achieved
+				;
+				;                               ToDo- We can apply the shrinking of the normal morphs, and then the growing of the 
+				;                               FMG morphs. So we need to have the FMG morphs stored appart from the normal ones
+				If goingUp
+					growVal = growVal + 0.02
+					If growVal >= growStage * 0.1
+						goingUp = false
+						;Debug.Trace("SNU - growVal is "+growVal+", going back down")
+						
+						;ToDo- Instead of hard apply the normals, add an overlay with the final normal map and apply an alpha override
+						;      with growVal as value. When the TF finishes, first apply the actual normal map as a skin override,
+						;      wait for a second and then remove the overlay.
+						
+						;TLALOC- Update normals if needed
+						currentStage = switchMuscleNormals(akTarget, currentStage, growVal * 100 )
+						
+						;ToDo- We NEED to check for the changes the bones already have. Otherwise it will look
+						;      like the body does a big jump in size if the character already has a high muscle score
+						updateBones(akTarget, growVal)
+					EndIf
+				Else
+					growVal = growVal - 0.01
+					If growVal >= growSteps - 0.01 && growVal <= growSteps + 0.01
+						;Debug.Trace("SNU - growVal has rested on "+growVal)
+						
+						growVal = growSteps ;TLALOC - Break condition
+						
+						updateBones(akTarget, growVal)
+					ElseIf growVal <= (growStage * 0.1) - 0.05
+						If !((growStage * 0.1) - 0.05 > growSteps) ;TLALOC - Fix for special case where the target size is skipped
+							goingUp = true
+							growStage = growStage + 1
+							;Debug.Trace("SNU - growVal is "+growVal+", going back up")
+						EndIf
 					EndIf
 				EndIf
+		;/		
+				;TLALOC- Update normals if needed
+				AddNodeOverrideFloat(akTarget, true, overlaySlot, 8, -1, growVal, true)	
+				;AddNodeOverrideFloat(akTarget, true, "Face [Ovl0]", 8, -1, 1.0, true)
+				;AddNodeOverrideFloat(akTarget, true, "Hands [Ovl1]", 8, -1, 1.0, true)
+				;AddNodeOverrideFloat(akTarget, true, "Feet [Ovl1]", 8, -1, 1.0, true)
+		/;		
+				If goingUp
+					Utility.wait(0.04)
+				Else
+					Utility.wait(0.2)
+				EndIf
+			endWhile
+			;Debug.Trace("SNU - Final growVal is "+growVal)
+			
+			If currentMusclePercent == 1.0
+				applyMuscleNormals(akTarget, 5)
+				snusnuMain.ClearMorphs(false)
 			EndIf
-	;/		
-			;TLALOC- Update normals if needed
-			AddNodeOverrideFloat(akTarget, true, overlaySlot, 8, -1, growVal, true)	
-			;AddNodeOverrideFloat(akTarget, true, "Face [Ovl0]", 8, -1, 1.0, true)
-			;AddNodeOverrideFloat(akTarget, true, "Hands [Ovl1]", 8, -1, 1.0, true)
-			;AddNodeOverrideFloat(akTarget, true, "Feet [Ovl1]", 8, -1, 1.0, true)
-	/;		
-			If goingUp
-				Utility.wait(0.04)
-			Else
-				Utility.wait(0.2)
-			EndIf
-		endWhile
-		;Debug.Trace("SNU - Final growVal is "+growVal)
-		
-		If currentMusclePercent == 1.0
-			applyMuscleNormals(akTarget, 5)
-			snusnuMain.ClearMorphs(false)
 		EndIf
 		
 		If canPlayAnimation(akTarget)
@@ -207,11 +229,15 @@ event OnEffectStart(Actor akTarget, Actor akCaster)
 			maxGrowth = currentMusclePercent
 		EndIf
 		
-		removeNormalMuscle(akTarget, maxGrowth)
-		muscleChange(akTarget, maxGrowth )
-		updateBones(akTarget, maxGrowth, False)
-		
-		switchMuscleNormals(akTarget, 4, 100 )
+		If snusnuMain.useAltBody
+			swapBodyMesh(akTarget)
+		Else
+			removeNormalMuscle(akTarget, maxGrowth)
+			muscleChange(akTarget, maxGrowth )
+			updateBones(akTarget, maxGrowth, False)
+			
+			switchMuscleNormals(akTarget, 4, 100 )
+		EndIf
 	EndIf
 	
 	;Ultra punching strength
@@ -220,9 +246,13 @@ event OnEffectStart(Actor akTarget, Actor akCaster)
 	akTarget.EquipItem(snusnuMain.FistsOfRage, True, True)
 	
 	If currentMusclePercent == 1.0 - (snusnuMain.moreChangesIncrements * 2)
-		snusnuMain.updateBoobsPhysics(true, 2)
+		If !snusnuMain.useAltBody
+			snusnuMain.updateBoobsPhysics(true, 2)
+		EndIf
 	Else
-		snusnuMain.updateBoobsPhysics(true, 1)
+		If !snusnuMain.useAltBody
+			snusnuMain.updateBoobsPhysics(true, 1)
+		EndIf
 	
 		If snusnuMain.useAltAnims
 			If currentMusclePercent != 1.0
@@ -266,7 +296,7 @@ Event OnPlayerLoadGame()
 	Debug.Trace("SNU - OnPlayerLoadGame()")
 	
 	Debug.Trace("SNU - Stored TF Time is: "+tfTime)
-	
+		
 	reloadUpdate = true
 	registerForSingleUpdate(12)
 	RegisterForSleep()
@@ -289,31 +319,37 @@ Event OnUpdate()
 	EndIf
 	
 	If reloadUpdate
-		If !loadFMGMorphs()
-			Debug.Notification("Could not load the FMG morphs!")
-		EndIf
-		updateBones(snusnuMain.PlayerRef, currentMusclePercent, False)
-			
-		If currentMusclePercent == 1.0 - (snusnuMain.moreChangesIncrements * 2)
-			applyMuscleNormals(snusnuMain.PlayerRef, 2)
-			snusnuMain.updateBoobsPhysics(false, 2)
-		Else
-			If currentMusclePercent < 1.0
-				applyMuscleNormals(snusnuMain.PlayerRef, 3)
-			Else
-				applyMuscleNormals(snusnuMain.PlayerRef, 5)
+		If !snusnuMain.useAltBody
+			If !loadFMGMorphs()
+				Debug.Notification("Could not load the FMG morphs!")
+			EndIf
+			updateBones(snusnuMain.PlayerRef, currentMusclePercent, False)
 				
-				;Jump height fix
-				If Game.GetGameSettingFloat("fJumpHeightMin") < 180.0
-					Game.SetGameSettingFloat("fJumpHeightMin", 180.0)
+			If currentMusclePercent == 1.0 - (snusnuMain.moreChangesIncrements * 2)
+				applyMuscleNormals(snusnuMain.PlayerRef, 2)
+				snusnuMain.updateBoobsPhysics(false, 2)
+			Else
+				If currentMusclePercent < 1.0
+					applyMuscleNormals(snusnuMain.PlayerRef, 3)
+				Else
+					applyMuscleNormals(snusnuMain.PlayerRef, 5)
+					
+					;Jump height fix
+					If Game.GetGameSettingFloat("fJumpHeightMin") < 180.0
+						Game.SetGameSettingFloat("fJumpHeightMin", 180.0)
+					EndIf
 				EndIf
+				
+				snusnuMain.updateBoobsPhysics(false, 1)
+				If snusnuMain.applyMoreChangesOvertime
+					If currentMusclePercent == 1.0
+						applyBarbarianSkin(snusnuMain.PlayerRef, 2)
+					ElseIf currentMusclePercent == 1.0 - snusnuMain.moreChangesIncrements
+						applyBarbarianSkin(snusnuMain.PlayerRef, 1)
+					EndIf
+				EndIf
+				
 			EndIf
-			
-			snusnuMain.updateBoobsPhysics(false, 1)
-			If snusnuMain.applyMoreChangesOvertime
-				applyBarbarianSkin(snusnuMain.PlayerRef, moreChangesCount)
-			EndIf
-			
 		EndIf
 		
 		snusnuMain.updateAllowedItemsEquipedWeight(currentMusclePercent)
@@ -322,7 +358,7 @@ Event OnUpdate()
 		reloadUpdate = false
 	EndIf
 	
-	If StorageUtil.GetIntValue(snusnuMain.PlayerRef, "SNU_UltraMuscle", 0) == 12
+	If !snusnuMain.useAltBody && StorageUtil.GetIntValue(snusnuMain.PlayerRef, "SNU_UltraMuscle", 0) == 12
 		;Changes were made!
 		If !loadFMGMorphs()
 			Debug.Trace("SNU - Could not load the FMG morphs!")
@@ -420,7 +456,7 @@ Event OnSleepStop(bool abInterrupted)
 EndEvent
 
 Event OnObjectUnequipped(Form type, ObjectReference ref)
-	if !snusnuMain.isTransforming && type == snusnuMain.handsFix && moreChangesCount >= 1
+	if !snusnuMain.useAltBody && !snusnuMain.isTransforming && type == snusnuMain.handsFix && moreChangesCount >= 1
 		Utility.wait(0.4)
 		Debug.Trace("SNU - Apply fix over hand fix. tfTime="+tfTime)
 		applyBarbarianSkin(snusnuMain.PlayerRef, moreChangesCount, false)
@@ -464,42 +500,43 @@ Event OnEffectFinish(Actor akTarget, Actor akCaster)
 		EndIf
 	EndIf
 	
-	
-	If snusnuMain.tfAnimation
-		Int normalsStage = 5
-		float deflateVal = currentMusclePercent
-		while deflateVal > 0.0
-			removeNormalMuscle(akTarget, deflateVal)
+	If !snusnuMain.useAltBody
+		If snusnuMain.tfAnimation
+			Int normalsStage = 5
+			float deflateVal = currentMusclePercent
+			while deflateVal > 0.0
+				removeNormalMuscle(akTarget, deflateVal)
+				
+				muscleChange(akTarget, deflateVal)
+				
+				If (deflateVal * 100) as Int % 16 == 0
+					updateBones(akTarget, deflateVal, False)
 			
-			muscleChange(akTarget, deflateVal)
-			
-			If (deflateVal * 100) as Int % 16 == 0
-				updateBones(akTarget, deflateVal, False)
-		
-				normalsStage -= 1
-				If normalsStage >= snusnuMain.currentBuildStage
-					applyMuscleNormals(akTarget, normalsStage)
+					normalsStage -= 1
+					If normalsStage >= snusnuMain.currentBuildStage
+						applyMuscleNormals(akTarget, normalsStage)
+					EndIf
 				EndIf
-			EndIf
+				
+				deflateVal -= 0.02
+				Utility.wait(0.04)
+			endWhile
 			
-			deflateVal -= 0.02
-			Utility.wait(0.04)
-		endWhile
-		
-		updateBones(akTarget, 0, False)
-		
-		clearMuscleMorphs(akTarget)
-		snusnuMain.clearBoneScales(akTarget)
-	Else
-		clearMuscleMorphs(akTarget)
-		snusnuMain.clearBoneScales(akTarget)
+			updateBones(akTarget, 0, False)
+			
+			clearMuscleMorphs(akTarget)
+			snusnuMain.clearBoneScales(akTarget)
+		Else
+			clearMuscleMorphs(akTarget)
+			snusnuMain.clearBoneScales(akTarget)
+		EndIf
 	EndIf
 	
 	;TLALOC-ToDo- Remove normals overlay
 	;AddNodeOverrideFloat(akTarget, true, overlaySlot, 8, -1, growVal, true)
 	;RemoveAllReferenceSkinOverrides(akTarget);For the custom normals
 	;ApplySkinOverrides(akTarget)
-	If snusnuMain.currentBuildStage <= 1
+	If !snusnuMain.useAltBody && snusnuMain.currentBuildStage <= 1
 		Bool isFemale = akTarget.GetActorBase().GetSex() != 0
 		NiOverride.RemoveSkinOverride(akTarget, isFemale, false, 0x04, 9, 1)
 		NiOverride.RemoveSkinOverride(akTarget, isFemale, true, 0x04, 9, 1)
@@ -520,8 +557,11 @@ Event OnEffectFinish(Actor akTarget, Actor akCaster)
 	
 	;TLALOC-ToDo- Change skin?
 	;If snusnuMain.applyMoreChangesOvertime && moreChangesCount > 0
+	If !snusnuMain.useAltBody
 		applyBarbarianSkin(akTarget, 0)
-	;EndIf
+	Else
+		swapBodyMesh(akTarget, false)
+	EndIf
 	
 	switchHeads(akTarget, 0)
 	
@@ -536,6 +576,12 @@ Event OnEffectFinish(Actor akTarget, Actor akCaster)
 	If snusnuMain.hardcoreMode
 		snusnuMain.updateAllowedItemsEquipedWeight()
 		snusnuMain.needEquipWeightUpdate = true
+	EndIf
+	
+	;Debug.Trace("SNU - vampireRace="+vampireRace+", hasVampirism="+hasVampirism)
+	If vampireRace && hasVampirism
+		Debug.Trace("SNU - Reverting back to vampire race")
+		snusnuMain.PlayerRef.SetRace(vampireRace)
 	EndIf
 	
 	Debug.Trace("SNU - Finished removal of transformation effect")
@@ -599,16 +645,14 @@ Function updateBones(Actor theActor, Float magnitude, Bool goingUp = true)
 	
 	Int boneCounter = 0
 	While boneCounter < snusnuMain.totalCurrentBones
-		If bonesValuesFMG[boneCounter] != 1.0
-			snusnuMain.changeBoneScale(theActor, boneCounter, snusnuMain.getBoneSize(magnitude, bonesValuesFMG[boneCounter]))
-		EndIf
+		snusnuMain.changeBoneScale(theActor, boneCounter, snusnuMain.getBoneSize(magnitude, bonesValuesFMG[boneCounter]))
 		boneCounter += 1
 	EndWhile
 EndFunction
 
 ;Head index: 0=Original, 1=Muscle, 2=Muscle tan, 3=Muscle tan 2
 Function switchHeads(Actor headOwner, Int newHeadIndex)
-	If !snusnuMain.changeHeadPart
+	If !snusnuMain.changeHeadPart || snusnuMain.useAltBody
 		return
 	EndIf
 	
@@ -640,6 +684,50 @@ Function switchHeads(Actor headOwner, Int newHeadIndex)
 	EndIf
 	
 	headOwner.RegenerateHead()
+EndFunction
+
+Function swapBodyMesh(Actor victim, Bool applyFMGBody = true)
+	Armor SkinToChange
+	HeadPart FaceToChange
+	TextureSet FaceTextureSetToChange
+	
+	;victim.UnequipItemSlot(32)
+	;Utility.wait(0.5)
+	victim.UnequipAll()
+	Utility.wait(0.5)
+	
+	If applyFMGBody
+		Bool isFemale = victim.GetActorBase().GetSex() != 0
+		NiOverride.RemoveSkinOverride(victim, isFemale, false, 0x04, 9, 1)
+		NiOverride.RemoveSkinOverride(victim, isFemale, true, 0x04, 9, 1)
+		If !victim.IsOnMount()
+			victim.QueueNiNodeUpdate()
+			Utility.wait(0.5)
+		EndIf
+		
+		ActorBase akTargetBase = victim.getActorBase()
+		Int headIndex = akTargetBase.GetIndexOfHeadPartByType(1)
+		snusnuMain.originalHead = akTargetBase.GetNthHeadPart(headIndex)
+		Debug.Trace("SNU - Original head: "+snusnuMain.originalHead)
+		
+		snusnuMain.originalBody = akTargetBase.GetSkin()
+		snusnuMain.originalFace = akTargetBase.GetFaceTextureSet()
+
+		
+		SkinToChange = snusnuMain.AltFMGBody
+		FaceToChange = snusnuMain.AltFMGHead
+		FaceTextureSetToChange = snusnuMain.AltFMGFace
+	Else
+		SkinToChange = snusnuMain.originalBody
+		FaceToChange = snusnuMain.originalHead
+		FaceTextureSetToChange = snusnuMain.originalFace
+	EndIf
+	
+	victim.ChangeHeadPart(FaceToChange)
+	victim.GetActorBase().SetSkin(SkinToChange)
+	victim.GetActorBase().SetFaceTextureSet(FaceTextureSetToChange)
+	victim.QueueNiNodeUpdate()
+	victim.RegenerateHead()
 EndFunction
 
 Function updateFistsPower(Float magnitude)

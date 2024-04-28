@@ -36,6 +36,7 @@ Int _myApplyMoreChanges
 Int _myDynamicChanges
 Int _myChangesInterval
 Int _myChangesIncrements
+Int _myUseAltBody
 
 Int _myZeroSliders
 Int _myApplyDefault
@@ -255,7 +256,17 @@ Event OnPageReset(String a_page)
 		
 		AddHeaderOption("$SNUSNU_TRANSFORMATION")
 		AddEmptyOption()
-		_myCustomizeFMG = AddToggleOption("Customize FMG Morphs", editFMGMorphs)
+		If StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle", 0) == 0
+			_myUseAltBody = AddToggleOption("Use alternate body mesh", snusnuMain.useAltBody)
+		Else
+			_myUseAltBody = AddToggleOption("Use alternate body mesh", snusnuMain.useAltBody, OPTION_FLAG_DISABLED)
+		EndIf
+		Int altBodyFlag = OPTION_FLAG_NONE
+		If snusnuMain.useAltBody
+			altBodyFlag = OPTION_FLAG_DISABLED
+		EndIf
+		AddEmptyOption()
+		_myCustomizeFMG = AddToggleOption("Customize FMG Morphs", editFMGMorphs, altBodyFlag)
 		If snusnuMain.isWeightMorphsLoaded
 			_myRemoveWeightMorphs = AddToggleOption("$SNUSNU_NOWEIGHTMORPHS", snusnuMain.removeWeightMorphs)
 		Else
@@ -265,12 +276,12 @@ Event OnPageReset(String a_page)
 		_mytfAnimationNPC = AddToggleOption("$SNUSNU_USETFANIMNPC", snusnuMain.tfAnimationNPC)
 		_myuseAltAnims = AddToggleOption("$SNUSNU_USEALTANIMS", snusnuMain.useAltAnims)
 		_myuseAltAnimsNPC = AddToggleOption("$SNUSNU_USEALTANIMSNPC", snusnuMain.useAltAnimsNPC)
-		_mychangeHeadPart = AddToggleOption("$SNUSNU_CHANGEHEAD", snusnuMain.changeHeadPart)
+		_mychangeHeadPart = AddToggleOption("$SNUSNU_CHANGEHEAD", snusnuMain.changeHeadPart, altBodyFlag)
 		_myplayTFSound = AddToggleOption("$SNUSNU_PLAYTFSOUND", snusnuMain.playTFSound)
-		_myApplyMoreChanges = AddToggleOption("More changes while TF", snusnuMain.applyMoreChangesOvertime)
-		_myChangesInterval = AddSliderOption("More changes interval", snusnuMain.moreChangesInterval, "{2}")
-		_myChangesIncrements = AddSliderOption("More changes growth increments", snusnuMain.moreChangesIncrements, "{2}")
-		_myDynamicChanges = AddToggleOption("Dynamic changes calculation", snusnuMain.dynamicChangesCalculation)
+		_myApplyMoreChanges = AddToggleOption("More changes while TF", snusnuMain.applyMoreChangesOvertime, altBodyFlag)
+		_myChangesInterval = AddSliderOption("More changes interval", snusnuMain.moreChangesInterval, "{2}", altBodyFlag)
+		_myChangesIncrements = AddSliderOption("More changes growth increments", snusnuMain.moreChangesIncrements, "{2}", altBodyFlag)
+		_myDynamicChanges = AddToggleOption("Dynamic changes calculation", snusnuMain.dynamicChangesCalculation, altBodyFlag)
 		_myNPCMuscleScore = AddSliderOption("NPC Custom Muscle", snusnuMain.npcMuscleScore*100, "{0}%")
 		AddKeyMapOptionST("SnusnuNPCMuscle","Reload NPC muscles", snusnuMain.npcMuscleKey)
 		
@@ -637,6 +648,8 @@ Event OnOptionHighlight(Int a_option)
 		SetInfoText("How much muscles will grow with each change interval. Changes go in two stages, so if you choose 0.25 then the initial FMG muscle will be at 50%, then the first change stage will be to 75% and the final stage will always be to 100%")
 	ElseIf a_option == _myCustomizeFMG
 		SetInfoText("Toggle FMG morphs customization.")
+	ElseIf a_option == _myUseAltBody
+		SetInfoText("Use a different body mesh for FMG transformation instead of body morphs. A proper body mesh and textures need to be added to their respective folders.")
 	ElseIf a_option == _myRemoveWeightMorphs
 		SetInfoText("$SNUSNU_NOWEIGHTMORPHS_DESC")
 	ElseIf a_option == _myUseWeightSlider
@@ -713,6 +726,31 @@ Event OnOptionSelect(Int a_option)
 	ElseIf a_option == _myDynamicChanges
 		snusnuMain.dynamicChangesCalculation = !snusnuMain.dynamicChangesCalculation
 		SetToggleOptionValue(a_option, snusnuMain.dynamicChangesCalculation)
+	ElseIf a_option == _myUseAltBody
+		snusnuMain.useAltBody = !snusnuMain.useAltBody
+		SetToggleOptionValue(a_option, snusnuMain.useAltBody)
+		
+		If snusnuMain.useAltBody
+			snusnuMain.changeHeadPart = false
+			snusnuMain.applyMoreChangesOvertime = false
+			snusnuMain.dynamicChangesCalculation = false
+			
+			Self.SetOptionFlags(_myCustomizeFMG, Self.OPTION_FLAG_DISABLED, True)
+			Self.SetOptionFlags(_mychangeHeadPart, Self.OPTION_FLAG_DISABLED, True)
+			Self.SetOptionFlags(_myApplyMoreChanges, Self.OPTION_FLAG_DISABLED, True)
+			Self.SetOptionFlags(_myChangesInterval, Self.OPTION_FLAG_DISABLED, True)
+			Self.SetOptionFlags(_myChangesIncrements, Self.OPTION_FLAG_DISABLED, True)
+			Self.SetOptionFlags(_myDynamicChanges, Self.OPTION_FLAG_DISABLED, True)
+		Else
+			Self.SetOptionFlags(_myCustomizeFMG, Self.OPTION_FLAG_NONE, True)
+			Self.SetOptionFlags(_mychangeHeadPart, Self.OPTION_FLAG_NONE, True)
+			Self.SetOptionFlags(_myApplyMoreChanges, Self.OPTION_FLAG_NONE, True)
+			Self.SetOptionFlags(_myChangesInterval, Self.OPTION_FLAG_NONE, True)
+			Self.SetOptionFlags(_myChangesIncrements, Self.OPTION_FLAG_NONE, True)
+			Self.SetOptionFlags(_myDynamicChanges, Self.OPTION_FLAG_NONE, True)
+		EndIf
+		
+		ForcePageReset()
 	ElseIf a_option == _myCustomizeFMG
 		editFMGMorphs = !editFMGMorphs
 		SetToggleOptionValue(a_option, editFMGMorphs)
@@ -1632,6 +1670,7 @@ Bool Function saveSettings()
 	JsonUtil.SetIntValue(fileName, "getInfoKey", snusnuMain.getInfoKey)
 	JsonUtil.SetIntValue(fileName, "npcMuscleKey", snusnuMain.npcMuscleKey)
 	JsonUtil.SetFloatValue(fileName, "npcMuscleScore", snusnuMain.npcMuscleScore)
+	JsonUtil.SetIntValue(fileName, "useAltBody", snusnuMain.useAltBody as Int)
 	
 	JsonUtil.SetIntValue(fileName, "useDynamicPhysics", snusnuMain.useDynamicPhysics as Int)
 	JsonUtil.SetIntValue(fileName, "useMuscleAnims", snusnuMain.useMuscleAnims as Int)
@@ -1710,6 +1749,7 @@ bool Function loadSettings()
 		snusnuMain.dynamicChangesCalculation = JsonUtil.GetIntValue(fileName, "dynamicChangesCalculation", snusnuMain.dynamicChangesCalculation as Int)
 		snusnuMain.moreChangesInterval = JsonUtil.GetFloatValue(fileName, "moreChangesInterval", snusnuMain.moreChangesInterval as Float)
 		snusnuMain.moreChangesIncrements = JsonUtil.GetFloatValue(fileName, "moreChangesIncrements", snusnuMain.moreChangesIncrements as Float)
+		snusnuMain.useAltBody = JsonUtil.GetIntValue(fileName, "useAltBody", snusnuMain.useAltBody as Int)
 		
 		If snusnuMain.getInfoKey != JsonUtil.GetIntValue(fileName, "getInfoKey", snusnuMain.getInfoKey)
 			snusnuMain.getInfoKey = JsonUtil.GetIntValue(fileName, "getInfoKey", snusnuMain.getInfoKey)

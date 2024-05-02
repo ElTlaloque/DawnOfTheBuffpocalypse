@@ -23,11 +23,20 @@ Float[] bonesValuesFMG
 Float[] maleValuesFMG
 
 Bool reloadUpdate = false
+Bool alreadyTransformed = false
 
 
 event OnEffectStart(Actor akTarget, Actor akCaster)
+	If StorageUtil.GetIntValue(akTarget, "SNU_UltraMuscle", 0) > 0
+		Debug.Notification("Removing FMG spell!")
+		alreadyTransformed = true
+		Dispel()
+		return
+	EndIf
+
 	If snusnuMain.isTransforming
 		Debug.Notification("Already transforming!")
+		alreadyTransformed = true
 		Dispel()
 		return
 	EndIf
@@ -36,6 +45,7 @@ event OnEffectStart(Actor akTarget, Actor akCaster)
 	;ToDo- Test this spell on male characters
 	;/If snusnuMain.PlayerRef.GetActorBase().GetSex() == 0
 		Debug.Notification("This spell only works on female characters")
+		alreadyTransformed = true
 		Dispel()
 		return
 	EndIf/;
@@ -43,26 +53,21 @@ event OnEffectStart(Actor akTarget, Actor akCaster)
 	initFMGSliders()
 	If !loadFMGMorphs()
 		Debug.Notification("Could not load the FMG morphs!")
+		alreadyTransformed = true
 		Dispel()
 		return
 	EndIf
-	
-	While StorageUtil.GetIntValue(akTarget, "SNU_UltraMuscle", 0) > 0
-		;ToDo- Check if this logic works correctly
-		Utility.wait(0.1)
-	EndWhile
-	
+		
 	If snusnuMain.PlayerRef.hasKeyword(snusnuMain.isVampire)
 		;Change to original race for the duration of the spell to avoid head texture mishaps
 		hasVampirism = true
 		
-		;ToDo- Check if this works. If it does, then remove all LYHD refs and implement our own race switching code
-		LetYourHairDown_MCM LYHD = Game.GetFormFromFile(0x05000D61, "LetYourHairDown.esp") As LetYourHairDown_MCM
-		If LYHD
-			vampireRace = LYHD.PlayerAlias.GetPlayerVampireRace()
-			if vampireRace
-				LYHD.PlayerAlias.SwitchPlayerToNonVampireForm(vampireRace);
-			endIf
+		vampireRace = snusnuMain.getVampireRace(akTarget)
+		If vampireRace
+			Race notVampRace = snusnuMain.getNonVampireRace(vampireRace)
+			If notVampRace
+				akTarget.SetRace(notVampRace)
+			EndIf
 		EndIf
 	EndIf
 	
@@ -151,7 +156,6 @@ event OnEffectStart(Actor akTarget, Actor akCaster)
 					removeNormalMuscle(akTarget, growVal)
 				EndIf
 				muscleChange(akTarget, growVal );NOTE- growVal should be a value between 0 and 1
-				;TLALOC-ToDo- Also gradually change normal muscle mass (snusnuMain.UpdateWeight())
 				
 				;Apply the pulsating animation: Muscles will suddently grow a lot, then will shrink a little, then grow again, 
 				;                               then shrink again, until desired size is achieved
@@ -303,6 +307,10 @@ Event OnPlayerLoadGame()
 EndEvent
 
 Event OnUpdate()
+	If alreadyTransformed
+		return
+	EndIf
+	
 	If snusnuMain.isTransforming
 		;ToDo- We can put here the transforming code to make it more stable and saveable
 		
@@ -464,6 +472,10 @@ Event OnObjectUnequipped(Form type, ObjectReference ref)
 EndEvent
 
 Event OnEffectFinish(Actor akTarget, Actor akCaster)
+	If alreadyTransformed
+		return
+	EndIf
+	
 	snusnuMain.isTransforming = true
 	
 	StorageUtil.SetIntValue(akTarget, "SNU_UltraMuscle", 0)
@@ -529,6 +541,7 @@ Event OnEffectFinish(Actor akTarget, Actor akCaster)
 		Else
 			clearMuscleMorphs(akTarget)
 			snusnuMain.clearBoneScales(akTarget)
+			snusnuMain.UpdateWeight(true)
 		EndIf
 	EndIf
 	
@@ -555,15 +568,12 @@ Event OnEffectFinish(Actor akTarget, Actor akCaster)
 	;TLALOC-ToDo- Change hair?
 	;switchBarbarianHair()
 	
-	;TLALOC-ToDo- Change skin?
-	;If snusnuMain.applyMoreChangesOvertime && moreChangesCount > 0
+	;TLALOC- Change skin?
 	If !snusnuMain.useAltBody
 		applyBarbarianSkin(akTarget, 0)
 	Else
 		swapBodyMesh(akTarget, false)
 	EndIf
-	
-	switchHeads(akTarget, 0)
 	
 	Game.SetGameSettingFloat("fJumpHeightMin", 76.0)
 	
@@ -579,7 +589,7 @@ Event OnEffectFinish(Actor akTarget, Actor akCaster)
 	EndIf
 	
 	;Debug.Trace("SNU - vampireRace="+vampireRace+", hasVampirism="+hasVampirism)
-	If vampireRace && hasVampirism
+	If vampireRace && hasVampirism && !snusnuMain.isVampireLord
 		Debug.Trace("SNU - Reverting back to vampire race")
 		snusnuMain.PlayerRef.SetRace(vampireRace)
 	EndIf
@@ -652,7 +662,7 @@ EndFunction
 
 ;Head index: 0=Original, 1=Muscle, 2=Muscle tan, 3=Muscle tan 2
 Function switchHeads(Actor headOwner, Int newHeadIndex)
-	If !snusnuMain.changeHeadPart || snusnuMain.useAltBody
+	If !snusnuMain.changeHeadPart || snusnuMain.useAltBody || snusnuMain.isWerewolf
 		return
 	EndIf
 	
@@ -857,7 +867,7 @@ string Function initOverlaySlot(Actor buffTarget) Global
 	If newOverlayID == "x"
 		Debug.Trace("SNU - ERROR: No free slot was found to apply muscle overlays")
 	;/Else
-		;TLALOC-ToDo- Don't assume actor is female in all of niOverride calls
+		;TLALOC- Don't assume actor is female in all of niOverride calls
 		NiOverride.AddNodeOverrideString(buffTarget, true, "Body "+newOverlayID, 9, 0, normalsPath+"tan.dds", true)
 		NiOverride.AddNodeOverrideString(buffTarget, true, "Body "+newOverlayID, 9, 1, normalsPath+"ultra.dds", true)
 		Debug.Trace("SNU - overlay slot was found: "+newOverlayID)/;
@@ -897,6 +907,10 @@ Function applyOverlayStrings(Actor target, String slot)
 EndFunction
 
 Function applyBarbarianSkin(Actor target, Int skinIndex, Bool applyFix = true)
+	If snusnuMain.isVampireLord
+		return
+	EndIf
+	
 	Debug.Trace("SNU - applyBarbarianSkin()")
 	Bool hasHandFix = false
 	Armor handsArmor = target.GetWornForm(0x00000008) as Armor
@@ -942,6 +956,8 @@ Function applyBarbarianSkin(Actor target, Int skinIndex, Bool applyFix = true)
 		;Feet
 		NiOverride.RemoveSkinOverride(target, isFemale, false, 0x80, 9, 0)
 		NiOverride.RemoveSkinOverride(target, isFemale, true, 0x80, 9, 0)
+		
+		switchHeads(target, 0)
 		
 		If !target.IsOnMount()
 			target.QueueNiNodeUpdate()

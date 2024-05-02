@@ -97,7 +97,7 @@ Bool Property is3BAPhysicsLoaded Auto
 
 ;TLALOC- TF related stuff
 Bool Property isTransforming = false Auto
-SPELL Property MusclePowerSpell  Auto  
+SPELL Property MusclePowerSpell  Auto
 SPELL Property UltraMusclePowerSpell  Auto  
 Armor Property FistsOfRage  Auto 
 Bool Property tfAnimation = true Auto
@@ -155,8 +155,12 @@ Bool Property isWerewolf = false Auto
 Float Property addWerewolfStrength = 0.05 Auto
 
 Keyword Property isVampire Auto
+Float Property addVampireStrength = 0.125 Auto
 Bool Property isVampireLord = false Auto
-Bool Property useVampireMechanics = false Auto
+SPELL Property VampireLordMuscleSpell Auto
+Bool Property isVampireLordReVampedLoaded Auto
+FormList Property SnusnuPlayableRaces Auto
+FormList Property SnusnuVampireRaces Auto
 
 ;TLALOC- Custom animations
 int Property snuModID Auto
@@ -250,6 +254,8 @@ Event OnPlayerLoadGame()
 			EndIf
 		EndIf
 		
+		isVampireLordReVampedLoaded = (Game.GetModByName("VampLordBS.esp") != 255)
+		
 		initSliderArrays()
 		RegisterEvents(True)
 		UpdateEffects()
@@ -298,11 +304,17 @@ Event OnRaceSwitchComplete()
 			addWerewolfBuild()
 		ElseIf isVampireLord
 			isVampireLord = false
+			Debug.Trace("SNU - Dispeling VampireLordMuscleSpell")
+			VampireLordMuscleSpell.cast(PlayerRef)
 		EndIf
 	ElseIf PlayerRef.getRace().getName() == "Werewolf"
 		isWerewolf = true
 	ElseIf PlayerRef.getRace().getName() == "Vampire Lord"
-		isVampireLord = true
+		If isVampireLordReVampedLoaded
+			isVampireLord = true
+			Debug.Trace("SNU - Casting VampireLordMuscleSpell")
+			VampireLordMuscleSpell.cast(PlayerRef)
+		EndIf
 	EndIf
 	
 	Debug.Trace("SNU - OnRaceSwitchComplete(isWerewolf="+isWerewolf+")")
@@ -318,6 +330,20 @@ Event OnCellLoad()
 	;Debug.Notification("Cell finished loading!")
 	Utility.Wait(1)
 	applyNPCMuscle()
+	
+	Location playerLocation = PlayerRef.GetCurrentLocation()
+	If playerLocation.HasKeywordString("LocTypeHouse") || playerLocation.HasKeywordString("LocTypeInn") || \
+	playerLocation.HasKeywordString("LocTypeTemple") ;|| playerLocation.HasKeywordString("LocTypeStore")
+		
+		updateCarryWeight()
+		
+		If hardcoreMode
+			;Fix for hardcore mode values not being updated often enough (specially happens for vampires. Or not going to bed in general...)
+			Debug.Notification("Updating allowed equipped weight")
+			updateAllowedItemsEquipedWeight()
+			needEquipWeightUpdate = true
+		EndIf
+	EndIf
 EndEvent
 
 Event OnUpdate()
@@ -361,12 +387,12 @@ Event OnUpdate()
 				EndIf
 			EndIf
 			
-			If StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle", 0) == 0
+			If StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle", 0) == 0 && !isVampireLord
 				;TLALOC- Muscle score degradation
 				Float DegradationTimer = GameDaysPassed.GetValue() - LastDegradationTime
 				Float totalDegradation = degradationBase * MultLoss * DegradationTimer
 				
-				If PlayerRef.hasKeyword(isVampire)
+				If checkVampirism()
 					;ToDo- If PC is vampire and they are outside in the day, degradation should be twice as bad
 					;For now, degradation is always ten times faster
 					totalDegradation = totalDegradation * 10
@@ -384,10 +410,8 @@ Event OnUpdate()
 				updateMuscleScore(totalDegradation)
 				
 				If justWakeUp
-					;ToDo- We might need to find a way to update the carry weight in a non intrusive way without having to 
-					;      rely on specific events like sleep or eat. <--- That doesn't make sense. Specific events are exactly
-					;      for that.
-					updateCarryWeight()
+					;Moved to OnCellLoad
+					;updateCarryWeight()
 					
 					If hardcoreMode
 						;Cleanup equipped item weights
@@ -402,7 +426,7 @@ Event OnUpdate()
 			;Debug.Trace("SNU - DegradationTimer="+DegradationTimer)
 			LastDegradationTime = GameDaysPassed.GetValue()
 			
-			If StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle", 0) == 0
+			If StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle", 0) == 0 && !isVampireLord
 				UpdateWeight(true)
 				checkBodyNormalsState()
 				
@@ -648,7 +672,7 @@ EndFunction
 Event OnObjectEquipped(Form type, ObjectReference ref)
 	;Debug.Trace("SNU -----------------OnObjectEquipped()-----------------")
 	Potion iaExercise = Game.GetFormFromFile(0x05084235, "ImmersiveInteractions.esp") As Potion
-	If !PlayerRef.hasKeyword(isVampire) && iaExercise && type == iaExercise
+	If !checkVampirism() && iaExercise && type == iaExercise
 		updateMuscleScore(0.75 * MultGainMisc)
 		Debug.Notification("I'm getting a little stronger")
 		return
@@ -742,7 +766,7 @@ Bool Function hasHeavyEquipment()
 EndFunction
 
 Event OnAnimationEvent(ObjectReference akSource, string asEventName)
-	If Enabled && akSource == PlayerRef && StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle", 0) == 0 && !PlayerRef.hasKeyword(isVampire)
+	If Enabled && akSource == PlayerRef && StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle", 0) == 0 && !checkVampirism()
 		;Debug.Trace("SNU - OnAnimationEvent("+asEventName+")")
 		
 		Bool isRunningUp = false
@@ -822,7 +846,7 @@ Event OnAnimationEvent(ObjectReference akSource, string asEventName)
 			;Debug.Notification("Drawing my bow to full charge surely requieres a certain ammount of strenght")
 			
 			;bowDrawTime = 0.0
-		ElseIf asEventName == "FootRight" && PlayerRef.IsOverEncumbered()
+		ElseIf asEventName == "FootRight" && (PlayerRef.IsOverEncumbered() || PO3_SKSEFunctions.IsActorUnderwater(PlayerRef))
 			scoreAddition = scoreAddition + (0.05 * MultGainArmor)
 			;Debug.Notification("Moving heavy stuff is good excercise")
 		Else
@@ -860,7 +884,7 @@ Event OnSleepStop(bool abInterrupted)
 	Debug.Trace("SNU - Checking mighty dream probability:")
 	Debug.Trace("SNU -        affinityScore="+affinityScore)
 	Debug.Trace("SNU -        randomProbability="+randomProbability)
-	If StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle", 0) == 0 && affinityScore > randomProbability
+	If StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle", 0) == 0 && !isVampireLord && affinityScore > randomProbability
 		Utility.wait(3)
 		Debug.Notification("I had a dream i was mighty unstoppable")
 		If affinityScore <= muscleMightProbability * 0.9
@@ -896,11 +920,22 @@ Float Function getSleepBonus()
 	return sleepBonus
 EndFunction
 
+Bool Function checkVampirism()
+	return addVampireStrength > 0.0 && PlayerRef.hasKeyword(isVampire)
+EndFunction
+
 Event OnVampireFeed(Actor akTarget)
-	;ToDo- How much should we add (create toggle and slider options in MCM)
-	updateMuscleScore(muscleScoreMax*0.125) ;Was 0.075
-	Debug.Notification("I feel stronger now")
-	UpdateWeight(true)
+	If addVampireStrength > 0.0
+		updateMuscleScore(muscleScoreMax * addVampireStrength) ;Was 0.075
+		
+		If hardcoreMode
+			updateAllowedItemsEquipedWeight()
+			getEquipedFullWeight()
+		EndIf
+		
+		Debug.Notification("I feel stronger now")
+		UpdateWeight(true)
+	EndIf
 EndEvent
 
 Event OnKeyDown(Int KeyCode)
@@ -973,7 +1008,7 @@ Float Function getBoneSize(Float baseModifier, Float boneModifier)
 EndFunction
 
 Function UpdateWeight(Bool applyNow = True)
-	If HAS_NIOVERRIDE && !isTransforming && StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle", 0) == 0
+	If HAS_NIOVERRIDE && !isTransforming && StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle", 0) == 0 && !isVampireLord
 		;Debug.Trace("SNU - UpdateWeight()")
 		Float fightingMuscle = getfightingMuscle()
 		
@@ -1557,7 +1592,7 @@ EndFunction
 ;     Pregnancy stages = 0=Not preg, 1=Preg
 Function checkBodyNormalsState()
 	;Debug.Trace("SNU - checkBodyNormalsState()")
-	If disableNormals || StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle", 0) != 0
+	If disableNormals || StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle", 0) != 0 || isVampireLord
 		return
 	EndIf
 	
@@ -1710,7 +1745,7 @@ Function UpdateEffects(Bool reAdd = True)
 		Float magStamina
 		Float magSpeed
 		
-		If StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle", 0) == 0
+		If StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle", 0) == 0 && !isVampireLord
 			magStamina = (muscleScore / muscleScoreMax) * Stamina
 			magSpeed = (muscleScore / muscleScoreMax) * Speed
 		Else
@@ -1729,7 +1764,7 @@ Function UpdateEffects(Bool reAdd = True)
 		EndIf
 		
 		If muscleScore > 10.0 && combatProficiency > 0.0
-			If StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle", 0) == 0
+			If StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle", 0) == 0 && !isVampireLord
 				Float halfMaxScore = muscleScoreMax / 2
 				If muscleScore > halfMaxScore
 					Float magCombat = ((muscleScore - halfMaxScore) / halfMaxScore) * combatProficiency
@@ -1908,8 +1943,9 @@ Function ResetWeight(Bool _enable)
 		
 		If PlayerRef.getRace().getName() == "Werewolf"
 			isWerewolf = true
-		ElseIf PlayerRef.getRace().getName() == "Vampire Lord"
+		ElseIf PlayerRef.getRace().getName() == "Vampire Lord" && isVampireLordReVampedLoaded
 			isVampireLord = true
+			VampireLordMuscleSpell.cast(PlayerRef)
 		EndIf
 	Else
 		UpdateEffects(False)
@@ -2510,7 +2546,7 @@ EndFunction
 
 Int Function getGroupIndex(int newIndex)
 	Int group = 1
-	;ToDo- Check if those calculations are correct
+	;ToDo- Always look for inconsistencies on this
 	If newIndex > 195
 		group = 5
 	ElseIf newIndex > 168
@@ -3068,6 +3104,21 @@ Function addWerewolfBuild()
 		EndIf
 	EndIf
 EndFunction
+
+Race Function getVampireRace(Actor theVampire)
+	Race vampireRace = theVampire.GetRace()
+	int index = SnusnuVampireRaces.Find(vampireRace)
+	If index > -1
+		return SnusnuVampireRaces.GetAt(index) as Race
+	EndIf
+	
+	return none
+endFunction
+
+Race Function getNonVampireRace(Race vampireRace)
+	int vampireIndex = SnusnuVampireRaces.Find(vampireRace)
+	return SnusnuPlayableRaces.GetAt(vampireIndex) as Race
+endFunction
 
 ;TLALOC- NPC Related functions
 Function applyNPCMuscle()

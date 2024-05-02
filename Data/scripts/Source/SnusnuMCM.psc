@@ -16,6 +16,7 @@ Int _myMultGainFight
 Int _myMultGainArmor
 Int _myMultGainMisc
 Int _myMultGainWufwuf
+Int _myVampGains
 Int _myStamina
 Int _mySpeed
 Int _myCombatProficiency
@@ -233,7 +234,7 @@ Event OnPageReset(String a_page)
 		_myMultGainArmor = AddSliderOption("$SNUSNU_MULTGAINARMOR", snusnuMain.MultGainArmor, "{2}")
 		_myMultGainMisc = AddSliderOption("$SNUSNU_MULTGAINMISC", snusnuMain.MultGainMisc, "{2}")
 		_myMultGainWufwuf = AddSliderOption("$SNUSNU_MULTGAINWUF", snusnuMain.addWerewolfStrength*100, "{0}%")
-		AddEmptyOption()
+		_myVampGains = AddSliderOption("Vampire Feed Gains", snusnuMain.addVampireStrength*100, "{1}%")
 		AddEmptyOption()
 		AddEmptyOption()
 		
@@ -628,6 +629,8 @@ Event OnOptionHighlight(Int a_option)
 		SetInfoText("Multiplier for how much muscle is gained by other miscellaneous actions (Swimming, Wood chopping and Mining). 2 means you will get twice as much, while 0.5 will give you only half of default value")
 	ElseIf a_option == _myMultGainWufwuf
 		SetInfoText("Multiplier for how much muscle is gained by transforming into a Werewolf. Value is a percent for maximum muscle score.")
+	ElseIf a_option == _myVampGains
+		SetInfoText("Multiplier for how much muscle is gained by feeding blood as a vampire. Consuming blood potions will not grant any gains though. Setting it to cero will disable this feature and muscle gains will work the same for vampires.")
 	ElseIf a_option == _myBoostCarryWeight
 		SetInfoText("Maximum carry weight boost by getting more muscular. It will change depending on Muscle Score.")
 	ElseIf a_option == _mytfAnimation
@@ -934,6 +937,11 @@ Event OnOptionSliderOpen(Int a_option)
 		SetSliderDialogDefaultValue(5.0)
 		SetSliderDialogRange(0.0, 50.0)
 		SetSliderDialogInterval(1.0)
+	ElseIf a_option == _myVampGains
+		SetSliderDialogStartValue(snusnuMain.addVampireStrength*100)
+		SetSliderDialogDefaultValue(12.5)
+		SetSliderDialogRange(0.0, 50.0)
+		SetSliderDialogInterval(0.5)
 	ElseIf a_option == _myBoostCarryWeight
 		SetSliderDialogStartValue(snusnuMain.carryWeightBoost)
 		SetSliderDialogDefaultValue(0.0)
@@ -1117,6 +1125,9 @@ Event OnOptionSliderAccept(Int a_option, Float a_value)
 	ElseIf a_option == _myMultGainWufwuf
 		snusnuMain.addWerewolfStrength = a_value/100
 		SetSliderOptionValue(a_option, a_value, "{0}%")
+	ElseIf a_option == _myVampGains
+		snusnuMain.addVampireStrength = a_value/100
+		SetSliderOptionValue(a_option, a_value, "{1}%")
 	ElseIf a_option == _myBoostCarryWeight
 		If snusnuMain.carryWeightBoost != a_value
 			applyCarryWeightValue(a_value)
@@ -1655,6 +1666,7 @@ Bool Function saveSettings()
 	JsonUtil.SetFloatValue(fileName, "MultGainArmor", snusnuMain.MultGainArmor)
 	JsonUtil.SetFloatValue(fileName, "MultGainMisc", snusnuMain.MultGainMisc)
 	JsonUtil.SetFloatValue(fileName, "addWerewolfStrength", snusnuMain.addWerewolfStrength)
+	JsonUtil.SetFloatValue(fileName, "addVampireStrength", snusnuMain.addVampireStrength)
 	JsonUtil.SetFloatValue(fileName, "malnourishmentValue", snusnuMain.malnourishmentValue)
 	JsonUtil.SetIntValue(fileName, "tfAnimation", snusnuMain.tfAnimation as Int)
 	JsonUtil.SetIntValue(fileName, "tfAnimationNPC", snusnuMain.tfAnimationNPC as Int)
@@ -1737,6 +1749,7 @@ bool Function loadSettings()
 		snusnuMain.MultGainArmor = JsonUtil.GetFloatValue(fileName, "MultGainArmor", snusnuMain.MultGainArmor)
 		snusnuMain.MultGainMisc = JsonUtil.GetFloatValue(fileName, "MultGainMisc", snusnuMain.MultGainMisc)
 		snusnuMain.addWerewolfStrength = JsonUtil.GetFloatValue(fileName, "addWerewolfStrength", snusnuMain.addWerewolfStrength)
+		snusnuMain.addVampireStrength = JsonUtil.GetFloatValue(fileName, "addVampireStrength", snusnuMain.addVampireStrength)
 		snusnuMain.malnourishmentValue = JsonUtil.GetFloatValue(fileName, "malnourishmentValue", snusnuMain.malnourishmentValue)
 		snusnuMain.tfAnimation = JsonUtil.GetIntValue(fileName, "tfAnimation", snusnuMain.tfAnimation as Int)
 		snusnuMain.tfAnimationNPC = JsonUtil.GetIntValue(fileName, "tfAnimationNPC", snusnuMain.tfAnimationNPC as Int)

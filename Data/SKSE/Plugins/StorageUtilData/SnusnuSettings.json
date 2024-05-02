@@ -1,6 +1,7 @@
 {
 	"float" : 
 	{
+		"addvampirestrength" : 0.125,
 		"addwerewolfstrength" : 0.05000000074505806,
 		"carryweightboost" : 100.0,
 		"combatproficiency" : 15.0,
@@ -34,6 +35,7 @@
 		"tfanimationnpc" : 1,
 		"usealtanims" : 1,
 		"usealtanimsnpc" : 1,
+		"usealtbody" : 0,
 		"usedaranims" : 1,
 		"usedynamicphysics" : 1,
 		"usemuscleanims" : 1

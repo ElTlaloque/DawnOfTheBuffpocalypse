@@ -51,14 +51,14 @@ event OnEffectStart(Actor akTarget, Actor akCaster)
 	EndIf/;
 	
 	initFMGSliders()
-	If !loadFMGMorphs()
+	If !loadFMGMorphs(snusnuMain.PlayerRef)
 		Debug.Notification("Could not load the FMG morphs!")
 		alreadyTransformed = true
 		Dispel()
 		return
 	EndIf
-		
-	If snusnuMain.PlayerRef.hasKeyword(snusnuMain.isVampire)
+	
+	If snusnuMain.PlayerRef.hasKeyword(snusnuMain.isVampire) && snusnuMain.applyVampireFix
 		;Change to original race for the duration of the spell to avoid head texture mishaps
 		hasVampirism = true
 		
@@ -94,21 +94,21 @@ event OnEffectStart(Actor akTarget, Actor akCaster)
 	
 	
 	Debug.Trace("SNU - FMG Spell duration: "+GetDuration())
-	currentMusclePercent = 1.0
+	snusnuMain.currentMusclePercent = 1.0
 	If snusnuMain.applyMoreChangesOvertime
 		If snusnuMain.dynamicChangesCalculation
 			Float intervalSeconds = snusnuMain.moreChangesInterval * 86400 ;Number of seconds in a day
 			intervalSeconds = intervalSeconds / 20
 			
 			If GetDuration() >= (intervalSeconds * 2) + 300 ;2 days ingame plus 5 real minutes overhead
-				currentMusclePercent = 1.0 - (snusnuMain.moreChangesIncrements * 2)
+				snusnuMain.currentMusclePercent = 1.0 - (snusnuMain.moreChangesIncrements * 2)
 			Else ;If GetDuration() >= intervalSeconds + 300 ;1 days ingame plus 5 real minutes overhead
 				;We never want to start at 100%, so we start at the next stage even if there is not enough time to reach 100%. Otherwise
 				;we might as well not use More Changes Overtime at all.
-				currentMusclePercent = 1.0 - snusnuMain.moreChangesIncrements
+				snusnuMain.currentMusclePercent = 1.0 - snusnuMain.moreChangesIncrements
 			EndIf
 		Else
-			currentMusclePercent = 1.0 - (snusnuMain.moreChangesIncrements * 2)
+			snusnuMain.currentMusclePercent = 1.0 - (snusnuMain.moreChangesIncrements * 2)
 		EndIf
 	EndIf
 			
@@ -147,7 +147,7 @@ event OnEffectStart(Actor akTarget, Actor akCaster)
 			originalMuscleScore = snusnuMain.getfightingMuscle()
 			
 			If snusnuMain.applyMoreChangesOvertime
-				growSteps = currentMusclePercent
+				growSteps = snusnuMain.currentMusclePercent
 			EndIf
 			
 			while growVal != growSteps || goingUp
@@ -163,7 +163,7 @@ event OnEffectStart(Actor akTarget, Actor akCaster)
 				;                               ToDo- We can apply the shrinking of the normal morphs, and then the growing of the 
 				;                               FMG morphs. So we need to have the FMG morphs stored appart from the normal ones
 				If goingUp
-					growVal = growVal + 0.02
+					growVal = growVal + 0.04
 					If growVal >= growStage * 0.1
 						goingUp = false
 						;Debug.Trace("SNU - growVal is "+growVal+", going back down")
@@ -210,9 +210,21 @@ event OnEffectStart(Actor akTarget, Actor akCaster)
 			endWhile
 			;Debug.Trace("SNU - Final growVal is "+growVal)
 			
-			If currentMusclePercent == 1.0
+			If snusnuMain.currentMusclePercent == 1.0
 				applyMuscleNormals(akTarget, 5)
-				snusnuMain.ClearMorphs(false)
+				;snusnuMain.ClearMorphs(false)
+				NiOverride.ClearBodyMorphKeys(snusnuMain.PlayerRef, snusnuMain.SNUSNU_KEY)
+			EndIf
+		EndIf
+		
+		If snusnuMain.currentMusclePercent >= 1.0 - snusnuMain.moreChangesIncrements
+			If snusnuMain.useAltAnims
+				If snusnuMain.currentMusclePercent != 1.0
+					snusnuMain.updateAnimations(4) ;Was 3
+				Else
+					snusnuMain.updateAnimations(4)
+				EndIf
+				Utility.wait(1)
 			EndIf
 		EndIf
 		
@@ -230,7 +242,7 @@ event OnEffectStart(Actor akTarget, Actor akCaster)
 	Else
 		Float maxGrowth = 1.0
 		If snusnuMain.applyMoreChangesOvertime
-			maxGrowth = currentMusclePercent
+			maxGrowth = snusnuMain.currentMusclePercent
 		EndIf
 		
 		If snusnuMain.useAltBody
@@ -242,14 +254,24 @@ event OnEffectStart(Actor akTarget, Actor akCaster)
 			
 			switchMuscleNormals(akTarget, 4, 100 )
 		EndIf
+		
+		If snusnuMain.currentMusclePercent >= 1.0 - snusnuMain.moreChangesIncrements
+			If snusnuMain.useAltAnims
+				If snusnuMain.currentMusclePercent != 1.0
+					snusnuMain.updateAnimations(4) ;Was 3
+				Else
+					snusnuMain.updateAnimations(4)
+				EndIf
+			EndIf
+		EndIf
 	EndIf
 	
 	;Ultra punching strength
-	updateFistsPower(currentMusclePercent)
+	updateFistsPower(snusnuMain.currentMusclePercent)
 	akTarget.AddItem(snusnuMain.FistsOfRage, 1, True)
 	akTarget.EquipItem(snusnuMain.FistsOfRage, True, True)
 	
-	If currentMusclePercent == 1.0 - (snusnuMain.moreChangesIncrements * 2)
+	If snusnuMain.currentMusclePercent == 1.0 - (snusnuMain.moreChangesIncrements * 2)
 		If !snusnuMain.useAltBody
 			snusnuMain.updateBoobsPhysics(true, 2)
 		EndIf
@@ -257,32 +279,24 @@ event OnEffectStart(Actor akTarget, Actor akCaster)
 		If !snusnuMain.useAltBody
 			snusnuMain.updateBoobsPhysics(true, 1)
 		EndIf
-	
-		If snusnuMain.useAltAnims
-			If currentMusclePercent != 1.0
-				snusnuMain.updateAnimations(4) ;Was 3
-			Else
-				snusnuMain.updateAnimations(4)
-			EndIf
-		EndIf
 		
 		switchHeads(akTarget, 1)
 	EndIf
 	
-	If currentMusclePercent == 1.0
+	If snusnuMain.currentMusclePercent == 1.0
 		;Improved jump height
 		Game.SetGameSettingFloat("fJumpHeightMin", 180.0)
 	EndIf
 	
 	If snusnuMain.hardcoreMode
-		snusnuMain.updateAllowedItemsEquipedWeight(currentMusclePercent)
+		snusnuMain.updateAllowedItemsEquipedWeight()
 		snusnuMain.needEquipWeightUpdate = true
 	EndIf
 	
 	Utility.wait(1.0)
 	
 	;CarryWeight Boost
-	akTarget.ModActorValue("CarryWeight", 400*currentMusclePercent)
+	akTarget.ModActorValue("CarryWeight", 400*snusnuMain.currentMusclePercent)
 	
 	tfTime = snusnuMain.GameDaysPassed.GetValue()
 	
@@ -328,16 +342,16 @@ Event OnUpdate()
 	
 	If reloadUpdate
 		If !snusnuMain.useAltBody
-			If !loadFMGMorphs()
+			If !loadFMGMorphs(snusnuMain.PlayerRef)
 				Debug.Notification("Could not load the FMG morphs!")
 			EndIf
-			updateBones(snusnuMain.PlayerRef, currentMusclePercent, False)
+			updateBones(snusnuMain.PlayerRef, snusnuMain.currentMusclePercent, False)
 				
-			If currentMusclePercent == 1.0 - (snusnuMain.moreChangesIncrements * 2)
+			If snusnuMain.currentMusclePercent == 1.0 - (snusnuMain.moreChangesIncrements * 2)
 				applyMuscleNormals(snusnuMain.PlayerRef, 2)
 				snusnuMain.updateBoobsPhysics(false, 2)
 			Else
-				If currentMusclePercent < 1.0
+				If snusnuMain.currentMusclePercent < 1.0
 					applyMuscleNormals(snusnuMain.PlayerRef, 3)
 				Else
 					applyMuscleNormals(snusnuMain.PlayerRef, 5)
@@ -350,9 +364,9 @@ Event OnUpdate()
 				
 				snusnuMain.updateBoobsPhysics(false, 1)
 				If snusnuMain.applyMoreChangesOvertime
-					If currentMusclePercent == 1.0
+					If snusnuMain.currentMusclePercent == 1.0
 						applyBarbarianSkin(snusnuMain.PlayerRef, 2)
-					ElseIf currentMusclePercent == 1.0 - snusnuMain.moreChangesIncrements
+					ElseIf snusnuMain.currentMusclePercent == 1.0 - snusnuMain.moreChangesIncrements
 						applyBarbarianSkin(snusnuMain.PlayerRef, 1)
 					EndIf
 				EndIf
@@ -360,7 +374,7 @@ Event OnUpdate()
 			EndIf
 		EndIf
 		
-		snusnuMain.updateAllowedItemsEquipedWeight(currentMusclePercent)
+		snusnuMain.updateAllowedItemsEquipedWeight()
 		snusnuMain.needEquipWeightUpdate = true
 	
 		reloadUpdate = false
@@ -368,14 +382,14 @@ Event OnUpdate()
 	
 	If !snusnuMain.useAltBody && StorageUtil.GetIntValue(snusnuMain.PlayerRef, "SNU_UltraMuscle", 0) == 12
 		;Changes were made!
-		If !loadFMGMorphs()
+		If !loadFMGMorphs(snusnuMain.PlayerRef)
 			Debug.Trace("SNU - Could not load the FMG morphs!")
 		Else
-			muscleChange(snusnuMain.PlayerRef, currentMusclePercent )
-			updateBones(snusnuMain.PlayerRef, currentMusclePercent, False)
+			muscleChange(snusnuMain.PlayerRef, snusnuMain.currentMusclePercent )
+			updateBones(snusnuMain.PlayerRef, snusnuMain.currentMusclePercent, False)
 			
 			If snusnuMain.hardcoreMode
-				snusnuMain.updateAllowedItemsEquipedWeight(currentMusclePercent)
+				snusnuMain.updateAllowedItemsEquipedWeight()
 				snusnuMain.needEquipWeightUpdate = true
 			EndIf
 			
@@ -388,60 +402,59 @@ Event OnUpdate()
 	;Debug.Trace("SNU - tfTime="+tfTime+", Days passed: "+(snusnuMain.GameDaysPassed.GetValue() - tfTime))
 	If snusnuMain.applyMoreChangesOvertime && tfTime > 0.0 && snusnuMain.GameDaysPassed.GetValue() - tfTime >= snusnuMain.moreChangesInterval
 		Debug.Trace("SNU - Starting more changes stage "+moreChangesCount)
-		If currentMusclePercent < 1.0
-			Float newCarryWeight = 400*currentMusclePercent
+		If snusnuMain.currentMusclePercent < 1.0
+			Float newCarryWeight = 400*snusnuMain.currentMusclePercent
 			
-			currentMusclePercent += snusnuMain.moreChangesIncrements
+			snusnuMain.currentMusclePercent += snusnuMain.moreChangesIncrements
 			
 			If snusnuMain.hardcoreMode
-				snusnuMain.updateAllowedItemsEquipedWeight(currentMusclePercent)
+				snusnuMain.updateAllowedItemsEquipedWeight()
 				snusnuMain.needEquipWeightUpdate = true
 			EndIf
 			
-			If currentMusclePercent == 1.0
+			If snusnuMain.currentMusclePercent == 1.0
 				Debug.Notification("Gods i'm getting huge!")
-			ElseIf currentMusclePercent == 1.0 - snusnuMain.moreChangesIncrements
+			ElseIf snusnuMain.currentMusclePercent == 1.0 - snusnuMain.moreChangesIncrements
 				Debug.Notification("Is my body growing again!?")
 			EndIf
 			
 			snusnuMain.PlayerRef.ModActorValue("CarryWeight", -newCarryWeight)
 			Utility.wait(1.0)
-			snusnuMain.PlayerRef.ModActorValue("CarryWeight", 400*currentMusclePercent)
+			snusnuMain.PlayerRef.ModActorValue("CarryWeight", 400*snusnuMain.currentMusclePercent)
 			
 			;Apply more muscle morphs
-			applyQuickGrowthAnim(snusnuMain.PlayerRef, currentMusclePercent)
+			applyQuickGrowthAnim(snusnuMain.PlayerRef, snusnuMain.currentMusclePercent)
 			
-			If currentMusclePercent == 1.0
+			If snusnuMain.currentMusclePercent == 1.0
 				applyMuscleNormals(snusnuMain.PlayerRef, 5)
-				snusnuMain.ClearMorphs(false)
+				;snusnuMain.ClearMorphs(false)
+				NiOverride.ClearBodyMorphKeys(snusnuMain.PlayerRef, snusnuMain.SNUSNU_KEY)
 				
 				;Improved jump height
 				Game.SetGameSettingFloat("fJumpHeightMin", 180.0)
 				
 				snusnuMain.updateAnimations(4)
 				
-				Debug.Notification("Is my skin getting darker?")
 				applyBarbarianSkin(snusnuMain.PlayerRef, 2)
-			ElseIf currentMusclePercent == 1.0 - snusnuMain.moreChangesIncrements
+			ElseIf snusnuMain.currentMusclePercent == 1.0 - snusnuMain.moreChangesIncrements
 				applyMuscleNormals(snusnuMain.PlayerRef, 3)
 				
 				snusnuMain.updateBoobsPhysics(true, 1)
 				snusnuMain.updateAnimations(4) ;Was 3
 				
-				Debug.Notification("Im getting a nice tan")
 				applyBarbarianSkin(snusnuMain.PlayerRef, 1)
 			EndIf
 			
 			
 			snusnuMain.PlayerRef.unequipItem(snusnuMain.FistsOfRage)
-			updateFistsPower(currentMusclePercent)
+			updateFistsPower(snusnuMain.currentMusclePercent)
 			Utility.wait(0.1)
 			snusnuMain.PlayerRef.equipItem(snusnuMain.FistsOfRage)
 		EndIf
 		
 		moreChangesCount += 1
 		StorageUtil.SetIntValue(snusnuMain.PlayerRef, "SNU_UltraMuscle", 1+moreChangesCount)
-		If currentMusclePercent < 1.0
+		If snusnuMain.currentMusclePercent < 1.0
 			tfTime = snusnuMain.GameDaysPassed.GetValue()
 		Else
 			;Break condition
@@ -515,7 +528,7 @@ Event OnEffectFinish(Actor akTarget, Actor akCaster)
 	If !snusnuMain.useAltBody
 		If snusnuMain.tfAnimation
 			Int normalsStage = 5
-			float deflateVal = currentMusclePercent
+			float deflateVal = snusnuMain.currentMusclePercent
 			while deflateVal > 0.0
 				removeNormalMuscle(akTarget, deflateVal)
 				
@@ -578,7 +591,7 @@ Event OnEffectFinish(Actor akTarget, Actor akCaster)
 	Game.SetGameSettingFloat("fJumpHeightMin", 76.0)
 	
 	;CarryWeight Boost
-	Float newCarryWeight = 400*currentMusclePercent
+	Float newCarryWeight = 400*snusnuMain.currentMusclePercent
 	akTarget.ModActorValue("CarryWeight", -newCarryWeight)
 	
 	Utility.wait(1.0)
@@ -694,6 +707,8 @@ Function switchHeads(Actor headOwner, Int newHeadIndex)
 	EndIf
 	
 	headOwner.RegenerateHead()
+	Utility.wait(1)
+	headOwner.QueueNiNodeUpdate() ;Cleans previous head mesh. ToDo- Needs to be tested
 EndFunction
 
 Function swapBodyMesh(Actor victim, Bool applyFMGBody = true)
@@ -758,15 +773,29 @@ Function updateFistsPower(Float magnitude)
 EndFunction
 
 Function removeNormalMuscle(Actor buffTarget, Float changePercent)
-	Float fightingMuscle = originalMuscleScore * (1 - changePercent)
-	
-	Int totalSliders = StorageUtil.IntListCount(buffTarget, snusnuMain.SNUSNU_KEY)
-	Int slidersLoop = 0
-	while slidersLoop < totalSliders
-		Int currentSliderIndex = StorageUtil.IntListGet(buffTarget, snusnuMain.SNUSNU_KEY, slidersLoop)
-		NiOverride.SetBodyMorph(buffTarget, snusnuMain.getSliderString(currentSliderIndex), snusnuMain.SNUSNU_KEY, fightingMuscle * snusnuMain.getSliderValue(currentSliderIndex))
-		slidersLoop += 1
-	endWhile
+	If snusnuMain.useWeightSlider
+		FLoat newWeight = changePercent * 100
+		Float tWeight = buffTarget.GetLeveledActorBase().GetWeight()
+		Float tNeckdelta = (tWeight/100) - (newWeight/100)
+		
+		;Debug.Trace("SNU - currentWeight="+tWeight+", newWeight="+newWeight)
+		If newWeight - tWeight > 5.0 || newWeight - tWeight < -5.0
+			;TLALOC- The following code can produce small lags
+			buffTarget.GetActorBase().SetWeight(newWeight)
+			buffTarget.UpdateWeight(tNeckdelta)
+			buffTarget.QueueNiNodeUpdate()
+		EndIf
+	Else
+		Float fightingMuscle = originalMuscleScore * (1 - changePercent)
+		
+		Int totalSliders = StorageUtil.IntListCount(buffTarget, snusnuMain.SNUSNU_KEY)
+		Int slidersLoop = 0
+		while slidersLoop < totalSliders
+			Int currentSliderIndex = StorageUtil.IntListGet(buffTarget, snusnuMain.SNUSNU_KEY, slidersLoop)
+			NiOverride.SetBodyMorph(buffTarget, snusnuMain.getSliderString(currentSliderIndex), snusnuMain.SNUSNU_KEY, fightingMuscle * snusnuMain.getSliderValue(currentSliderIndex))
+			slidersLoop += 1
+		endWhile
+	EndIf
 EndFunction
 
 Function muscleChange(Actor buffTarget, Float changePercent)
@@ -922,7 +951,7 @@ Function applyBarbarianSkin(Actor target, Int skinIndex, Bool applyFix = true)
 	endIf
 	
 	Bool isFemale = target.GetActorBase().GetSex() != 0
-	If skinIndex > 0
+	If skinIndex > 0 && (!snusnuMain.PlayerRef.hasKeyword(snusnuMain.isVampire) || snusnuMain.applyVampireFix)
 		String tempNormalsPath = snusnuMain.normalsPath+snusnuMain.getNormalsByBodyType(target)+"Ultra"+skinIndex+"\\"
 		
 		;Body
@@ -933,8 +962,10 @@ Function applyBarbarianSkin(Actor target, Int skinIndex, Bool applyFix = true)
 		;NiOverride.AddSkinOverrideString(target, isFemale, false, 0x04, 9, 0, tempNormalsPath+"Face.dds", true)
 		;NiOverride.AddSkinOverrideString(target, isFemale, true, 0x04, 9, 0, tempNormalsPath+"Face.dds", true)
 		If skinIndex == 1
+			Debug.Notification("Im getting a nice tan")
 			switchHeads(target, 2)
 		ElseIf skinIndex == 2
+			Debug.Notification("My skin is getting very rough!")
 			switchHeads(target, 3)
 		EndIf
 		
@@ -984,14 +1015,18 @@ Function initFMGSliders()
 	maleValuesFMG = new Float[2]
 EndFunction
 
-Bool Function loadFMGMorphs()
-	String fileName = "SnuSnuProfiles/SnuDefaultFMG"
+Bool Function loadFMGMorphs(Actor buffedActor)
+	String fileName = "SnuSnuProfiles/SnuDefaultFMG_" + snusnuMain.getNormalsByBodyType(buffedActor, false)
 	
 	If JsonUtil.Load(fileName) && JsonUtil.IsGood(fileName)
 		int[] tempMorphsArray = JsonUtil.IntListToArray(fileName, "MainMorphs")
-		If !StorageUtil.IntListCopy(none, SNUSNU_BUFF_KEY, tempMorphsArray)
-			Debug.Trace("SNU - ERROR: FMG Morphs array could not be loaded!!")
-			Return false
+		If tempMorphsArray && tempMorphsArray.length > 0
+			If !StorageUtil.IntListCopy(none, SNUSNU_BUFF_KEY, tempMorphsArray)
+				Debug.Trace("SNU - ERROR: Main morphs array could not be loaded!!")
+				Return false
+			EndIf
+		Else
+			StorageUtil.IntListClear(none, SNUSNU_BUFF_KEY)
 		EndIf
 		
 		cbbeValuesFMG = JsonUtil.FloatListToArray(fileName, "CBBEMorphs")
@@ -1003,7 +1038,7 @@ Bool Function loadFMGMorphs()
 		bonesValuesFMG = JsonUtil.FloatListToArray(fileName, "BoneMorphs")
 		maleValuesFMG = JsonUtil.FloatListToArray(fileName, "MaleMorphs")
 	Else
-		Debug.Trace("SNU - ERROR: FMG Morphs array could not be loaded!!")
+		Debug.Trace("SNU - ERROR: FMG Morphs could not be loaded!!")
 		Return false
 	EndIf
 	

@@ -21,6 +21,7 @@
 	"int" : 
 	{
 		"applymorechangesovertime" : 1,
+		"applyvampirefix" : 0,
 		"changeheadpart" : 1,
 		"disablenormals" : 0,
 		"dynamicchangescalculation" : 0,
@@ -39,5 +40,6 @@
 		"usedaranims" : 1,
 		"usedynamicphysics" : 1,
 		"usemuscleanims" : 1
+		"usewerewolfmorphs" : 0
 	}
 }

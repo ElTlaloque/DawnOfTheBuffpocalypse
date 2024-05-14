@@ -5,6 +5,7 @@ Snusnu Property snusnuMain Auto
 String SNUSNU_BUFF_KEY = "Snusnu_BUFF"
 
 Float Property originalMuscleScore = 0.0 Auto
+Float Property musclePercent = 1.0 Auto
 
 ;FMG Morphs
 Float[] cbbeValuesFMG
@@ -17,11 +18,24 @@ Float[] maleValuesFMG
 
 
 Event OnEffectStart(Actor akTarget, Actor akCaster)
+	Debug.Trace("SNU - VampireLordMuscle was cast")
 	If snusnuMain.isVampireLord
 		applyMuscleEffect(akTarget)
 	Else
-		removeMuscleEffect(akTarget)
+		;removeMuscleEffect(akTarget)
 	EndIf
+EndEvent
+
+Event OnEffectFinish(Actor akTarget, Actor akCaster)
+	Debug.Trace("SNU - SnusnuVampireLordMuscleScript.OnEffectFinish()")
+EndEvent
+
+Event OnPlayerLoadGame()
+	Debug.Trace("SNU - SnusnuVampireLordMuscleScript.OnPlayerLoadGame()")
+	
+	Utility.Wait(7)
+	;Fix for normals not loading correctly
+	forceSwitchMuscleNormals(snusnuMain.PlayerRef, musclePercent * 100, snusnuMain.getNormalsByBodyType(snusnuMain.PlayerRef))
 EndEvent
 
 Function applyMuscleEffect(Actor akTarget)
@@ -39,13 +53,13 @@ Function applyMuscleEffect(Actor akTarget)
 	Debug.Trace("SNU - Starting Vampire Lord Muscle Effect")
 	Debug.Notification("Starting Vampire Lord Muscle Effect")
 	initFMGSliders()
-	If !loadFMGMorphs()
+	If !loadFMGMorphs(akTarget)
 		Debug.Notification("Could not load the FMG morphs!")
 		Dispel()
 		return
 	EndIf
 	
-	Float musclePercent = snusnuMain.muscleScore / snusnuMain.muscleScoreMax
+	musclePercent = snusnuMain.muscleScore / snusnuMain.muscleScoreMax
 	musclePercent = musclePercent * 1.2
 	If musclePercent > 1.0
 		musclePercent = 1.0
@@ -69,7 +83,7 @@ Function removeMuscleEffect(Actor akTarget)
 	EndIf
 	
 	snusnuMain.UpdateWeight(true)
-	snusnuMain.checkBodyNormalsState()
+	;snusnuMain.checkBodyNormalsState()
 	
 	Debug.Trace("SNU - Finished Vampire Lord Muscle Effect")
 EndFunction
@@ -168,14 +182,18 @@ Function initFMGSliders()
 	maleValuesFMG = new Float[2]
 EndFunction
 
-Bool Function loadFMGMorphs()
-	String fileName = "SnuSnuProfiles/SnuDefaultFMG"
+Bool Function loadFMGMorphs(Actor theVampLord)
+	String fileName = "SnuSnuProfiles/SnuDefaultFMG_" + snusnuMain.getNormalsByBodyType(theVampLord, false)
 	
 	If JsonUtil.Load(fileName) && JsonUtil.IsGood(fileName)
 		int[] tempMorphsArray = JsonUtil.IntListToArray(fileName, "MainMorphs")
-		If !StorageUtil.IntListCopy(none, SNUSNU_BUFF_KEY, tempMorphsArray)
-			Debug.Trace("SNU - ERROR: FMG Morphs array could not be loaded!!")
-			Return false
+		If tempMorphsArray && tempMorphsArray.length > 0
+			If !StorageUtil.IntListCopy(none, SNUSNU_BUFF_KEY, tempMorphsArray)
+				Debug.Trace("SNU - ERROR: Main morphs array could not be loaded!!")
+				Return false
+			EndIf
+		Else
+			StorageUtil.IntListClear(none, SNUSNU_BUFF_KEY)
 		EndIf
 		
 		cbbeValuesFMG = JsonUtil.FloatListToArray(fileName, "CBBEMorphs")

@@ -38,6 +38,8 @@ Int _myDynamicChanges
 Int _myChangesInterval
 Int _myChangesIncrements
 Int _myUseAltBody
+Int _myVampireFix
+Int _myUseWufwufMorphs
 
 Int _myZeroSliders
 Int _myApplyDefault
@@ -163,6 +165,7 @@ Event OnConfigClose()
 		;Update body if PC is currently transformed
 		If StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle", 0) != 0
 			StorageUtil.SetIntValue(PlayerRef, "SNU_UltraMuscle", 12)
+			snusnuMain.UnregisterForUpdate()
 			snusnuMain.RegisterForSingleUpdate(1)
 		EndIf
 		
@@ -192,6 +195,11 @@ Event OnPageReset(String a_page)
 	EndIf
 
 	If (a_page == Pages[0])
+		Int isFemaleFlag = OPTION_FLAG_NONE
+		If PlayerRef.GetActorBase().GetSex() == 0
+			isFemaleFlag = OPTION_FLAG_DISABLED
+		EndIf
+		
 		SetCursorFillMode(LEFT_TO_RIGHT)
 		AddHeaderOption("$SNUSNU_OPTIONS")
 		AddEmptyOption()
@@ -203,13 +211,18 @@ Event OnPageReset(String a_page)
 		
 		;_mySelectedBody = AddToggleOption("$SNUSNU_SELECTEDBODY", snusnuMain.selectedBody)
 		AddMenuOptionST("InstalledBody", "$SNUSNU_SELECTEDBODY", GetConditionalString(snusnuMain.selectedBody))
-		;_myUseWeightSlider = AddToggleOption("$SNUSNU_USEWEIGHTSLIDER", snusnuMain.useWeightSlider)
-		_myDisableNormals = AddToggleOption("$SNUSNU_DISABLENORMALS", snusnuMain.disableNormals)
+		_myUseWeightSlider = AddToggleOption("$SNUSNU_USEWEIGHTSLIDER", snusnuMain.useWeightSlider)
 		AddMenuOptionST("LoadDefaults", "Load default morphs", GetDefaultMorphString(selectedDefaultMorphs))
-		_myDynamicPhysics = AddToggleOption("Dynamic Breasts Physics", snusnuMain.useDynamicPhysics)
+		_myDisableNormals = AddToggleOption("$SNUSNU_DISABLENORMALS", snusnuMain.disableNormals)
+		_myDynamicPhysics = AddToggleOption("Dynamic Breasts Physics", snusnuMain.useDynamicPhysics, isFemaleFlag)
 		_myChangeAnims = AddToggleOption("Change to muscular anims", snusnuMain.useMuscleAnims)
 		_myUseDARAnims = AddToggleOption("Use DAR for animations", snusnuMain.useDARAnims)
 		_myMuscleAnimsLevel = AddSliderOption("Muscular level anims", snusnuMain.muscleAnimsLevel.getValue() as Float, "{0}")
+		If snusnuMain.isWerewolvesLoaded
+			_myUseWufwufMorphs = AddToggleOption("Use Werewolf morphs", snusnuMain.useWerewolfMorphs)
+		Else
+			_myUseWufwufMorphs = AddToggleOption("Use Werewolf morphs", snusnuMain.useWerewolfMorphs, OPTION_FLAG_DISABLED)
+		EndIf
 		
 		AddEmptyOption()
 		AddEmptyOption()
@@ -257,6 +270,7 @@ Event OnPageReset(String a_page)
 		
 		AddHeaderOption("$SNUSNU_TRANSFORMATION")
 		AddEmptyOption()
+		
 		If StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle", 0) == 0
 			_myUseAltBody = AddToggleOption("Use alternate body mesh", snusnuMain.useAltBody)
 		Else
@@ -268,29 +282,43 @@ Event OnPageReset(String a_page)
 		EndIf
 		AddEmptyOption()
 		_myCustomizeFMG = AddToggleOption("Customize FMG Morphs", editFMGMorphs, altBodyFlag)
+		AddEmptyOption()
+		
+		AddHeaderOption("TF Player Options")
+		AddHeaderOption("TF NPC Options")
 		If snusnuMain.isWeightMorphsLoaded
 			_myRemoveWeightMorphs = AddToggleOption("$SNUSNU_NOWEIGHTMORPHS", snusnuMain.removeWeightMorphs)
 		Else
 			_myRemoveWeightMorphs = AddToggleOption("$SNUSNU_NOWEIGHTMORPHS", snusnuMain.removeWeightMorphs, OPTION_FLAG_DISABLED)
 		EndIf
+		_myNPCMuscleScore = AddSliderOption("NPC Custom Muscle", snusnuMain.npcMuscleScore*100, "{0}%")
+		_myplayTFSound = AddToggleOption("$SNUSNU_PLAYTFSOUND", snusnuMain.playTFSound)
+		AddKeyMapOptionST("SnusnuNPCMuscle","Reload NPC muscles", snusnuMain.npcMuscleKey)
 		_mytfAnimation = AddToggleOption("$SNUSNU_USETFANIM", snusnuMain.tfAnimation)
 		_mytfAnimationNPC = AddToggleOption("$SNUSNU_USETFANIMNPC", snusnuMain.tfAnimationNPC)
 		_myuseAltAnims = AddToggleOption("$SNUSNU_USEALTANIMS", snusnuMain.useAltAnims)
 		_myuseAltAnimsNPC = AddToggleOption("$SNUSNU_USEALTANIMSNPC", snusnuMain.useAltAnimsNPC)
-		_mychangeHeadPart = AddToggleOption("$SNUSNU_CHANGEHEAD", snusnuMain.changeHeadPart, altBodyFlag)
-		_myplayTFSound = AddToggleOption("$SNUSNU_PLAYTFSOUND", snusnuMain.playTFSound)
+		If PlayerRef.GetActorBase().GetSex() == 1
+			_mychangeHeadPart = AddToggleOption("$SNUSNU_CHANGEHEAD", snusnuMain.changeHeadPart, altBodyFlag)
+		Else
+			_mychangeHeadPart = AddToggleOption("$SNUSNU_CHANGEHEAD", snusnuMain.changeHeadPart, isFemaleFlag)
+		EndIf
+		AddEmptyOption()
 		_myApplyMoreChanges = AddToggleOption("More changes while TF", snusnuMain.applyMoreChangesOvertime, altBodyFlag)
+		AddEmptyOption()
 		_myChangesInterval = AddSliderOption("More changes interval", snusnuMain.moreChangesInterval, "{2}", altBodyFlag)
+		AddEmptyOption()
 		_myChangesIncrements = AddSliderOption("More changes growth increments", snusnuMain.moreChangesIncrements, "{2}", altBodyFlag)
+		AddEmptyOption()
 		_myDynamicChanges = AddToggleOption("Dynamic changes calculation", snusnuMain.dynamicChangesCalculation, altBodyFlag)
-		_myNPCMuscleScore = AddSliderOption("NPC Custom Muscle", snusnuMain.npcMuscleScore*100, "{0}%")
-		AddKeyMapOptionST("SnusnuNPCMuscle","Reload NPC muscles", snusnuMain.npcMuscleKey)
+		AddEmptyOption()
+		_myVampireFix = AddToggleOption("Seam fix for vampires", snusnuMain.applyVampireFix)
 		
 	ElseIf (a_page == Pages[1] && snusnuMain.selectedBody != 2)
 		SetCursorFillMode(LEFT_TO_RIGHT)
 		If snusnuMain.selectedBody == 0 ;UUNP/BHUNP
-			AddHeaderOption(pageNames[3])
-			AddEmptyOption()
+			;AddHeaderOption(pageNames[3])
+			;AddEmptyOption()
 			
 			Int counter = 0
 			while counter < 52
@@ -298,8 +326,8 @@ Event OnPageReset(String a_page)
 				counter += 1
 			endWhile
 		Else ;CBBE SE
-			AddHeaderOption(pageNames[6])
-			AddEmptyOption()
+			;AddHeaderOption(pageNames[6])
+			;AddEmptyOption()
 			AddHeaderOption("BREASTS")
 			AddEmptyOption()
 			cbbeSliders[0] = AddSliderOption(sliderHasValue(snusnuMain.cbbeValues[0])+"Size (Inverted)", snusnuMain.cbbeValues[0], "{2}")
@@ -378,8 +406,8 @@ Event OnPageReset(String a_page)
 	ElseIf (a_page == Pages[2] && snusnuMain.selectedBody != 2)
 		SetCursorFillMode(LEFT_TO_RIGHT)
 		If snusnuMain.selectedBody == 0 ;UUNP/BHUNP
-			AddHeaderOption(pageNames[4])
-			AddEmptyOption()
+			;AddHeaderOption(pageNames[4])
+			;AddEmptyOption()
 			
 			Int counter = 0
 			while counter < 74
@@ -387,8 +415,8 @@ Event OnPageReset(String a_page)
 				counter += 1
 			endWhile
 		Else ;CBBE SE
-			AddHeaderOption(pageNames[7])
-			AddEmptyOption()
+			;AddHeaderOption(pageNames[7])
+			;AddEmptyOption()
 			AddHeaderOption("BUTT")
 			AddEmptyOption()
 			cbbeSESliders[14] = AddSliderOption(sliderHasValue(snusnuMain.cbbeSEValues[14])+"Shape Classic", snusnuMain.cbbeSEValues[14], "{2}")
@@ -463,8 +491,8 @@ Event OnPageReset(String a_page)
 	ElseIf (a_page == Pages[3] && snusnuMain.selectedBody != 2)
 		SetCursorFillMode(LEFT_TO_RIGHT)
 		If snusnuMain.selectedBody == 0 ;UUNP/BHUNP
-			AddHeaderOption(pageNames[5])
-			AddEmptyOption()
+			;AddHeaderOption(pageNames[5])
+			;AddEmptyOption()
 			
 			Int counter = 0
 			while counter < 43
@@ -472,8 +500,8 @@ Event OnPageReset(String a_page)
 				counter += 1
 			endWhile
 		Else ;CBBE SE
-			AddHeaderOption(pageNames[8])
-			AddEmptyOption()
+			;AddHeaderOption(pageNames[8])
+			;AddEmptyOption()
 			AddHeaderOption("MUSCLE DEFINITION")
 			AddEmptyOption()
 			bhunpSliders[21] = AddSliderOption(sliderHasValue(snusnuMain.bhunpValues[21])+"Abs", snusnuMain.bhunpValues[21], "{2}")
@@ -501,15 +529,15 @@ Event OnPageReset(String a_page)
 		EndIf
 	ElseIf ((a_page == Pages[4] && snusnuMain.selectedBody != 2) || (a_page == Pages[1] && snusnuMain.selectedBody == 2))
 		SetCursorFillMode(LEFT_TO_RIGHT)
-		AddHeaderOption("BONE MORPHS")
-		AddEmptyOption()
-		AddHeaderOption("Legacy Bones")
+		;AddHeaderOption("BONE MORPHS")
+		;AddEmptyOption()
+		AddHeaderOption("LEGACY BONES")
 		AddEmptyOption()
 		boneSliders[0] = AddSliderOption(boneSliderHasValue(snusnuMain.bonesValues[0])+boneStrings[0], snusnuMain.bonesValues[0], "{3}");Upper spine
 		boneSliders[1] = AddSliderOption(boneSliderHasValue(snusnuMain.bonesValues[1])+boneStrings[1], snusnuMain.bonesValues[1], "{3}");Advanced forearms
 		AddEmptyOption()
 		AddEmptyOption()
-		AddHeaderOption("New Bones")
+		AddHeaderOption("NEW BONES")
 		AddEmptyOption()
 		boneSliders[2] = AddSliderOption(boneSliderHasValue(snusnuMain.bonesValues[2])+boneStrings[2], snusnuMain.bonesValues[2], "{3}");Upperarms
 		boneSliders[18] = AddSliderOption(boneSliderHasValue(snusnuMain.bonesValues[18])+boneStrings[18], snusnuMain.bonesValues[18], "{3}");Biceps
@@ -528,7 +556,7 @@ Event OnPageReset(String a_page)
 		AddEmptyOption()
 		AddEmptyOption()
 		;Female Only
-		AddHeaderOption("Female only bones")
+		AddHeaderOption("FEMALE ONLY BONES")
 		AddEmptyOption()
 		boneSliders[12] = AddSliderOption(boneSliderHasValue(snusnuMain.bonesValues[12])+boneStrings[12], snusnuMain.bonesValues[12], "{3}");Breasts (HDT)
 		boneSliders[13] = AddSliderOption(boneSliderHasValue(snusnuMain.bonesValues[13])+boneStrings[13], snusnuMain.bonesValues[13], "{3}");Breast Fullness (3BBB)
@@ -653,6 +681,10 @@ Event OnOptionHighlight(Int a_option)
 		SetInfoText("Toggle FMG morphs customization.")
 	ElseIf a_option == _myUseAltBody
 		SetInfoText("Use a different body mesh for FMG transformation instead of body morphs. A proper body mesh and textures need to be added to their respective folders.")
+	ElseIf a_option == _myVampireFix
+		SetInfoText("Apply vampire race fix during the FMG transformation. This fix will remove the vampire race of your character during the FMG transformation. This will fix any texture neck seams but it will also mess the way the game and mods treat your character regarding their vampirism.")
+	ElseIf a_option == _myUseWufwufMorphs
+		SetInfoText("Apply muscle and weight morphs on werewolf form. Requieres \"TWO - Total Werewolf Overhaul\" mod.")
 	ElseIf a_option == _myRemoveWeightMorphs
 		SetInfoText("$SNUSNU_NOWEIGHTMORPHS_DESC")
 	ElseIf a_option == _myUseWeightSlider
@@ -729,6 +761,12 @@ Event OnOptionSelect(Int a_option)
 	ElseIf a_option == _myDynamicChanges
 		snusnuMain.dynamicChangesCalculation = !snusnuMain.dynamicChangesCalculation
 		SetToggleOptionValue(a_option, snusnuMain.dynamicChangesCalculation)
+	ElseIf a_option == _myVampireFix
+		snusnuMain.applyVampireFix = !snusnuMain.applyVampireFix
+		SetToggleOptionValue(a_option, snusnuMain.applyVampireFix)
+	ElseIf a_option == _myUseWufwufMorphs
+		snusnuMain.useWerewolfMorphs = !snusnuMain.useWerewolfMorphs
+		SetToggleOptionValue(a_option, snusnuMain.useWerewolfMorphs)
 	ElseIf a_option == _myUseAltBody
 		snusnuMain.useAltBody = !snusnuMain.useAltBody
 		SetToggleOptionValue(a_option, snusnuMain.useAltBody)
@@ -791,6 +829,7 @@ Event OnOptionSelect(Int a_option)
 			;Update body if PC is currently transformed
 			If StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle", 0) != 0
 				StorageUtil.SetIntValue(PlayerRef, "SNU_UltraMuscle", 12)
+				snusnuMain.UnregisterForUpdate()
 				snusnuMain.RegisterForSingleUpdate(1)
 			EndIf
 		EndIf
@@ -810,10 +849,13 @@ Event OnOptionSelect(Int a_option)
 		snusnuMain.useDynamicPhysics = !snusnuMain.useDynamicPhysics
 		applyDynamicPhysicsOption()
 	ElseIf a_option == _myZeroSliders
+		String Msg
+		Msg = "Setting body sliders to 0.0, please wait!"
+		ShowMessage(Msg, False)
+		
 		snusnuMain.ClearMorphs()
 		SetToggleOptionValue(a_option, true)
 		
-		String Msg
 		Msg = "All body sliders have been set to 0.0"
 		ShowMessage(Msg, False)
 	ElseIf a_option == _myApplyDefault
@@ -1335,8 +1377,6 @@ String Function GetConditionalString(Int Cond)
 	ElseIf Cond == 1
 		Return "CBBE Body"
 	ElseIf Cond == 2
-		Return "CBBE 3BA Body"
-	ElseIf Cond == 3
 		Return "Vanilla"
 	EndIf
 	Return ""
@@ -1381,7 +1421,7 @@ Function initPageNames()
 	pageNames[6] = "CBBE Morphs Page 1"
 	pageNames[7] = "CBBE Morphs Page 2"
 	pageNames[8] = "CBBE Special Morphs"
-	pageNames[9] = "Unisex Bones"
+	pageNames[9] = "Bone Morphs"
 EndFunction
 
 Function initStringArrays()
@@ -1683,6 +1723,8 @@ Bool Function saveSettings()
 	JsonUtil.SetIntValue(fileName, "npcMuscleKey", snusnuMain.npcMuscleKey)
 	JsonUtil.SetFloatValue(fileName, "npcMuscleScore", snusnuMain.npcMuscleScore)
 	JsonUtil.SetIntValue(fileName, "useAltBody", snusnuMain.useAltBody as Int)
+	JsonUtil.SetIntValue(fileName, "applyVampireFix", snusnuMain.applyVampireFix as Int)
+	JsonUtil.SetIntValue(fileName, "useWerewolfMorphs", snusnuMain.useWerewolfMorphs as Int)
 	
 	JsonUtil.SetIntValue(fileName, "useDynamicPhysics", snusnuMain.useDynamicPhysics as Int)
 	JsonUtil.SetIntValue(fileName, "useMuscleAnims", snusnuMain.useMuscleAnims as Int)
@@ -1763,6 +1805,8 @@ bool Function loadSettings()
 		snusnuMain.moreChangesInterval = JsonUtil.GetFloatValue(fileName, "moreChangesInterval", snusnuMain.moreChangesInterval as Float)
 		snusnuMain.moreChangesIncrements = JsonUtil.GetFloatValue(fileName, "moreChangesIncrements", snusnuMain.moreChangesIncrements as Float)
 		snusnuMain.useAltBody = JsonUtil.GetIntValue(fileName, "useAltBody", snusnuMain.useAltBody as Int)
+		snusnuMain.applyVampireFix = JsonUtil.GetIntValue(fileName, "applyVampireFix", snusnuMain.applyVampireFix as Int)
+		snusnuMain.useWerewolfMorphs = JsonUtil.GetIntValue(fileName, "useWerewolfMorphs", snusnuMain.useWerewolfMorphs as Int)
 		
 		If snusnuMain.getInfoKey != JsonUtil.GetIntValue(fileName, "getInfoKey", snusnuMain.getInfoKey)
 			snusnuMain.getInfoKey = JsonUtil.GetIntValue(fileName, "getInfoKey", snusnuMain.getInfoKey)
@@ -2117,11 +2161,11 @@ String Function switchFMGMorphs(Bool loadFMG)
 		If !snusnuMain.saveAllMorphs("SnuSnuProfiles/SnuTempMorphs")
 			errorMSG = "There was an error while saving current morphs!"
 		EndIf
-		If !snusnuMain.loadAllMorphs("SnuSnuProfiles/SnuDefaultFMG")
+		If !snusnuMain.loadAllMorphs("SnuSnuProfiles/SnuDefaultFMG_" + snusnuMain.getNormalsByBodyType(PlayerRef, false))
 			errorMSG = "There was an error while loading FMG morphs!"
 		EndIf
 	Else
-		If !snusnuMain.saveAllMorphs("SnuSnuProfiles/SnuDefaultFMG")
+		If !snusnuMain.saveAllMorphs("SnuSnuProfiles/SnuDefaultFMG_" + snusnuMain.getNormalsByBodyType(PlayerRef, false))
 			errorMSG = "There was an error while saving FMG morphs!"
 		EndIf
 		If !snusnuMain.loadAllMorphs("SnuSnuProfiles/SnuTempMorphs")

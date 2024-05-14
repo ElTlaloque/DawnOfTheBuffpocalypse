@@ -121,6 +121,7 @@ Float Property moreChangesIncrements = 0.35  Auto ;How much to change
 Float Property muscleMightAffinity = 0.0  Auto
 Float Property muscleMightProbability = 0.25  Auto
 Float Property totalMuscleToAdd = 0.01 Auto
+Float Property currentMusclePercent = 1.0 Auto
 
 ;Alt FMG body. No morphs, just a different body mesh
 Bool Property useAltBody = false Auto
@@ -153,6 +154,8 @@ Bool isEquipWeightUpdating = false
 
 Bool Property isWerewolf = false Auto
 Float Property addWerewolfStrength = 0.05 Auto
+Bool Property useWerewolfMorphs = false Auto
+Bool Property isWerewolvesLoaded = false Auto
 
 Keyword Property isVampire Auto
 Float Property addVampireStrength = 0.125 Auto
@@ -161,6 +164,7 @@ SPELL Property VampireLordMuscleSpell Auto
 Bool Property isVampireLordReVampedLoaded Auto
 FormList Property SnusnuPlayableRaces Auto
 FormList Property SnusnuVampireRaces Auto
+Bool Property applyVampireFix = false Auto
 
 ;TLALOC- Custom animations
 int Property snuModID Auto
@@ -224,9 +228,13 @@ Event OnInit()
 		PlayerRef = Game.getPlayer()
 	EndIf
 	
-	ResetWeight(True)
-	RegisterEvents(True)
-	UpdateEffects()
+	If PlayerRef.GetActorBase().GetSex() == 0
+		selectedBody = 2
+	EndIf
+	
+	;ResetWeight(True)
+	;RegisterEvents(True)
+	;UpdateEffects()
 	initFNISanims()
 EndEvent
 
@@ -245,6 +253,8 @@ Event OnPlayerLoadGame()
 		EndIf
 		
 		isWeightMorphsLoaded = (Game.GetModByName("WeightMorphs.esp") != 255)
+		isWerewolvesLoaded = (Game.GetModByName("Werewolves.esp") != 255)
+		isVampireLordReVampedLoaded = (Game.GetModByName("VampLordBS.esp") != 255)
 		
 		If useDynamicPhysics
 			is3BAPhysicsLoaded = (Game.GetModByName("3BBB.esp") != 255)
@@ -253,8 +263,6 @@ Event OnPlayerLoadGame()
 				firstUpdateForBoobs = true
 			EndIf
 		EndIf
-		
-		isVampireLordReVampedLoaded = (Game.GetModByName("VampLordBS.esp") != 255)
 		
 		initSliderArrays()
 		RegisterEvents(True)
@@ -293,20 +301,27 @@ EndEvent
 Event OnRaceSwitchComplete()
 	If PlayerRef.getRace().getName() != "Werewolf" && PlayerRef.getRace().getName() != "Vampire Lord"
 		;Race is neither vampire or werewolf, so we assume whatever they were transformed into they reverted back
-		If Enabled
-			RegisterEvents(True)
-			UpdateEffects()
-			checkBodyNormalsState()
-		EndIf
-		
 		If isWerewolf
 			isWerewolf = false
 			addWerewolfBuild()
 		ElseIf isVampireLord
 			isVampireLord = false
 			Debug.Trace("SNU - Dispeling VampireLordMuscleSpell")
-			VampireLordMuscleSpell.cast(PlayerRef)
+			
+			;VampireLordMuscleSpell.cast(PlayerRef)
+			PlayerRef.DispelSpell( VampireLordMuscleSpell )
+			
+			clearVampireLordMuscle()
+			
+			Utility.Wait(0.2)
 		EndIf
+		
+		If Enabled
+			RegisterEvents(True)
+			UpdateEffects()
+			checkBodyNormalsState()
+		EndIf
+		
 	ElseIf PlayerRef.getRace().getName() == "Werewolf"
 		isWerewolf = true
 	ElseIf PlayerRef.getRace().getName() == "Vampire Lord"
@@ -395,7 +410,7 @@ Event OnUpdate()
 				If checkVampirism()
 					;ToDo- If PC is vampire and they are outside in the day, degradation should be twice as bad
 					;For now, degradation is always ten times faster
-					totalDegradation = totalDegradation * 10
+					totalDegradation = totalDegradation * 15
 				EndIf
 				
 				If justWakeUp
@@ -653,7 +668,7 @@ Float Function getItemWeight(Form theItem)
 	return 0.0
 EndFunction
 
-Function updateAllowedItemsEquipedWeight(Float fmgMusclePercent = 1.0)
+Function updateAllowedItemsEquipedWeight()
 	Float currentEquipRange = maxItemsEquipedWeight - minItemsEquipedWeight
 	Float musclePercent = muscleScore / muscleScoreMax
 	allowedItemsEquipedWeight = (currentEquipRange * musclePercent) + minItemsEquipedWeight
@@ -661,10 +676,10 @@ Function updateAllowedItemsEquipedWeight(Float fmgMusclePercent = 1.0)
 	Debug.Trace("SNU - Updating Allowed Equipped Weight. maxItemsEquipedWeight="+maxItemsEquipedWeight+", allowedItemsEquipedWeight="+allowedItemsEquipedWeight)
 	
 	If StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle", 0) > 0
-		If fmgMusclePercent == 1.0
+		If currentMusclePercent == 1.0
 			allowedItemsEquipedWeight = allowedItemsEquipedWeight + 200
 		Else
-			allowedItemsEquipedWeight = allowedItemsEquipedWeight + (100 * fmgMusclePercent)
+			allowedItemsEquipedWeight = allowedItemsEquipedWeight + (100 * currentMusclePercent)
 		EndIf
 	EndIf
 EndFunction
@@ -698,6 +713,7 @@ Event OnObjectEquipped(Form type, ObjectReference ref)
 		
 		If itemsEquipedWeight > allowedItemsEquipedWeight
 			needEquipWeightUpdate = true
+			UnregisterForUpdate()
 			RegisterForSingleUpdate(1)
 		EndIf
 	EndIf
@@ -730,6 +746,7 @@ Event OnObjectUnequipped(Form type, ObjectReference ref)
 		
 	If heavyItemsEquiped && itemsEquipedWeight <= allowedItemsEquipedWeight && PlayerRef.GetActorValue("CarryWeight") < -100
 		needEquipWeightUpdate = true
+		UnregisterForUpdate()
 		RegisterForSingleUpdate(1)
 	EndIf
 	isEquipWeightUpdating = false
@@ -924,8 +941,20 @@ Bool Function checkVampirism()
 	return addVampireStrength > 0.0 && PlayerRef.hasKeyword(isVampire)
 EndFunction
 
+Function clearVampireLordMuscle()
+	NiOverride.ClearBodyMorphKeys(PlayerRef, "Snusnu_BUFF")
+	clearBoneScales(PlayerRef)
+
+	Bool isFemale = PlayerRef.GetActorBase().GetSex() != 0
+	NiOverride.RemoveSkinOverride(PlayerRef, isFemale, false, 0x04, 9, 1)
+	NiOverride.RemoveSkinOverride(PlayerRef, isFemale, true, 0x04, 9, 1)
+	If !PlayerRef.IsOnMount()
+		PlayerRef.QueueNiNodeUpdate()
+	EndIf
+endFunction
+
 Event OnVampireFeed(Actor akTarget)
-	If addVampireStrength > 0.0
+	If addVampireStrength > 0.0 && StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle", 0) == 0
 		updateMuscleScore(muscleScoreMax * addVampireStrength) ;Was 0.075
 		
 		If hardcoreMode
@@ -1021,13 +1050,13 @@ Function UpdateWeight(Bool applyNow = True)
 			If newWeight - tWeight > 5.0 || newWeight - tWeight < -5.0
 				;TLALOC- The following code can produce small lags
 				PlayerRef.GetActorBase().SetWeight(newWeight)
-				PlayerRef.QueueNiNodeUpdate()
 				PlayerRef.UpdateWeight(tNeckdelta)
+				PlayerRef.QueueNiNodeUpdate()
 				;Debug.Trace("SNU - New weight was set")
 			EndIf
 			
 			;TLALOC- Apply bone changes
-			applyBoneMorphs(PlayerRef)
+			;applyBoneMorphs(PlayerRef)
 			
 			;TLALOC- Custom Boobs physics
 			updateBoobsPhysics()
@@ -1049,24 +1078,25 @@ Function UpdateWeight(Bool applyNow = True)
 					endWhile
 					
 					;TLALOC- Apply bone changes
-					applyBoneMorphs(PlayerRef)
+					;applyBoneMorphs(PlayerRef)
 					
 					;TLALOC- Werewolf body morph --------------------------------------------------------------------
 					;ToDo- Add slider support for all Werewolf morphs
-					
-					;NiOverride.SetBodyMorph(PlayerRef, "BodyHigh", SNUSNU_KEY, fightingMuscle * 1.5) ;1.5
-					;NiOverride.SetBodyMorph(PlayerRef, "BreastsLowHDT", SNUSNU_KEY, fightingMuscle * -1.0)
-					
-					;SMALL version
-					NiOverride.SetBodyMorph(PlayerRef, "BodyHigh", SNUSNU_KEY, fightingMuscle * 2.0)
-					NiOverride.SetBodyMorph(PlayerRef, "BreastsLowHDT", SNUSNU_KEY, fightingMuscle * -0.5)
-					
-					;WeightMorphs;
-					If isWeightMorphsLoaded 
-						WeightMorphsMCM WMCM = Game.GetFormFromFile(0x05000888, "WeightMorphs.esp") As WeightMorphsMCM
-						If WMCM.WMorphs.Weight >= 0.0
-							NiOverride.SetBodyMorph(PlayerRef, "BodyHighHDT", SNUSNU_KEY, WMCM.WMorphs.Weight * 0.5);0.8
-							;NiOverride.SetBodyMorph(PlayerRef, "BodyVeryHighHDT", SNUSNU_KEY, fightingMuscle * 0.4)
+					If useWerewolfMorphs
+						;NiOverride.SetBodyMorph(PlayerRef, "BodyHigh", SNUSNU_KEY, fightingMuscle * 1.5) ;1.5
+						;NiOverride.SetBodyMorph(PlayerRef, "BreastsLowHDT", SNUSNU_KEY, fightingMuscle * -1.0)
+						
+						;SMALL version
+						NiOverride.SetBodyMorph(PlayerRef, "BodyHigh", SNUSNU_KEY, fightingMuscle * 2.0)
+						NiOverride.SetBodyMorph(PlayerRef, "BreastsLowHDT", SNUSNU_KEY, fightingMuscle * -0.5)
+						
+						;WeightMorphs;
+						If isWeightMorphsLoaded 
+							WeightMorphsMCM WMCM = Game.GetFormFromFile(0x05000888, "WeightMorphs.esp") As WeightMorphsMCM
+							If WMCM.WMorphs.Weight >= 0.0
+								NiOverride.SetBodyMorph(PlayerRef, "BodyHighHDT", SNUSNU_KEY, WMCM.WMorphs.Weight * 0.5);0.8
+								;NiOverride.SetBodyMorph(PlayerRef, "BodyVeryHighHDT", SNUSNU_KEY, fightingMuscle * 0.4)
+							EndIf
 						EndIf
 					EndIf
 					;TLALOC- Werewolf body morph --------------------------------------------------------------------
@@ -1080,9 +1110,12 @@ Function UpdateWeight(Bool applyNow = True)
 				;applyMaleMorphs(PlayerRef)
 				
 				;TLALOC- Apply bone changes
-				applyBoneMorphs(PlayerRef)
+				;applyBoneMorphs(PlayerRef)
 			EndIf
 		EndIf
+		
+		;TLALOC- Apply bone changes
+		applyBoneMorphs(PlayerRef)
 		
 		If applyNow
 			NiOverride.UpdateModelWeight(PlayerRef)
@@ -1276,6 +1309,15 @@ Function changeBoneScale(Actor theActor, Int boneIndex, Float scaleValue)
 			SetNodeScale(theActor, actorIsFemale, "NPC R Thigh [RThg]", scaleValue, SNUSNU_KEY)
 			SetNodeScale(theActor, actorIsFemale, "CME R Thigh [RThg]", 1/scaleValue, SNUSNU_KEY)	
 			SetNodeScale(theActor, actorIsFemale, "NPC R Thigh [LThg]", scaleValue, SNUSNU_KEY)
+			
+			;/Test lenght fix
+			float[] _thigh_Length = NiOverride.GetNodeTransformPosition(theActor, false, actorIsFemale, "NPC L Thigh [LThg]", SNUSNU_KEY)
+			Debug.Trace("SNU - Thigh length is: "+_thigh_Length[2])
+			_thigh_Length[2] = Math.abs(1.0 - scaleValue)
+			Debug.Trace("SNU - Setting thigh length to: "+_thigh_Length[2])
+			SetNodePosition(theActor, actorIsFemale, "NPC L Thigh [LThg]", _thigh_Length)
+			SetNodePosition(theActor, actorIsFemale, "NPC R Thigh [RThg]", _thigh_Length)
+			/;
 		ElseIf boneIndex == 10 ;Calfs
 			SetNodeScale(theActor, actorIsFemale, "NPC L Calf [LClf]", scaleValue, SNUSNU_KEY)
 			SetNodeScale(theActor, actorIsFemale, "CME L Calf [LClf]", 1/scaleValue, SNUSNU_KEY)		
@@ -1412,6 +1454,12 @@ Function clearBoneScales(Actor theActor)
 
 	SetNodeScale(theActor, actorIsFemale, "NPC L UpperarmTwist2 [LUt2]", 1.0, SNUSNU_KEY)
 	SetNodeScale(theActor, actorIsFemale, "NPC R UpperarmTwist2 [RUt2]", 1.0, SNUSNU_KEY)
+	
+	;Length changes
+	float[] _thigh_Length = NiOverride.GetNodeTransformPosition(theActor, false, actorIsFemale, "NPC L Thigh [LThg]", SNUSNU_KEY)
+	_thigh_Length[2] = 0.0
+	SetNodePosition(theActor, actorIsFemale, "NPC L Thigh [LThg]", _thigh_Length)
+	SetNodePosition(theActor, actorIsFemale, "NPC R Thigh [RThg]", _thigh_Length)
 EndFunction
 
 Function SetNodeScale(Actor akActor, bool isFemale, string nodeName, float value, string modkey) global
@@ -1577,13 +1625,17 @@ Function tempDebugSliders()
 	endWhile
 EndFunction
 
-String Function getNormalsByBodyType(Actor normalVictim)
+String Function getNormalsByBodyType(Actor normalVictim, Bool pathFormat = true)
+	String addition = "\\"
+	If !pathFormat
+		addition = ""
+	EndIf
 	If normalVictim.GetActorBase().GetSex() == 0
-		return "MALE\\"
+		return "MALE" + addition
 	ElseIf selectedBody == 0 || selectedBody == 2
-		return "UNP\\"
+		return "UNP" + addition
 	ElseIf selectedBody == 1
-		return "CBBE\\"
+		return "CBBE" + addition
 	EndIf
 EndFunction
 
@@ -1935,6 +1987,12 @@ Function ResetWeight(Bool _enable)
 			;Player is Male
 			useWeightSlider = true
 			;disableNormals = true
+			
+			playTFSound = false
+			useDynamicPhysics = false
+			useMuscleAnims = false
+			useAltAnims = false
+			changeHeadPart = false
 		EndIf
 		UpdateEffects()
 		checkBodyNormalsState()
@@ -1948,6 +2006,13 @@ Function ResetWeight(Bool _enable)
 			VampireLordMuscleSpell.cast(PlayerRef)
 		EndIf
 	Else
+		If isVampireLord
+			isVampireLord = false
+			Debug.Trace("SNU - Dispeling VampireLordMuscleSpell")
+			VampireLordMuscleSpell.cast(PlayerRef)
+			Utility.Wait(2)
+		EndIf
+		
 		UpdateEffects(False)
 		;NiOverride.RemoveAllReferenceSkinOverrides(PlayerRef)
 		Bool isFemale = PlayerRef.GetActorBase().GetSex() != 0
@@ -1963,41 +2028,52 @@ Function ClearMorphs(Bool clearBones = true)
 		; CBBE
 		Int cbbeLoop = 0
 		while cbbeLoop < 52
-			clearSliderData(1, cbbeLoop)
+			;clearSliderData(1, cbbeLoop)
+			setSliderValue(cbbeLoop, 0.0, false)
 			cbbeLoop += 1
 		endWhile
 		
 		;UUNP
 		Int uunpLoop = 0
 		while uunpLoop < 74
-			clearSliderData(2, uunpLoop)
+			;clearSliderData(2, uunpLoop)
+			setSliderValue(uunpLoop + 52, 0.0, false)
 			uunpLoop += 1
 		endWhile
 
 		;BHUNP Sliders
 		Int bhunpLoop = 0
 		while bhunpLoop < 43
-			clearSliderData(3, bhunpLoop)
+			;clearSliderData(3, bhunpLoop)
+			setSliderValue(bhunpLoop + 52 + 74, 0.0, false)
 			bhunpLoop += 1
 		endWhile
 		
 		;CBBE SE Sliders
 		Int cbbeSELoop = 0
 		while cbbeSELoop < 27
-			clearSliderData(4, cbbeSELoop)
+			;clearSliderData(4, cbbeSELoop)
+			setSliderValue(cbbeSELoop + 52 + 74 + 43, 0.0, false)
 			cbbeSELoop += 1
 		endWhile
 		
 		;CBBE 3BA Sliders
 		Int cbbe3BALoop = 0
 		while cbbe3BALoop < 40
-			clearSliderData(5, cbbe3BALoop)
+			;clearSliderData(5, cbbe3BALoop)
+			setSliderValue(cbbe3BALoop + 52 + 74 + 43 + 27, 0.0, false)
 			cbbe3BALoop += 1
 		endWhile
 		
 		;Bone changes
 		If clearBones
 			clearBoneScales(PlayerRef)
+			
+			Int boneCounter = 0
+			While boneCounter < 68
+				bonesValues[boneCounter] = 1.0
+				boneCounter += 1
+			EndWhile
 		EndIf
 		
 		; Male
@@ -2832,7 +2908,7 @@ Function initDefaultSliders()
 	bonesValues[0] = 1.0 ;MultForearmBone
 	Int boneCounter = 2
 	While boneCounter < 68
-		bonesValues[boneCounter] = 0.0
+		bonesValues[boneCounter] = 1.0
 		boneCounter += 1
 	EndWhile
 	
@@ -3123,7 +3199,7 @@ endFunction
 ;TLALOC- NPC Related functions
 Function applyNPCMuscle()
 	Debug.Trace("SNU - Refreshing NPC muscle")
-	;ToDo- We need to add logic to customize and store morphs for male bodies
+	;ToDo- We need to add logic to customize and store morphs for male bodies even if PC is female
 	Int totalNPCs = FormListCount(none, "MUSCLE_NPCS")
 	Debug.Trace("SNU - Total muscle NPCs: "+totalNPCs)
 	Int npcsLoop = 0
@@ -3179,10 +3255,12 @@ Bool Function saveAllMorphs(String profileName = "")
 	EndIf
 	
 	cleanupCurrentMorphsList(true) ;ToDo- Will this be always needed?
-	int[] tempMorphsArray = IntListToArray(PlayerRef, SNUSNU_KEY)
-	If !JsonUtil.IntListCopy(fileName, "MainMorphs", tempMorphsArray)
-		Debug.Trace("SNU - ERROR: Morphs array could not be saved!!")
-		Return false
+	If IntListCount(PlayerRef, SNUSNU_KEY) > 0
+		int[] tempMorphsArray = IntListToArray(PlayerRef, SNUSNU_KEY)
+		If !JsonUtil.IntListCopy(fileName, "MainMorphs", tempMorphsArray)
+			Debug.Trace("SNU - ERROR: Morphs array could not be saved!!")
+			Return false
+		EndIf
 	EndIf
 	
 	If !JsonUtil.FloatListCopy(fileName, "CBBEMorphs", cbbeValues)
@@ -3227,9 +3305,13 @@ Bool Function loadAllMorphs(String profileName = "")
 	
 	If JsonUtil.Load(fileName) && JsonUtil.IsGood(fileName)
 		int[] tempMorphsArray = JsonUtil.IntListToArray(fileName, "MainMorphs")
-		If !IntListCopy(PlayerRef, SNUSNU_KEY, tempMorphsArray)
-			Debug.Trace("SNU - ERROR: Morphs array could not be loaded!!")
-			Return false
+		If tempMorphsArray && tempMorphsArray.length > 0
+			If !IntListCopy(PlayerRef, SNUSNU_KEY, tempMorphsArray)
+				Debug.Trace("SNU - ERROR: Main morphs array could not be loaded!!")
+				Return false
+			EndIf
+		Else
+			IntListClear(PlayerRef, SNUSNU_KEY)
 		EndIf
 		
 		NiOverride.ClearBodyMorphKeys(PlayerRef, SNUSNU_KEY)
@@ -3247,7 +3329,7 @@ Bool Function loadAllMorphs(String profileName = "")
 		
 		UpdateWeight(true)
 	Else
-		Debug.Trace("SNU - ERROR: Morphs array could not be loaded!!")
+		Debug.Trace("SNU - ERROR: Morphs could not be loaded!!")
 		Return false
 	EndIf
 	

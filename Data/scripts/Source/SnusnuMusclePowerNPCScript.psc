@@ -42,7 +42,7 @@ Function transformFMG(Actor fmgTarget)
 									!fmgTarget.IsInCombat() && fmgTarget.GetSitState() == 0 && !fmgTarget.IsSwimming()
 	
 	initFMGSliders()
-	If !loadFMGMorphs()
+	If !loadFMGMorphs(fmgTarget)
 		Debug.Notification("Could not load the FMG morphs!")
 		Dispel()
 		return
@@ -85,7 +85,7 @@ Function transformFMG(Actor fmgTarget)
 			;Apply the pulsating animation: Muscles will suddently grow a lot, then will shrink a little, 
 			;                               then grow again, then shrink again, until desired size is achieved
 			If goingUp
-				growVal = growVal + 0.02
+				growVal = growVal + 0.04
 				If growVal >= growStage * 0.1
 					goingUp = false
 					;Debug.Trace("SNU - growVal is "+growVal+", going back down")
@@ -166,7 +166,7 @@ EndFunction
 Function disTransformFMG(Actor fmgTarget)
 	If snusnuMain.tfAnimationNPC
 		initFMGSliders()
-		If !loadFMGMorphs()
+		If !loadFMGMorphs(fmgTarget)
 			Debug.Notification("Could not load the FMG morphs!")
 			
 			clearMuscleMorphs(fmgTarget)
@@ -354,14 +354,18 @@ Function initFMGSliders()
 	maleValuesFMG = new Float[2]
 EndFunction
 
-Bool Function loadFMGMorphs()
-	String fileName = "SnuSnuProfiles/SnuDefaultFMG"
+Bool Function loadFMGMorphs(Actor buffedActor)
+	String fileName = "SnuSnuProfiles/SnuDefaultFMG_" + snusnuMain.getNormalsByBodyType(buffedActor, false)
 	
 	If JsonUtil.Load(fileName) && JsonUtil.IsGood(fileName)
 		int[] tempMorphsArray = JsonUtil.IntListToArray(fileName, "MainMorphs")
-		If !StorageUtil.IntListCopy(none, SNUSNU_BUFF_KEY, tempMorphsArray)
-			Debug.Trace("SNU - ERROR: FMG Morphs array could not be loaded!!")
-			Return false
+		If tempMorphsArray && tempMorphsArray.length > 0
+			If !StorageUtil.IntListCopy(none, SNUSNU_BUFF_KEY, tempMorphsArray)
+				Debug.Trace("SNU - ERROR: Main morphs array could not be loaded!!")
+				Return false
+			EndIf
+		Else
+			StorageUtil.IntListClear(none, SNUSNU_BUFF_KEY)
 		EndIf
 		
 		cbbeValuesFMG = JsonUtil.FloatListToArray(fileName, "CBBEMorphs")

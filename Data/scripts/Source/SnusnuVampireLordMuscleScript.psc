@@ -4,9 +4,6 @@ Snusnu Property snusnuMain Auto
 
 String SNUSNU_BUFF_KEY = "Snusnu_BUFF"
 
-Float Property originalMuscleScore = 0.0 Auto
-Float Property musclePercent = 1.0 Auto
-
 ;FMG Morphs
 Float[] cbbeValuesFMG
 Float[] uunpValuesFMG
@@ -26,18 +23,6 @@ Event OnEffectStart(Actor akTarget, Actor akCaster)
 	EndIf
 EndEvent
 
-Event OnEffectFinish(Actor akTarget, Actor akCaster)
-	Debug.Trace("SNU - SnusnuVampireLordMuscleScript.OnEffectFinish()")
-EndEvent
-
-Event OnPlayerLoadGame()
-	Debug.Trace("SNU - SnusnuVampireLordMuscleScript.OnPlayerLoadGame()")
-	
-	Utility.Wait(7)
-	;Fix for normals not loading correctly
-	forceSwitchMuscleNormals(snusnuMain.PlayerRef, musclePercent * 100, snusnuMain.getNormalsByBodyType(snusnuMain.PlayerRef))
-EndEvent
-
 Function applyMuscleEffect(Actor akTarget)
 	;Vampire lord form uses the same morphs as the FMG spell, so they cannot be active at the same time
 	If StorageUtil.GetIntValue(akTarget, "SNU_UltraMuscle", 0) > 0
@@ -51,7 +36,7 @@ Function applyMuscleEffect(Actor akTarget)
 	EndIf
 			
 	Debug.Trace("SNU - Starting Vampire Lord Muscle Effect")
-	Debug.Notification("Starting Vampire Lord Muscle Effect")
+	snusnuMain.showInfoNotification("Starting Vampire Lord Muscle Effect")
 	initFMGSliders()
 	If !loadFMGMorphs(akTarget)
 		Debug.Notification("Could not load the FMG morphs!")
@@ -59,16 +44,34 @@ Function applyMuscleEffect(Actor akTarget)
 		return
 	EndIf
 	
-	musclePercent = snusnuMain.muscleScore / snusnuMain.muscleScoreMax
-	musclePercent = musclePercent * 1.2
-	If musclePercent > 1.0
-		musclePercent = 1.0
+	snusnuMain.vampireLordMusclePercent = snusnuMain.muscleScore / snusnuMain.muscleScoreMax
+	snusnuMain.vampireLordMusclePercent = snusnuMain.vampireLordMusclePercent * 1.2
+	If snusnuMain.vampireLordMusclePercent > 1.0
+		snusnuMain.vampireLordMusclePercent = 1.0
 	EndIf
 	
-	removeNormalMuscle(akTarget, musclePercent)
-	muscleChange(akTarget, musclePercent)
-	updateBones(akTarget, musclePercent)
-	forceSwitchMuscleNormals(akTarget, musclePercent * 100, snusnuMain.getNormalsByBodyType(akTarget))
+	snusnuMain.removeNormalMuscle(akTarget, snusnuMain.vampireLordMusclePercent)
+	muscleChange(akTarget, snusnuMain.vampireLordMusclePercent)
+	updateBones(akTarget, snusnuMain.vampireLordMusclePercent)
+	
+	Bool hasHandFix = false
+	Armor handsArmor = akTarget.GetWornForm(0x00000008) as Armor
+	if !handsArmor
+		Debug.Trace("SNU - Attempting to apply hands fix!")
+		akTarget.equipItem(snusnuMain.handsFix, true, true)
+		Utility.wait(0.2)
+		hasHandFix = true
+	endIf
+	
+	Int level = SnusnuMusclePowerNPCScript.forceSwitchMuscleNormals(akTarget, snusnuMain.vampireLordMusclePercent * 100, snusnuMain.getNormalsByBodyType(akTarget))
+	snusnuMain.chooseVampLordBoobsPhysics(level)
+	
+	if hasHandFix
+		Debug.Trace("SNU - Finishing to apply hands fix!")
+		Utility.wait(0.2)
+		akTarget.unequipItemslot(33)
+		akTarget.removeitem(snusnuMain.handsFix, 1, true)
+	endIf
 EndFunction
 
 Function removeMuscleEffect(Actor akTarget)
@@ -86,18 +89,6 @@ Function removeMuscleEffect(Actor akTarget)
 	;snusnuMain.checkBodyNormalsState()
 	
 	Debug.Trace("SNU - Finished Vampire Lord Muscle Effect")
-EndFunction
-
-Function removeNormalMuscle(Actor buffTarget, Float changePercent)
-	Float fightingMuscle = originalMuscleScore * (1 - changePercent)
-	
-	Int totalSliders = StorageUtil.IntListCount(buffTarget, snusnuMain.SNUSNU_KEY)
-	Int slidersLoop = 0
-	while slidersLoop < totalSliders
-		Int currentSliderIndex = StorageUtil.IntListGet(buffTarget, snusnuMain.SNUSNU_KEY, slidersLoop)
-		NiOverride.SetBodyMorph(buffTarget, snusnuMain.getSliderString(currentSliderIndex), snusnuMain.SNUSNU_KEY, fightingMuscle * snusnuMain.getSliderValue(currentSliderIndex))
-		slidersLoop += 1
-	endWhile
 EndFunction
 
 Function muscleChange(Actor buffTarget, Float changePercent)
@@ -123,53 +114,6 @@ Function updateBones(Actor theActor, Float magnitude, Bool goingUp = true)
 		snusnuMain.changeBoneScale(theActor, boneCounter, snusnuMain.getBoneSize(magnitude, bonesValuesFMG[boneCounter]))
 		boneCounter += 1
 	EndWhile
-EndFunction
-
-Int Function forceSwitchMuscleNormals(Actor buffTarget, Float newWeight, String bodyType) Global
-	Int newStage = 1
-
-	If newWeight >= 30.0 && newWeight < 55.0
-		newStage = 2
-	ElseIf newWeight >= 55.0 && newWeight < 75.0
-		newStage = 3
-	ElseIf newWeight >= 75.0
-		newStage = 5
-	EndIf
-	
-	Debug.Trace("SNU - Going to switch normals? newStage="+newStage+", newWeight="+newWeight)
-	;If newStage > 1
-		applyMuscleNormals(buffTarget, newStage, bodyType)
-	;/Else
-		;TLALOC- For some reason normals still get fucked up on NPCs sometimes so we need to regenerate their textures
-		RemoveAllReferenceSkinOverrides(buffTarget);For the custom normals
-		RemoveAllReferenceNodeOverrides(buffTarget);For the custom normals
-		RemoveSkinOverride(buffTarget, true, false, 0x04, 9, 1)
-	EndIf
-	/;
-	return newStage
-EndFunction
-
-Function applyMuscleNormals(Actor buffTarget, int stage, String bodyType) Global
-	String tempNormalsPath = "textures\\Snusnu\\Normals\\" + bodyType
-	;Debug.Trace("SNU - Normals path is now "+tempNormalsPath)
-	
-	If stage == 1
-		tempNormalsPath = "textures\\actors\\character\\female\\femalebody_1_msn"
-	ElseIf stage == 2
-		tempNormalsPath = tempNormalsPath + "athletic"
-	ElseIf stage == 3
-		tempNormalsPath = tempNormalsPath + "boneCrusher"
-	ElseIf stage == 4
-		tempNormalsPath = tempNormalsPath + "boneCrusherExtra"
-	ElseIf stage == 5
-		tempNormalsPath = tempNormalsPath + "boneCrusherUltra"
-	EndIf
-	
-	tempNormalsPath = tempNormalsPath + ".dds"
-	
-	Debug.Trace("SNU - Normals path is now "+tempNormalsPath)
-	Bool isFemale = buffTarget.GetActorBase().GetSex() != 0
-	NiOverride.AddSkinOverrideString(buffTarget, isFemale, false, 0x04, 9, 1, tempNormalsPath, true)
 EndFunction
 
 Function initFMGSliders()

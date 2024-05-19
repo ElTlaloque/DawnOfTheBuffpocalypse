@@ -17,6 +17,7 @@ Int Property SNUSNU_VERSION = 2 AutoReadOnly
 Int Property Version = 0 Auto
 Bool Property showUpdateMessage = false Auto
 Bool HAS_NIOVERRIDE = false
+Bool Property showInfoMessages = true Auto
 
 String Property SNUSNU_KEY = "Snusnu.esp" AutoReadOnly
 String Property SNU_EQUIP_WEIGHTS_KEY = "SNU_EQUIP_WEIGHTS" AutoReadOnly
@@ -51,6 +52,7 @@ Float Property currentExtraCarryWeight = 0.0 Auto
 Float Property LastDegradationTime = 0.0 Auto
 Float Property startSleepTime = 0.0 Auto
 Float Property totalSleepTime = 0.0 Auto
+Float Property lastSleepTime = 0.0 Auto
 Bool Property justWakeUp = false Auto
 
 Float bowDrawTime = 0.0
@@ -146,7 +148,7 @@ Bool Property hardcoreMode = false Auto
 int Property heavyItemsEquiped = 0 Auto
 Float Property itemsEquipedWeight = -1.0 Auto
 Float Property allowedItemsEquipedWeight = -1.0 Auto
-Float Property maxItemsEquipedWeight = 140.0 Auto
+Float Property maxItemsEquipedWeight = 100.0 Auto
 Float Property minItemsEquipedWeight = 15.0 Auto
 ;FIX: CarryWeight value doesn't get updated after switch equipping 2 heavy items
 Bool Property needEquipWeightUpdate = false Auto
@@ -161,6 +163,7 @@ Keyword Property isVampire Auto
 Float Property addVampireStrength = 0.125 Auto
 Bool Property isVampireLord = false Auto
 SPELL Property VampireLordMuscleSpell Auto
+Float Property vampireLordMusclePercent = 0.0 Auto
 Bool Property isVampireLordReVampedLoaded Auto
 FormList Property SnusnuPlayableRaces Auto
 FormList Property SnusnuVampireRaces Auto
@@ -274,11 +277,6 @@ Event OnPlayerLoadGame()
 		ReloadHotkeys()
 		
 		If allowedItemsEquipedWeight == -1.0 && hardcoreMode
-			;ToDo- Hardcoded value. We need to add a MCM option to set this
-			;      Temporarly reducing it to 100. Maximum vanilla equipment is 138, but skills will bring that down to 50%, so
-			;      it would be a nice incentive to keep improving the relevant skills.
-			maxItemsEquipedWeight = 100.0 ;140.0
-			
 			updateAllowedItemsEquipedWeight()
 			getEquipedFullWeight()
 			isEquipWeightUpdating = false
@@ -342,7 +340,7 @@ Event OnCellLoad()
 	;This will be used to refresh normal maps on NPCs
 	;LOGIC: Have a new boolean array to store if an NPC has been refreshed. Reset the array to all false in OnPlayerLoadGame.
 	;Loop on the NPCs list and check if they have their 3d loaded and the refreshed flag is false, then refresh their normal maps
-	;Debug.Notification("Cell finished loading!")
+	;showInfoNotification("Cell finished loading!")
 	Utility.Wait(1)
 	applyNPCMuscle()
 	
@@ -354,7 +352,7 @@ Event OnCellLoad()
 		
 		If hardcoreMode
 			;Fix for hardcore mode values not being updated often enough (specially happens for vampires. Or not going to bed in general...)
-			Debug.Notification("Updating allowed equipped weight")
+			showInfoNotification("Updating allowed equipped weight")
 			updateAllowedItemsEquipedWeight()
 			needEquipWeightUpdate = true
 		EndIf
@@ -417,7 +415,7 @@ Event OnUpdate()
 					Debug.Trace("SNU - justWakeUp, totalDegradation="+totalDegradation)
 					Float sleepBonus = getSleepBonus()
 					If sleepBonus > 0.0
-						Debug.Notification("I got back "+sleepBonus+" muscle score points")
+						showInfoNotification("I got back "+sleepBonus+" muscle score points")
 					EndIf
 					totalDegradation = totalDegradation + sleepBonus
 					Debug.Trace("SNU -             finalDegradation="+totalDegradation)
@@ -430,7 +428,7 @@ Event OnUpdate()
 					
 					If hardcoreMode
 						;Cleanup equipped item weights
-						Debug.Notification("Refreshing hardcore weights")
+						showInfoNotification("Refreshing hardcore weights")
 						updateAllowedItemsEquipedWeight()
 						getEquipedFullWeight()
 					EndIf
@@ -476,7 +474,7 @@ Event OnUpdate()
 				actualCarryWeight = PlayerRef.GetActorValue("CarryWeight")
 				Float modWeight = actualCarryWeight + 500.0
 				Debug.Trace("SNU - actualCarryWeight="+actualCarryWeight)
-				;Debug.Notification("Carry weight: "+actualCarryWeight)
+				;showInfoNotification("Carry weight: "+actualCarryWeight)
 			
 				;PlayerRef.UnequipItem(type, true)
 				PlayerRef.ModActorValue("CarryWeight", -modWeight)
@@ -484,7 +482,7 @@ Event OnUpdate()
 				IsOverwhelmed.setValue(1)
 			ElseIf heavyItemsEquiped && itemsEquipedWeight <= allowedItemsEquipedWeight && PlayerRef.GetActorValue("CarryWeight") < -100
 				Debug.Trace("SNU - All heavy items were removed. Restoring carryWeight")
-				;Debug.Notification("Restoring carry weight: "+actualCarryWeight+"+500")
+				;showInfoNotification("Restoring carry weight: "+actualCarryWeight+"+500")
 				Debug.Notification("I can move freely now")
 				
 				PlayerRef.ModActorValue("CarryWeight", actualCarryWeight + 500)
@@ -687,7 +685,7 @@ EndFunction
 Event OnObjectEquipped(Form type, ObjectReference ref)
 	;Debug.Trace("SNU -----------------OnObjectEquipped()-----------------")
 	Potion iaExercise = Game.GetFormFromFile(0x05084235, "ImmersiveInteractions.esp") As Potion
-	If !checkVampirism() && iaExercise && type == iaExercise
+	If !checkVampirism() && StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle", 0) == 0 && iaExercise && type == iaExercise
 		updateMuscleScore(0.75 * MultGainMisc)
 		Debug.Notification("I'm getting a little stronger")
 		return
@@ -709,7 +707,7 @@ Event OnObjectEquipped(Form type, ObjectReference ref)
 		FormListAdd(PlayerRef, SNU_EQUIP_WEIGHTS_KEY, type, true)
 		FloatListAdd(PlayerRef, SNU_EQUIP_WEIGHTS_KEY, newItemWeight, true)
 		;Debug.Trace("SNU - Full equiped weight is "+itemsEquipedWeight)
-		Debug.Notification("Equipped weight is "+itemsEquipedWeight)
+		showInfoNotification("Equipped weight is "+itemsEquipedWeight)
 		
 		If itemsEquipedWeight > allowedItemsEquipedWeight
 			needEquipWeightUpdate = true
@@ -741,7 +739,7 @@ Event OnObjectUnequipped(Form type, ObjectReference ref)
 		;Debug.Trace("SNU - Item weight "+oldItemWeight)
 		itemsEquipedWeight = itemsEquipedWeight - oldItemWeight
 		;Debug.Trace("SNU - New full equiped weight is "+itemsEquipedWeight)
-		Debug.Notification("Equipped weight is now "+itemsEquipedWeight)
+		showInfoNotification("Equipped weight is now "+itemsEquipedWeight)
 	EndIf
 		
 	If heavyItemsEquiped && itemsEquipedWeight <= allowedItemsEquipedWeight && PlayerRef.GetActorValue("CarryWeight") < -100
@@ -796,7 +794,7 @@ Event OnAnimationEvent(ObjectReference akSource, string asEventName)
 					scoreAddition = scoreAddition + (0.25 * MultGainFight)
 				EndIf
 			ElseIf PlayerRef.GetPositionZ() > prevPositionZ + 40.0 ;Was 30.0
-				;Debug.Notification("Running up!")
+				;showInfoNotification("Running up!")
 				isRunningUp = true
 				prevPositionZ = PlayerRef.GetPositionZ()
 				return
@@ -857,7 +855,7 @@ Event OnAnimationEvent(ObjectReference akSource, string asEventName)
 			;        as it will be always the same
 			
 			;bowDrawTime = GameDaysPassed.GetValue() - bowDrawTime
-			;Debug.Notification("bowDrawTime: "+bowDrawTime)
+			;showInfoNotification("bowDrawTime: "+bowDrawTime)
 			
 			scoreAddition = scoreAddition + (0.25 * MultGainFight)
 			;Debug.Notification("Drawing my bow to full charge surely requieres a certain ammount of strenght")
@@ -868,7 +866,7 @@ Event OnAnimationEvent(ObjectReference akSource, string asEventName)
 			;Debug.Notification("Moving heavy stuff is good excercise")
 		Else
 			;TLALOC- Experimental custom events debug
-			;Debug.Notification(asEventName)
+			;showInfoNotification(asEventName)
 		EndIf
 	EndIf
 EndEvent
@@ -928,17 +926,41 @@ Float Function getSleepBonus()
 		If recoveredMuscle > lostMuscle
 			recoveredMuscle = lostMuscle
 		EndIf
+		
+		;Apply muscle degradation if last sleep time is higher than 16 hours
+		Float timeWithoutSleep = GameDaysPassed.GetValue() - lastSleepTime
+		If timeWithoutSleep > 0.7
+			timeWithoutSleep = (timeWithoutSleep - 0.7) * 0.5
+			If timeWithoutSleep > 1.0
+				timeWithoutSleep = 1.0
+			EndIf
+			recoveredMuscle = recoveredMuscle * (1 - timeWithoutSleep)
+		EndIf
+		
 		Debug.Trace("SNU - totalSleepTime="+totalSleepTime+", storedMuscle="+storedMuscle+", lostMuscle="+lostMuscle+", recoveredMuscle="+recoveredMuscle)
 		sleepBonus = recoveredMuscle
 	EndIf
 	storedMuscle = 0.0
 	lostMuscle = 0.0
+	lastSleepTime = GameDaysPassed.GetValue()
 	
 	return sleepBonus
 EndFunction
 
 Bool Function checkVampirism()
 	return addVampireStrength > 0.0 && PlayerRef.hasKeyword(isVampire)
+EndFunction
+
+Function chooseVampLordBoobsPhysics(Int level)
+	If level == 1
+		updateBoobsPhysics(true, 3)
+	ElseIf level == 2
+		updateBoobsPhysics(true, 2)
+	ElseIf level == 3
+		updateBoobsPhysics(true, 1)
+	ElseIf level >= 4
+		updateBoobsPhysics(true, 1)
+	EndIf
 EndFunction
 
 Function clearVampireLordMuscle()
@@ -1543,17 +1565,17 @@ Function updateBoobsPhysics(Bool forceUpdate = false, Int newLevel = -1)
 			
 			Debug.Trace("SNU- Physics level is "+physicsLevel)
 			If physicsLevel == 1
-				Debug.Notification("Switching to breasts physics level 1")
+				showInfoNotification("Switching to breasts physics level 1")
 				Debug.Trace("Switching to breasts physics level 1")
 				PhysicsManager.CBPCBreasts(PlayerRef, true)
 				PhysicsManager.CBPCBreastsSmall(PlayerRef)
 			ElseIf physicsLevel == 2
-				Debug.Notification("Switching to breasts physics level 2")
+				showInfoNotification("Switching to breasts physics level 2")
 				Debug.Trace("Switching to breasts physics level 2")
 				PhysicsManager.CBPCBreasts(PlayerRef, true)
 				PhysicsManager.CBPCBreastsMid(PlayerRef)
 			ElseIf physicsLevel == 3
-				Debug.Notification("Switching to breasts physics level 3")
+				showInfoNotification("Switching to breasts physics level 3")
 				Debug.Trace("Switching to breasts physics level 3")
 				PhysicsManager.CBPCBreasts(PlayerRef, true)
 				PhysicsManager.CBPCBreastsBig(PlayerRef)
@@ -1561,7 +1583,7 @@ Function updateBoobsPhysics(Bool forceUpdate = false, Int newLevel = -1)
 				;ToDo- Change physics to SMP if body weight (from WeightMorphs) is big enough
 				;NOTE: As of right now, CBPC physics are more than enough to simulate big breasts Physics,
 				;      so there is no need for complicated SMP switching
-				Debug.Notification("Switching to breasts physics level 4")
+				showInfoNotification("Switching to breasts physics level 4")
 				Debug.Trace("Switching to breasts physics level 4")
 				PhysicsManager.CBPCBreasts(PlayerRef, true)
 				PhysicsManager.CBPCBreasts(PlayerRef)
@@ -1645,6 +1667,29 @@ EndFunction
 Function checkBodyNormalsState()
 	;Debug.Trace("SNU - checkBodyNormalsState()")
 	If disableNormals || StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle", 0) != 0 || isVampireLord
+		If isVampireLord
+			;TLALOC- Experimental messed up hand textures fix
+			Bool hasHandFix = false
+			Armor handsArmor = PlayerRef.GetWornForm(0x00000008) as Armor
+			if !handsArmor
+				Debug.Trace("SNU - Attempting to apply hands fix!")
+				PlayerRef.equipItem(handsFix, true, true)
+				Utility.wait(0.2)
+				hasHandFix = true
+			endIf
+		
+			Int level = SnusnuMusclePowerNPCScript.forceSwitchMuscleNormals(PlayerRef, vampireLordMusclePercent * 100, getNormalsByBodyType(PlayerRef))
+			chooseVampLordBoobsPhysics(level)
+			
+			;TLALOC- Experimental messed up hand textures fix
+			if hasHandFix
+				Debug.Trace("SNU - Finishing to apply hands fix!")
+				Utility.wait(0.2)
+				PlayerRef.unequipItemslot(33)
+				PlayerRef.removeitem(handsFix, 1, true)
+			endIf
+		EndIf
+		
 		return
 	EndIf
 	
@@ -2615,9 +2660,10 @@ Function setSliderValue(Int position, Float value, Bool updateWeightNow = true)
 		IntListAdd(PlayerRef, SNUSNU_KEY, position, false)
 	EndIf
 	
-	If updateWeightNow
+	;We should NEVER call UpdateWeight() for individual morph changes!!!
+	;/If updateWeightNow
 		UpdateWeight()
-	EndIf
+	EndIf/;
 EndFunction
 
 Int Function getGroupIndex(int newIndex)
@@ -3145,6 +3191,32 @@ Float Function getCarryWeightPercent()
 	return newCarryWeight
 EndFunction
 
+Function removeNormalMuscle(Actor buffTarget, Float changePercent)
+	If useWeightSlider
+		FLoat newWeight = changePercent * 100
+		Float tWeight = buffTarget.GetLeveledActorBase().GetWeight()
+		Float tNeckdelta = (tWeight/100) - (newWeight/100)
+		
+		;Debug.Trace("SNU - currentWeight="+tWeight+", newWeight="+newWeight)
+		If newWeight - tWeight > 5.0 || newWeight - tWeight < -5.0
+			;TLALOC- The following code can produce small lags
+			buffTarget.GetActorBase().SetWeight(newWeight)
+			buffTarget.UpdateWeight(tNeckdelta)
+			buffTarget.QueueNiNodeUpdate()
+		EndIf
+	Else
+		Float fightingMuscle = getfightingMuscle() * (1 - changePercent)
+		
+		Int totalSliders = StorageUtil.IntListCount(buffTarget, SNUSNU_KEY)
+		Int slidersLoop = 0
+		while slidersLoop < totalSliders
+			Int currentSliderIndex = StorageUtil.IntListGet(buffTarget, SNUSNU_KEY, slidersLoop)
+			NiOverride.SetBodyMorph(buffTarget, getSliderString(currentSliderIndex), SNUSNU_KEY, fightingMuscle * getSliderValue(currentSliderIndex))
+			slidersLoop += 1
+		endWhile
+	EndIf
+EndFunction
+
 Function addWerewolfBuild()
 	If !Enabled
 		return
@@ -3231,7 +3303,7 @@ Function applyNPCMuscle()
 			If currentActor && currentActor.is3dloaded() && muscleScoreNPC != 0 && StorageUtil.IntListGet(none, "MUSCLE_NPCS", npcsLoop) == 0
 				Bool isFemale = currentActor.GetActorBase().GetSex() != 0
 				String skinOverride = NiOverride.GetSkinOverrideString(currentActor, isFemale, false, 0x04, 9, 1)
-				Debug.Notification("Restoring normals to "+currentActor.GetBaseObject().getName())
+				showInfoNotification("Restoring normals to "+currentActor.GetBaseObject().getName())
 				Debug.Trace("SNU - Restoring normals to "+currentActor.GetBaseObject().getName()+": "+skinOverride)
 				If skinOverride == ""
 					SnusnuMusclePowerNPCScript.forceSwitchMuscleNormals(currentActor, muscleScoreNPC * 100, getNormalsByBodyType(currentActor))
@@ -3327,7 +3399,9 @@ Bool Function loadAllMorphs(String profileName = "")
 		
 		cleanupCurrentMorphsList(false) ;ToDo- Will this be always needed?
 		
-		UpdateWeight(true)
+		;We really should NOT update the body shape everytime a profile is loaded, specially if we are editing
+		;the FMG morphs and switching around the profiles several times in the MCM
+		;UpdateWeight(true)
 	Else
 		Debug.Trace("SNU - ERROR: Morphs could not be loaded!!")
 		Return false
@@ -3414,4 +3488,10 @@ Function cleanupCurrentMorphsList(Bool cleanValues)
 		EndIf
 		cbbe3BALoop += 1
 	endWhile
+EndFunction
+
+Function showInfoNotification(String infoMessage)
+	If showInfoMessages
+		Debug.Notification(infoMessage)
+	EndIf
 EndFunction

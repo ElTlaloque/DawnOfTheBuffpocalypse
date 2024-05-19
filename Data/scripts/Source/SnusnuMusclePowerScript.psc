@@ -133,7 +133,8 @@ event OnEffectStart(Actor akTarget, Actor akCaster)
 		;String overlaySlot = initOverlaySlot(akTarget)
 		
 		If snusnuMain.useAltBody
-			;ToDo- Also add this to the NPC spell
+			;ToDo- Also add this to the NPC spell. For now we will skip this as there might a big problem 
+			;      with the head of NPCs not being updated correctly
 			Utility.wait(8)
 			swapBodyMesh(akTarget)
 		Else
@@ -153,7 +154,7 @@ event OnEffectStart(Actor akTarget, Actor akCaster)
 			while growVal != growSteps || goingUp
 				If goingUp
 					;TLALOC- Gradually remove normal muscle
-					removeNormalMuscle(akTarget, growVal)
+					snusnuMain.removeNormalMuscle(akTarget, growVal)
 				EndIf
 				muscleChange(akTarget, growVal );NOTE- growVal should be a value between 0 and 1
 				
@@ -248,7 +249,7 @@ event OnEffectStart(Actor akTarget, Actor akCaster)
 		If snusnuMain.useAltBody
 			swapBodyMesh(akTarget)
 		Else
-			removeNormalMuscle(akTarget, maxGrowth)
+			snusnuMain.removeNormalMuscle(akTarget, maxGrowth)
 			muscleChange(akTarget, maxGrowth )
 			updateBones(akTarget, maxGrowth, False)
 			
@@ -393,7 +394,7 @@ Event OnUpdate()
 				snusnuMain.needEquipWeightUpdate = true
 			EndIf
 			
-			Debug.Notification("FMG shape has been updated")
+			snusnuMain.showInfoNotification("FMG shape has been updated")
 			Debug.Trace("SNU - FMG shape has been updated")
 		EndIf
 		StorageUtil.SetIntValue(snusnuMain.PlayerRef, "SNU_UltraMuscle", 1+moreChangesCount)
@@ -470,7 +471,7 @@ EndEvent
 Event OnSleepStop(bool abInterrupted)
 	If snusnuMain.hardcoreMode
 		;Cleanup equipped item weights
-		Debug.Notification("Refreshing hardcore weights")
+		snusnuMain.showInfoNotification("Refreshing hardcore weights")
 		snusnuMain.updateAllowedItemsEquipedWeight()
 		snusnuMain.getEquipedFullWeight()
 	EndIf
@@ -530,7 +531,7 @@ Event OnEffectFinish(Actor akTarget, Actor akCaster)
 			Int normalsStage = 5
 			float deflateVal = snusnuMain.currentMusclePercent
 			while deflateVal > 0.0
-				removeNormalMuscle(akTarget, deflateVal)
+				snusnuMain.removeNormalMuscle(akTarget, deflateVal)
 				
 				muscleChange(akTarget, deflateVal)
 				
@@ -632,7 +633,7 @@ Function applyQuickGrowthAnim(Actor tfActor, Float magnitude)
 		
 		float growthVal = magnitude - snusnuMain.moreChangesIncrements
 		while growthVal < magnitude
-			removeNormalMuscle(tfActor, growthVal)
+			snusnuMain.removeNormalMuscle(tfActor, growthVal)
 			
 			muscleChange(tfActor, growthVal)
 			
@@ -650,13 +651,13 @@ Function applyQuickGrowthAnim(Actor tfActor, Float magnitude)
 		EndIf
 	EndIf
 	
-	removeNormalMuscle(tfActor, magnitude)
+	snusnuMain.removeNormalMuscle(tfActor, magnitude)
 	muscleChange(tfActor, magnitude )
 	
 	updateBones(tfActor, magnitude)
 	
 	Debug.Trace("SNU - Finished growing to "+magnitude)
-	;Debug.Notification("Finished growing to "+(magnitude*100)+"%")
+	;snusnuMain.showInfoNotification("Finished growing to "+(magnitude*100)+"%")
 EndFunction
 
 Function updateBones(Actor theActor, Float magnitude, Bool goingUp = true)
@@ -770,32 +771,6 @@ Function updateFistsPower(Float magnitude)
 		
 		counter += 1
 	endWhile
-EndFunction
-
-Function removeNormalMuscle(Actor buffTarget, Float changePercent)
-	If snusnuMain.useWeightSlider
-		FLoat newWeight = changePercent * 100
-		Float tWeight = buffTarget.GetLeveledActorBase().GetWeight()
-		Float tNeckdelta = (tWeight/100) - (newWeight/100)
-		
-		;Debug.Trace("SNU - currentWeight="+tWeight+", newWeight="+newWeight)
-		If newWeight - tWeight > 5.0 || newWeight - tWeight < -5.0
-			;TLALOC- The following code can produce small lags
-			buffTarget.GetActorBase().SetWeight(newWeight)
-			buffTarget.UpdateWeight(tNeckdelta)
-			buffTarget.QueueNiNodeUpdate()
-		EndIf
-	Else
-		Float fightingMuscle = originalMuscleScore * (1 - changePercent)
-		
-		Int totalSliders = StorageUtil.IntListCount(buffTarget, snusnuMain.SNUSNU_KEY)
-		Int slidersLoop = 0
-		while slidersLoop < totalSliders
-			Int currentSliderIndex = StorageUtil.IntListGet(buffTarget, snusnuMain.SNUSNU_KEY, slidersLoop)
-			NiOverride.SetBodyMorph(buffTarget, snusnuMain.getSliderString(currentSliderIndex), snusnuMain.SNUSNU_KEY, fightingMuscle * snusnuMain.getSliderValue(currentSliderIndex))
-			slidersLoop += 1
-		endWhile
-	EndIf
 EndFunction
 
 Function muscleChange(Actor buffTarget, Float changePercent)

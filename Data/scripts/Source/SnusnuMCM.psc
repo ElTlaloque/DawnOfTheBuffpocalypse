@@ -11,6 +11,8 @@ Snusnu Property snusnuMain Auto
 
 Int _myEnabled
 Int _myHardcoreMode
+Int _mymaxItemsEquiped
+Int _myShowMessages
 Int _myMultLoss
 Int _myMultGainFight
 Int _myMultGainArmor
@@ -88,7 +90,7 @@ Int _myMultSamson
 String[] pageNames
 Int selectedDefaultMorphs = 1
 Bool editFMGMorphs = False
-
+Bool needBodyUpdate = False
 
 Function setMenuPages()
 	Pages = new String[7]
@@ -170,7 +172,7 @@ Event OnConfigClose()
 		EndIf
 		
 		editFMGMorphs = False
-	Else
+	ElseIf needBodyUpdate
 		snusnuMain.UpdateWeight() ;Fix for bone morphs
 	EndIf
 EndEvent
@@ -206,6 +208,8 @@ Event OnPageReset(String a_page)
 		
 		_myEnabled = AddToggleOption("$SNUSNU_ENABLED", snusnuMain.Enabled)
 		_myHardcoreMode = AddToggleOption("Hardcore Mode", snusnuMain.hardcoreMode)
+		_myShowMessages = AddToggleOption("Show info notifications", snusnuMain.showInfoMessages)
+		_mymaxItemsEquiped = AddSliderOption("Maximum equipment weight", snusnuMain.maxItemsEquipedWeight, "{0}")
 		AddEmptyOption()
 		AddEmptyOption()
 		
@@ -713,6 +717,10 @@ Event OnOptionHighlight(Int a_option)
 		SetInfoText("Use DAR instead of FNIS/Nemesis for animations")
 	ElseIf a_option == _myMuscleAnimsLevel
 		SetInfoText("Muscular level at which to apply muscular animations (0=Civilian, 1=Athletic, 2=Muscular, 3=Very Muscular)")
+	ElseIf a_option == _myShowMessages
+		SetInfoText("Show info notifications related to things you might want to be aware of during gameplay.")
+	ElseIf a_option == _mymaxItemsEquiped
+		SetInfoText("Hardcore mode's maximum allowed equiped weight. It will go beyond this value during a FMG transformation. It is highly recommended to leave this as it is since making it higher would just negate the reason to have a hardcore mode at all. It is here for specific situations like if you have armor or weapon mods that for some reason might have very high weight values. Or to make things more difficult by making it lower.")
 	
 	;LOAD AND SAVE
 	ElseIf a_option == _mySaveOptions
@@ -767,6 +775,9 @@ Event OnOptionSelect(Int a_option)
 	ElseIf a_option == _myUseWufwufMorphs
 		snusnuMain.useWerewolfMorphs = !snusnuMain.useWerewolfMorphs
 		SetToggleOptionValue(a_option, snusnuMain.useWerewolfMorphs)
+	ElseIf a_option == _myShowMessages
+		snusnuMain.showInfoMessages = !snusnuMain.showInfoMessages
+		SetToggleOptionValue(a_option, snusnuMain.showInfoMessages)
 	ElseIf a_option == _myUseAltBody
 		snusnuMain.useAltBody = !snusnuMain.useAltBody
 		SetToggleOptionValue(a_option, snusnuMain.useAltBody)
@@ -799,16 +810,19 @@ Event OnOptionSelect(Int a_option)
 		String Msg
 		If editFMGMorphs
 			If !snusnuMain.isTransforming
-				Msg = "All morph changes you do while this option is selected will only affect the FMG body shape. To go back to normal muscle morphs just disable this option."
+				Msg = "All morph changes you do while this option is selected will only affect the FMG body shape. To go back to normal muscle morphs just disable this option. It will take time to load the morphs, so please wait until the menu is fully updated."
 				ShowMessage(Msg, False)
 				
 				;Load FMG morphs profile here. All changes to the morphs must be saved after this
 				;option is disabled or user exits this menu.
 				;NOTICE! Previous morphs should be saved to a temporal profile file!
-				snusnuMain.UpdateWeight() ;Fix for bone morphs
+				needBodyUpdate = true
 				String loadErrorMsg = switchFMGMorphs(True)
 				If loadErrorMsg
 					ShowMessage(loadErrorMsg, false)
+				Else
+					Msg = "Menu has finished updating."
+					ShowMessage(Msg, False)
 				EndIf
 			Else
 				Msg = "You can not edit the FMG morphs while a FMG transformation is currently ongoing!"
@@ -817,13 +831,16 @@ Event OnOptionSelect(Int a_option)
 				SetToggleOptionValue(a_option, editFMGMorphs)
 			EndIf
 		Else
-			Msg = "Going back to normal muscle morphs customization"
+			Msg = "Going back to normal muscle morphs customization, please wait until the menu is fully updated."
 			ShowMessage(Msg, False)
 			
 			;Save morphs to a FMG profile file and load the previous morphs
 			String loadErrorMsg = switchFMGMorphs(False)
 			If loadErrorMsg
 				ShowMessage(loadErrorMsg, false)
+			Else
+				Msg = "Menu has finished updating."
+				ShowMessage(Msg, False)
 			EndIf
 			
 			;Update body if PC is currently transformed
@@ -850,7 +867,7 @@ Event OnOptionSelect(Int a_option)
 		applyDynamicPhysicsOption()
 	ElseIf a_option == _myZeroSliders
 		String Msg
-		Msg = "Setting body sliders to 0.0, please wait!"
+		Msg = "Setting body sliders to 0.0, please wait until confirmation message appears."
 		ShowMessage(Msg, False)
 		
 		snusnuMain.ClearMorphs()
@@ -1034,6 +1051,11 @@ Event OnOptionSliderOpen(Int a_option)
 		SetSliderDialogDefaultValue(0.25)
 		SetSliderDialogRange(0.05, 0.45)
 		SetSliderDialogInterval(0.01)
+	ElseIf a_option == _mymaxItemsEquiped
+		SetSliderDialogStartValue(snusnuMain.maxItemsEquipedWeight)
+		SetSliderDialogDefaultValue(100)
+		SetSliderDialogRange(20, 200)
+		SetSliderDialogInterval(1)
 	ElseIf a_option == _myMuscleAnimsLevel
 		SetSliderDialogStartValue(snusnuMain.muscleAnimsLevel.getValue())
 		SetSliderDialogDefaultValue(2.0)
@@ -1197,6 +1219,10 @@ Event OnOptionSliderAccept(Int a_option, Float a_value)
 	ElseIf a_option == _myChangesIncrements
 		snusnuMain.moreChangesIncrements = a_value
 		SetSliderOptionValue(a_option, snusnuMain.moreChangesIncrements, "{2}")
+	ElseIf a_option == _mymaxItemsEquiped
+		snusnuMain.maxItemsEquipedWeight = a_value
+		snusnuMain.updateAllowedItemsEquipedWeight()
+		SetSliderOptionValue(a_option, snusnuMain.maxItemsEquipedWeight, "{0}")
 	ElseIf a_option == _myMuscleAnimsLevel
 		applyMuscleAnimsLevelValue(a_value)
 		
@@ -1204,21 +1230,21 @@ Event OnOptionSliderAccept(Int a_option, Float a_value)
 	ElseIf a_option == _myMultSamuel
 		snusnuMain.maleValues[0] = a_value
 		SetSliderOptionValue(a_option, snusnuMain.maleValues[0], "{2}")
-		snusnuMain.UpdateWeight()
+		needBodyUpdate = true
 	ElseIf a_option == _myMultSamson
 		snusnuMain.maleValues[1] = a_value
 		SetSliderOptionValue(a_option, snusnuMain.maleValues[1], "{2}")
-		snusnuMain.UpdateWeight()
+		needBodyUpdate = true
 		
 	;GENERIC BONES MORPHS
 	ElseIf a_option == _myMultSpineBone
 		snusnuMain.bonesValues[0] = a_value
 		SetSliderOptionValue(a_option, snusnuMain.bonesValues[0], "{3}")
-		snusnuMain.UpdateWeight()
+		needBodyUpdate = true
 	ElseIf a_option == _myMultForearmBone
 		snusnuMain.bonesValues[1] = a_value
 		SetSliderOptionValue(a_option, snusnuMain.bonesValues[1], "{3}")
-		snusnuMain.UpdateWeight()
+		needBodyUpdate = true
 		
 	Else
 		int sliderIndex = 0
@@ -1232,6 +1258,7 @@ Event OnOptionSliderAccept(Int a_option, Float a_value)
 				SetSliderOptionValue(a_option, a_value, "{2}")
 				;ForcePageReset()
 				snusnuMain.setSliderValue(sliderIndex, a_value)
+				needBodyUpdate = true
 				found = true
 			EndIf
 			counter += 1
@@ -1245,6 +1272,7 @@ Event OnOptionSliderAccept(Int a_option, Float a_value)
 					SetSliderOptionValue(a_option, a_value, "{2}")
 					;ForcePageReset()
 					snusnuMain.setSliderValue(sliderIndex, a_value)
+					needBodyUpdate = true
 					found = true
 				EndIf
 				counter += 1
@@ -1259,6 +1287,7 @@ Event OnOptionSliderAccept(Int a_option, Float a_value)
 					SetSliderOptionValue(a_option, a_value, "{2}")
 					;ForcePageReset()
 					snusnuMain.setSliderValue(sliderIndex, a_value)
+					needBodyUpdate = true
 					found = true
 				EndIf
 				counter += 1
@@ -1273,6 +1302,7 @@ Event OnOptionSliderAccept(Int a_option, Float a_value)
 					SetSliderOptionValue(a_option, a_value, "{2}")
 					;ForcePageReset()
 					snusnuMain.setSliderValue(sliderIndex, a_value)
+					needBodyUpdate = true
 					found = true
 				EndIf
 				counter += 1
@@ -1287,6 +1317,7 @@ Event OnOptionSliderAccept(Int a_option, Float a_value)
 					SetSliderOptionValue(a_option, a_value, "{2}")
 					;ForcePageReset()
 					snusnuMain.setSliderValue(sliderIndex, a_value)
+					needBodyUpdate = true
 					found = true
 				EndIf
 				counter += 1
@@ -1301,6 +1332,7 @@ Event OnOptionSliderAccept(Int a_option, Float a_value)
 					SetSliderOptionValue(a_option, a_value, "{3}")
 					;ForcePageReset()
 					snusnuMain.bonesValues[counter] = a_value
+					needBodyUpdate = true
 					found = true
 				EndIf
 				counter += 1
@@ -1725,6 +1757,8 @@ Bool Function saveSettings()
 	JsonUtil.SetIntValue(fileName, "useAltBody", snusnuMain.useAltBody as Int)
 	JsonUtil.SetIntValue(fileName, "applyVampireFix", snusnuMain.applyVampireFix as Int)
 	JsonUtil.SetIntValue(fileName, "useWerewolfMorphs", snusnuMain.useWerewolfMorphs as Int)
+	JsonUtil.SetIntValue(fileName, "showInfoMessages", snusnuMain.showInfoMessages as Int)
+	JsonUtil.SetFloatValue(fileName, "maxItemsEquipedWeight", snusnuMain.maxItemsEquipedWeight)
 	
 	JsonUtil.SetIntValue(fileName, "useDynamicPhysics", snusnuMain.useDynamicPhysics as Int)
 	JsonUtil.SetIntValue(fileName, "useMuscleAnims", snusnuMain.useMuscleAnims as Int)
@@ -1807,6 +1841,10 @@ bool Function loadSettings()
 		snusnuMain.useAltBody = JsonUtil.GetIntValue(fileName, "useAltBody", snusnuMain.useAltBody as Int)
 		snusnuMain.applyVampireFix = JsonUtil.GetIntValue(fileName, "applyVampireFix", snusnuMain.applyVampireFix as Int)
 		snusnuMain.useWerewolfMorphs = JsonUtil.GetIntValue(fileName, "useWerewolfMorphs", snusnuMain.useWerewolfMorphs as Int)
+		snusnuMain.showInfoMessages = JsonUtil.GetIntValue(fileName, "showInfoMessages", snusnuMain.showInfoMessages as Int)
+		
+		snusnuMain.maxItemsEquipedWeight = JsonUtil.GetFloatValue(fileName, "maxItemsEquipedWeight", snusnuMain.maxItemsEquipedWeight as Float)
+		snusnuMain.updateAllowedItemsEquipedWeight()
 		
 		If snusnuMain.getInfoKey != JsonUtil.GetIntValue(fileName, "getInfoKey", snusnuMain.getInfoKey)
 			snusnuMain.getInfoKey = JsonUtil.GetIntValue(fileName, "getInfoKey", snusnuMain.getInfoKey)
@@ -1939,6 +1977,7 @@ State LoadDefaults
 		EndIf
 		
 		snusnuMain.LoadDefaultProfile(selectedDefaultMorphs)
+		needBodyUpdate = true
 		
 		String Msg
 		Msg = "Selected morphs profile has been applied."
@@ -1983,11 +2022,6 @@ Function applyHardcoreOption()
 	SetToggleOptionValue(_myHardcoreMode, snusnuMain.hardcoreMode)
 	
 	If snusnuMain.hardcoreMode
-		;ToDo- Hardcoded value. We need to add a MCM option to set this
-		;      Temporarly reducing it to 100. Maximum vanilla equipment is 138, but skills will bring that down to 50%, so
-		;      it would be a nice incentive to keep improving the relevant skills.
-		snusnuMain.maxItemsEquipedWeight = 100.0 ;140.0
-		
 		snusnuMain.updateAllowedItemsEquipedWeight()
 		snusnuMain.getEquipedFullWeight()
 	Else
@@ -2004,20 +2038,28 @@ Function applyBodyOption(Bool showMSG = true)
 		If snusnuMain.selectedBody == 0 ;UNP
 			snusnuMain.usePecs = false
 			snusnuMain.LoadDefaultProfile(1)
+			needBodyUpdate = true
 		ElseIf snusnuMain.selectedBody == 1 ;CBBE
 			snusnuMain.usePecs = true
 			snusnuMain.LoadDefaultProfile(3)
+			needBodyUpdate = true
 		EndIf
 	EndIf
 	
 	If showMSG
 		String Msg
-		Msg = "Doing a full menu reset."
+		Msg = "Doing a full menu reset, please wait for confirmation."
 		ShowMessage(Msg, False)
 	EndIf
 	
 	OpenConfig()
 	setPage(Pages[0], 0)
+	
+	If showMSG
+		String Msg
+		Msg = "Menu has been reset successfully."
+		ShowMessage(Msg, False)
+	EndIf
 EndFunction
 
 Function applyNormalsOption()
@@ -2092,7 +2134,7 @@ Function applymuscleScoreMaxValue(Float theValue)
 	;If snusnuMain.muscleScoreMax < snusnuMain.muscleScore
 		;snusnuMain.updateMuscleScore(0)
 		snusnuMain.recalculateAllMuscleVars(difference)
-		snusnuMain.UpdateWeight()
+		needBodyUpdate = true
 		snusnuMain.UpdateEffects()
 		;SetTextOptionValue(_myFightingScore, snusnuMain.getMuscleValuePercent(snusnuMain.muscleScore)+"%")
 	;EndIf
@@ -2112,7 +2154,7 @@ Function applySaveMorphs(String profileName = "")
 	
 	Self.SetOptionFlags(_mySaveMorphsProfile, Self.OPTION_FLAG_DISABLED, True)
 	Self.SetOptionFlags(_myLoadMorphsProfile, Self.OPTION_FLAG_DISABLED, True)
-	ShowMessage("Saving morph values", false)
+	ShowMessage("Saving morph values, please wait until confirmation message appears.", false)
 	If snusnuMain.saveAllMorphs(profileName)
 		ShowMessage("Morphs have been saved successfully", false)
 	Else
@@ -2138,9 +2180,10 @@ Function applyLoadMorphs(String profileName = "")
 	
 	Self.SetOptionFlags(_mySaveMorphsProfile, Self.OPTION_FLAG_DISABLED, True)
 	Self.SetOptionFlags(_myLoadMorphsProfile, Self.OPTION_FLAG_DISABLED, True)
-	ShowMessage("Loading morph values", false)
+	ShowMessage("Loading morph values, please wait until confirmation message appears.", false)
 	If snusnuMain.loadAllMorphs(profileName)
 		ShowMessage("Morphs have been loaded successfully", false)
+		needBodyUpdate = true
 	Else
 		ShowMessage("ERROR! Morph values could not be loaded!!", false)
 	EndIf

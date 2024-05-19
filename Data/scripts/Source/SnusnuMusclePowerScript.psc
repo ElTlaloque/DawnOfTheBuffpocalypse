@@ -5,7 +5,6 @@ String Property SNUSNU_BUFF_KEY = "Snusnu.esp_BUFF" AutoReadOnly
 Snusnu Property snusnuMain Auto
 Bool Property wasWMEnabled = false Auto
 Float Property wmWeight = 0.0 Auto
-Float Property originalMuscleScore = 0.0 Auto
 Int Property originalSkinTint = 0 Auto
 Int Property moreChangesCount = 0 Auto
 Float Property tfTime = 0.0 Auto
@@ -57,6 +56,8 @@ event OnEffectStart(Actor akTarget, Actor akCaster)
 		Dispel()
 		return
 	EndIf
+	
+	removeSpells(snusnuMain.PlayerRef)
 	
 	If snusnuMain.PlayerRef.hasKeyword(snusnuMain.isVampire) && snusnuMain.applyVampireFix
 		;Change to original race for the duration of the spell to avoid head texture mishaps
@@ -145,7 +146,6 @@ event OnEffectStart(Actor akTarget, Actor akCaster)
 			int growStage = 1
 			bool goingUp = true
 			int currentStage = snusnuMain.currentBuildStage
-			originalMuscleScore = snusnuMain.getfightingMuscle()
 			
 			If snusnuMain.applyMoreChangesOvertime
 				growSteps = snusnuMain.currentMusclePercent
@@ -608,11 +608,39 @@ Event OnEffectFinish(Actor akTarget, Actor akCaster)
 		snusnuMain.PlayerRef.SetRace(vampireRace)
 	EndIf
 	
+	reAddSpells(snusnuMain.PlayerRef)
+	
 	Debug.Trace("SNU - Finished removal of transformation effect")
 	Debug.Notification("My body is now back to normal")
 	
 	snusnuMain.isTransforming = false
 EndEvent
+
+Function removeSpells(Actor magicActor)
+	If magicActor.hasSpell(snusnuMain.MusclePowerSpell)
+		snusnuMain.hadMusclePowerSpell = true
+		magicActor.UnequipSpell(snusnuMain.MusclePowerSpell, 0)
+		magicActor.UnequipSpell(snusnuMain.MusclePowerSpell, 1)
+		magicActor.removeSpell(snusnuMain.MusclePowerSpell)
+	EndIf
+	If magicActor.hasSpell(snusnuMain.UltraMusclePowerSpell)
+		snusnuMain.hadUltraMusclePowerSpell = true
+		magicActor.UnequipSpell(snusnuMain.UltraMusclePowerSpell, 0)
+		magicActor.UnequipSpell(snusnuMain.UltraMusclePowerSpell, 1)
+		magicActor.removeSpell(snusnuMain.UltraMusclePowerSpell)
+	EndIf
+EndFunction
+
+Function reAddSpells(Actor magicActor)
+	If snusnuMain.hadMusclePowerSpell
+		snusnuMain.hadMusclePowerSpell = false
+		magicActor.addSpell(snusnuMain.MusclePowerSpell)
+	EndIf
+	If snusnuMain.hadUltraMusclePowerSpell
+		snusnuMain.hadUltraMusclePowerSpell = false
+		magicActor.addSpell(snusnuMain.UltraMusclePowerSpell)
+	EndIf
+EndFunction
 
 Bool Function canPlayAnimation(Actor animatedDude)
 	If animatedDude.isInCombat() || animatedDude.IsOnMount() || animatedDude.IsSwimming() || animatedDude.IsSprinting() || \

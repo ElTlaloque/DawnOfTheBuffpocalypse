@@ -101,6 +101,8 @@ Bool Property is3BAPhysicsLoaded Auto
 Bool Property isTransforming = false Auto
 SPELL Property MusclePowerSpell  Auto
 SPELL Property UltraMusclePowerSpell  Auto  
+Bool Property hadMusclePowerSpell = false Auto
+Bool Property hadUltraMusclePowerSpell = false Auto
 Armor Property FistsOfRage  Auto 
 Bool Property tfAnimation = true Auto
 Bool Property useAltAnims = true Auto
@@ -3205,6 +3207,7 @@ Function removeNormalMuscle(Actor buffTarget, Float changePercent)
 			buffTarget.QueueNiNodeUpdate()
 		EndIf
 	Else
+		Debug.Trace("SNU - Removing normal muscle: "+getfightingMuscle())
 		Float fightingMuscle = getfightingMuscle() * (1 - changePercent)
 		
 		Int totalSliders = StorageUtil.IntListCount(buffTarget, SNUSNU_KEY)

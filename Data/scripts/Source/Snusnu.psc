@@ -19,6 +19,12 @@ Bool Property showUpdateMessage = false Auto
 Bool HAS_NIOVERRIDE = false
 Bool Property showInfoMessages = true Auto
 
+LeveledItem Property LItemSpellTomes00AllSpells Auto
+Bool Property alreadyAddedSpellTomes = false Auto
+Book Property SpellTomeBigMuscle Auto
+Book Property SpellTomeUltraBigMuscle Auto
+Book Property SpellTomeBigMuscleNPC Auto
+
 String Property SNUSNU_KEY = "Snusnu.esp" AutoReadOnly
 String Property SNU_EQUIP_WEIGHTS_KEY = "SNU_EQUIP_WEIGHTS" AutoReadOnly
 
@@ -224,6 +230,12 @@ Bool Function CheckNiOverride()
 	Return SKSE.GetPluginVersion("skee") >= SKEE_VERSION && NiOverride.GetScriptVersion() >= NIOVERRIDE_SCRIPT_VERSION
 EndFunction
 
+Function addSpellsToMerchantLists()
+	Debug.Trace("SNU - Adding spells to leveled lists...")
+	LItemSpellTomes00AllSpells.addForm(SpellTomeBigMuscleNPC, 1, 1)
+	LItemSpellTomes00AllSpells.addForm(SpellTomeBigMuscle, 1, 1)
+	LItemSpellTomes00AllSpells.addForm(SpellTomeUltraBigMuscle, 1, 1)
+EndFunction
 
 Event OnInit()
 	;Debug.Trace("SNU - OnInit()")
@@ -267,6 +279,11 @@ Event OnPlayerLoadGame()
 			If is3BAPhysicsLoaded
 				firstUpdateForBoobs = true
 			EndIf
+		EndIf
+		
+		If !alreadyAddedSpellTomes
+			addSpellsToMerchantLists()
+			alreadyAddedSpellTomes = true
 		EndIf
 		
 		initSliderArrays()
@@ -450,6 +467,29 @@ Event OnUpdate()
 					effectsChanged = False
 				EndIf
 			ElseIf finalNormalsPath != "EMPTY"
+				If finalNormalsPath == "VAMP_EMPTY"
+					;TLALOC- Experimental messed up hand textures fix
+					Bool hasHandFix = false
+					Armor handsArmor = PlayerRef.GetWornForm(0x00000008) as Armor
+					if !handsArmor
+						Debug.Trace("SNU - Attempting to apply hands fix!")
+						PlayerRef.equipItem(handsFix, true, true)
+						Utility.wait(0.2)
+						hasHandFix = true
+					endIf
+				
+					Int level = SnusnuMusclePowerNPCScript.forceSwitchMuscleNormals(PlayerRef, vampireLordMusclePercent * 100, getNormalsByBodyType(PlayerRef))
+					chooseVampLordBoobsPhysics(level)
+					
+					;TLALOC- Experimental messed up hand textures fix
+					if hasHandFix
+						Debug.Trace("SNU - Finishing to apply hands fix!")
+						Utility.wait(0.2)
+						PlayerRef.unequipItemslot(33)
+						PlayerRef.removeitem(handsFix, 1, true)
+					endIf
+				EndIf
+				
 				;Clean all morphs so that MuscleSpell can apply their own
 				finalNormalsPath = "EMPTY"
 				UpdateEffects()
@@ -1206,14 +1246,14 @@ Function updateMuscleScore(float incValue)
 		storedMuscle = storedMuscle + incValue
 	EndIf
 	
-	If normalsScore >= 0
-		If normalsScore < muscleScore || incValue < 0
-			normalsScore = normalsScore + (incValue * 2)
-		Else
-			normalsScore = normalsScore + incValue
+	If normalsScore < muscleScore || incValue < 0
+		normalsScore = normalsScore + (incValue * 2)
+		
+		If normalsScore < 0
+			normalsScore = 0
 		EndIf
 	Else
-		normalsScore = 0
+		normalsScore = normalsScore + incValue
 	EndIf
 	
 	muscleScore = muscleScore + incValue
@@ -1670,26 +1710,7 @@ Function checkBodyNormalsState()
 	;Debug.Trace("SNU - checkBodyNormalsState()")
 	If disableNormals || StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle", 0) != 0 || isVampireLord
 		If isVampireLord
-			;TLALOC- Experimental messed up hand textures fix
-			Bool hasHandFix = false
-			Armor handsArmor = PlayerRef.GetWornForm(0x00000008) as Armor
-			if !handsArmor
-				Debug.Trace("SNU - Attempting to apply hands fix!")
-				PlayerRef.equipItem(handsFix, true, true)
-				Utility.wait(0.2)
-				hasHandFix = true
-			endIf
-		
-			Int level = SnusnuMusclePowerNPCScript.forceSwitchMuscleNormals(PlayerRef, vampireLordMusclePercent * 100, getNormalsByBodyType(PlayerRef))
-			chooseVampLordBoobsPhysics(level)
-			
-			;TLALOC- Experimental messed up hand textures fix
-			if hasHandFix
-				Debug.Trace("SNU - Finishing to apply hands fix!")
-				Utility.wait(0.2)
-				PlayerRef.unequipItemslot(33)
-				PlayerRef.removeitem(handsFix, 1, true)
-			endIf
+			finalNormalsPath = "VAMP_EMPTY"
 		EndIf
 		
 		return

@@ -51,6 +51,7 @@ Int _myPushupException
 Int _myNPCMuscleScore
 Int _myBoostCarryWeight
 
+Int _myHavePecs
 Int _myDynamicPhysics
 Int _myChangeAnims
 Int _myUseDARAnims
@@ -219,6 +220,7 @@ Event OnPageReset(String a_page)
 		AddMenuOptionST("LoadDefaults", "Load default morphs", GetDefaultMorphString(selectedDefaultMorphs))
 		_myDisableNormals = AddToggleOption("$SNUSNU_DISABLENORMALS", snusnuMain.disableNormals)
 		_myDynamicPhysics = AddToggleOption("Dynamic Breasts Physics", snusnuMain.useDynamicPhysics, isFemaleFlag)
+		_myHavePecs = AddToggleOption("Treat breasts as pecs", snusnuMain.usePecs, isFemaleFlag)
 		_myChangeAnims = AddToggleOption("Change to muscular anims", snusnuMain.useMuscleAnims)
 		_myUseDARAnims = AddToggleOption("Use DAR for animations", snusnuMain.useDARAnims)
 		_myMuscleAnimsLevel = AddSliderOption("Muscular level anims", snusnuMain.muscleAnimsLevel.getValue() as Float, "{0}")
@@ -228,7 +230,6 @@ Event OnPageReset(String a_page)
 			_myUseWufwufMorphs = AddToggleOption("Use Werewolf morphs", snusnuMain.useWerewolfMorphs, OPTION_FLAG_DISABLED)
 		EndIf
 		
-		AddEmptyOption()
 		AddEmptyOption()
 		AddEmptyOption()
 		
@@ -697,6 +698,8 @@ Event OnOptionHighlight(Int a_option)
 		SetInfoText("$SNUSNU_DISABLENORMALS_DESC")
 	ElseIf a_option == _myDynamicPhysics
 		SetInfoText("Change breasts physics depending on muscle score (CBPC needed). This will reduce breast bounciness to simulate muscular \"firmness\".")
+	ElseIf a_option == _myHavePecs
+		SetInfoText("This will treat breasts more like pecs during the dynamic physics calculations. Physics will be greatly reduced the bigger the muscle score is.")
 ;	ElseIf a_option == _mySelectedBody
 ;		SetInfoText("$SNUSNU_SELECTEDBODY_DESC")
 	ElseIf a_option == _myZeroSliders
@@ -745,6 +748,9 @@ Event OnOptionSelect(Int a_option)
 	ElseIf a_option == _myHardcoreMode
 		snusnuMain.hardcoreMode = !snusnuMain.hardcoreMode
 		applyHardcoreOption()
+	ElseIf a_option == _myHavePecs
+		snusnuMain.usePecs = !snusnuMain.usePecs
+		SetToggleOptionValue(a_option, snusnuMain.usePecs)
 	ElseIf a_option == _mytfAnimation
 		snusnuMain.tfAnimation = !snusnuMain.tfAnimation
 		SetToggleOptionValue(a_option, snusnuMain.tfAnimation)
@@ -1740,6 +1746,7 @@ Bool Function saveSettings()
 	JsonUtil.SetFloatValue(fileName, "addWerewolfStrength", snusnuMain.addWerewolfStrength)
 	JsonUtil.SetFloatValue(fileName, "addVampireStrength", snusnuMain.addVampireStrength)
 	JsonUtil.SetFloatValue(fileName, "malnourishmentValue", snusnuMain.malnourishmentValue)
+	JsonUtil.SetIntValue(fileName, "usePecs", snusnuMain.usePecs as Int)
 	JsonUtil.SetIntValue(fileName, "tfAnimation", snusnuMain.tfAnimation as Int)
 	JsonUtil.SetIntValue(fileName, "tfAnimationNPC", snusnuMain.tfAnimationNPC as Int)
 	JsonUtil.SetIntValue(fileName, "useAltAnims", snusnuMain.useAltAnims as Int)
@@ -1820,6 +1827,7 @@ bool Function loadSettings()
 			applymuscleScoreMaxValue(JsonUtil.GetFloatValue(fileName, "muscleScoreMax", snusnuMain.muscleScoreMax))
 		EndIf
 		
+		snusnuMain.usePecs = JsonUtil.GetIntValue(fileName, "usePecs", snusnuMain.usePecs as Int)
 		snusnuMain.MultLoss = JsonUtil.GetFloatValue(fileName, "MultLoss", snusnuMain.MultLoss)
 		snusnuMain.MultGainFight = JsonUtil.GetFloatValue(fileName, "MultGainFight", snusnuMain.MultGainFight)
 		snusnuMain.MultGainArmor = JsonUtil.GetFloatValue(fileName, "MultGainArmor", snusnuMain.MultGainArmor)
@@ -1975,6 +1983,7 @@ State LoadDefaults
 		Else
 			snusnuMain.usePecs = false
 		EndIf
+		SetToggleOptionValue(_myHavePecs, snusnuMain.usePecs)
 		
 		snusnuMain.LoadDefaultProfile(selectedDefaultMorphs)
 		needBodyUpdate = true

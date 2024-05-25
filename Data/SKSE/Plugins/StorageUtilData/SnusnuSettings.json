@@ -42,6 +42,7 @@
 		"usedaranims" : 1,
 		"usedynamicphysics" : 1,
 		"usemuscleanims" : 1
+		"usepecs" : 1,
 		"usewerewolfmorphs" : 0
 	}
 }

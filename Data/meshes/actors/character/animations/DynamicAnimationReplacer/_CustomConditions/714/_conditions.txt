@@ -1,0 +1,6 @@
+IsActorBase("Skyrim.esm"|0x000007) AND
+ValueLessThan("Snusnu.esp"|0x00011055, "Snusnu.esp"|0x00013607) AND
+NOT IsWornHasKeyword("Skyrim.esm" | 0x0006C0EC) AND
+HasPerk("HeelsFix.esp"|0x000810) AND
+IsMovementDirection(0) AND
+Random(0.25)

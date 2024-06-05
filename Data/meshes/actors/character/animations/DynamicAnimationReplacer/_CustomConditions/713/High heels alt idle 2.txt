@@ -1,0 +1,4 @@
+This folder contains animations for cloth type armor, or no armor at all (naked).
+------------------------------------------------------------------------------------------
+*/To use gender specific animations create "male" and "female" folders in current folder/*
+------------------------------------------------------------------------------------------

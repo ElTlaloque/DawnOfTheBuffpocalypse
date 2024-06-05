@@ -1,0 +1,3 @@
+IsActorBase("Skyrim.esm"|0x000007) AND
+ValueLessThan("Snusnu.esp"|0x00011055, "Snusnu.esp"|0x00013607) AND
+Random(0.25)

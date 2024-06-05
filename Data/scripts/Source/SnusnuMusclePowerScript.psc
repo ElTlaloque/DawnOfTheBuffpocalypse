@@ -66,6 +66,7 @@ event OnEffectStart(Actor akTarget, Actor akCaster)
 	EndIf
 	
 	removeSpells(snusnuMain.PlayerRef)
+	Utility.wait(1.0)
 	
 	If snusnuMain.PlayerRef.hasKeyword(snusnuMain.isVampire) && snusnuMain.applyVampireFix
 		;Change to original race for the duration of the spell to avoid head texture mishaps
@@ -130,7 +131,7 @@ event OnEffectStart(Actor akTarget, Actor akCaster)
 			tfSoundInstance = snusnuMain.snusnuTFSound.Play(akTarget)
 		EndIf
 		
-		If canPlayAnimation(akTarget)
+		If Snusnu.canPlayAnimation(akTarget)
 			;Unequip weapons
 			akTarget.SheatheWeapon()
 			Utility.wait(0.5)
@@ -148,16 +149,19 @@ event OnEffectStart(Actor akTarget, Actor akCaster)
 		Else
 			;ToDo- Move this loop to onUpdate(). Make functions to apply stuff before and after this animation. Call the after anim
 			;      function here if anim is disabled or in onUpdate if anim is enabled. Do the same with WeightMorphs
-			growSteps = 1
+			growSteps = snusnuMain.currentMusclePercent
 			growVal = 0.01
 			growStage = 1
 			goingUp = true
 			currentStage = snusnuMain.currentBuildStage
-			
-			If snusnuMain.applyMoreChangesOvertime
-				growSteps = snusnuMain.currentMusclePercent
-			EndIf
-			
+			;/
+			Debug.Trace("SNU - Initial TF Anim vars:")
+			Debug.Trace("SNU -      growSteps="+growSteps)
+			Debug.Trace("SNU -      growVal="+growVal)
+			Debug.Trace("SNU -      growStage="+growStage)
+			Debug.Trace("SNU -      goingUp="+goingUp)
+			Debug.Trace("SNU -      currentStage="+currentStage)
+			/;
 			registerForSingleUpdate(0.1)
 			return
 		EndIf
@@ -173,7 +177,7 @@ event OnEffectStart(Actor akTarget, Actor akCaster)
 			EndIf
 		EndIf
 		
-		If canPlayAnimation(akTarget)
+		If Snusnu.canPlayAnimation(akTarget)
 			Debug.SendAnimationEvent(akTarget,"IdleForceDefaultState")
 		EndIf
 		
@@ -185,10 +189,7 @@ event OnEffectStart(Actor akTarget, Actor akCaster)
 		akTarget.ResetExpressionOverrides()
 		akTarget.ClearExpressionOverride()
 	Else
-		Float maxGrowth = 1.0
-		If snusnuMain.applyMoreChangesOvertime
-			maxGrowth = snusnuMain.currentMusclePercent
-		EndIf
+		Float maxGrowth = snusnuMain.currentMusclePercent
 		
 		If snusnuMain.useAltBody
 			swapBodyMesh(akTarget)
@@ -245,7 +246,7 @@ Event OnUpdate()
 				snusnuMain.PlayerRef.SetExpressionOverride(8, 65)
 				snusnuMain.PlayerRef.SetExpressionPhoneme(0, 0.4)
 				
-				If canPlayAnimation(snusnuMain.PlayerRef)
+				If Snusnu.canPlayAnimation(snusnuMain.PlayerRef)
 					;Unequip weapons
 					snusnuMain.PlayerRef.SheatheWeapon()
 					Utility.wait(0.5)
@@ -279,7 +280,7 @@ Event OnUpdate()
 					
 					growVal = growSteps ;TLALOC - Break condition
 					
-					updateBones(snusnuMain.PlayerRef, growVal)
+					updateBones(snusnuMain.PlayerRef, growVal, True, True)
 				ElseIf growVal <= (growStage * 0.1) - 0.05
 					If !((growStage * 0.1) - 0.05 > growSteps) ;TLALOC - Fix for special case where the target size is skipped
 						goingUp = true
@@ -288,6 +289,8 @@ Event OnUpdate()
 					EndIf
 				EndIf
 			EndIf
+			
+			;Debug.Trace("SNU - growSteps="+growSteps+", growVal="+growVal+", growStage="+growStage+", goingUp="+goingUp+", currentStage="+currentStage)
 			
 			If growVal == growSteps && !goingUp
 				;Finishing TF steps
@@ -308,7 +311,7 @@ Event OnUpdate()
 					EndIf
 				EndIf
 				
-				If canPlayAnimation(snusnuMain.PlayerRef)
+				If Snusnu.canPlayAnimation(snusnuMain.PlayerRef)
 					Debug.SendAnimationEvent(snusnuMain.PlayerRef,"IdleForceDefaultState")
 				EndIf
 				
@@ -345,7 +348,7 @@ Event OnUpdate()
 			If !loadFMGMorphs(snusnuMain.PlayerRef)
 				Debug.Notification("Could not load the FMG morphs!")
 			EndIf
-			updateBones(snusnuMain.PlayerRef, snusnuMain.currentMusclePercent, False)
+			updateBones(snusnuMain.PlayerRef, snusnuMain.currentMusclePercent, False, True)
 				
 			If snusnuMain.currentMusclePercent == 1.0 - (snusnuMain.moreChangesIncrements * 2)
 				applyMuscleNormals(snusnuMain.PlayerRef, 2)
@@ -380,86 +383,88 @@ Event OnUpdate()
 		reloadUpdate = false
 	EndIf
 	
-	If !snusnuMain.useAltBody && StorageUtil.GetIntValue(snusnuMain.PlayerRef, "SNU_UltraMuscle", 0) == 12
-		;Changes were made!
-		If !loadFMGMorphs(snusnuMain.PlayerRef)
-			Debug.Trace("SNU - Could not load the FMG morphs!")
-		Else
-			muscleChange(snusnuMain.PlayerRef, snusnuMain.currentMusclePercent )
-			updateBones(snusnuMain.PlayerRef, snusnuMain.currentMusclePercent, False)
-			
-			If snusnuMain.hardcoreMode
-				snusnuMain.updateAllowedItemsEquipedWeight()
-				snusnuMain.needEquipWeightUpdate = true
+	If !snusnuMain.useAltBody
+		If StorageUtil.GetIntValue(snusnuMain.PlayerRef, "SNU_UltraMuscle", 0) == 12
+			;Changes were made!
+			If !loadFMGMorphs(snusnuMain.PlayerRef)
+				Debug.Trace("SNU - Could not load the FMG morphs!")
+			Else
+				muscleChange(snusnuMain.PlayerRef, snusnuMain.currentMusclePercent )
+				updateBones(snusnuMain.PlayerRef, snusnuMain.currentMusclePercent, False, True)
+				
+				If snusnuMain.hardcoreMode
+					snusnuMain.updateAllowedItemsEquipedWeight()
+					snusnuMain.needEquipWeightUpdate = true
+				EndIf
+				
+				snusnuMain.showInfoNotification("FMG shape has been updated")
+				Debug.Trace("SNU - FMG shape has been updated")
 			EndIf
-			
-			snusnuMain.showInfoNotification("FMG shape has been updated")
-			Debug.Trace("SNU - FMG shape has been updated")
-		EndIf
-		StorageUtil.SetIntValue(snusnuMain.PlayerRef, "SNU_UltraMuscle", 1+moreChangesCount)
-	EndIf
-	
-	;Debug.Trace("SNU - tfTime="+tfTime+", Days passed: "+(snusnuMain.GameDaysPassed.GetValue() - tfTime))
-	If snusnuMain.applyMoreChangesOvertime && tfTime > 0.0 && snusnuMain.GameDaysPassed.GetValue() - tfTime >= snusnuMain.moreChangesInterval
-		Debug.Trace("SNU - Starting more changes stage "+moreChangesCount)
-		If snusnuMain.currentMusclePercent < 1.0
-			Float newCarryWeight = 400*snusnuMain.currentMusclePercent
-			
-			snusnuMain.currentMusclePercent += snusnuMain.moreChangesIncrements
-			
-			If snusnuMain.hardcoreMode
-				snusnuMain.updateAllowedItemsEquipedWeight()
-				snusnuMain.needEquipWeightUpdate = true
-			EndIf
-			
-			If snusnuMain.currentMusclePercent == 1.0
-				Debug.Notification("Gods i'm getting huge!")
-			ElseIf snusnuMain.currentMusclePercent == 1.0 - snusnuMain.moreChangesIncrements
-				Debug.Notification("Is my body growing again!?")
-			EndIf
-			
-			snusnuMain.PlayerRef.ModActorValue("CarryWeight", -newCarryWeight)
-			Utility.wait(1.0)
-			snusnuMain.PlayerRef.ModActorValue("CarryWeight", 400*snusnuMain.currentMusclePercent)
-			
-			;Apply more muscle morphs
-			applyQuickGrowthAnim(snusnuMain.PlayerRef, snusnuMain.currentMusclePercent)
-			
-			If snusnuMain.currentMusclePercent == 1.0
-				applyMuscleNormals(snusnuMain.PlayerRef, 5)
-				;snusnuMain.ClearMorphs(false)
-				NiOverride.ClearBodyMorphKeys(snusnuMain.PlayerRef, snusnuMain.SNUSNU_KEY)
-				
-				;Improved jump height
-				Game.SetGameSettingFloat("fJumpHeightMin", 180.0)
-				
-				snusnuMain.updateAnimations(4)
-				
-				applyBarbarianSkin(snusnuMain.PlayerRef, 2)
-			ElseIf snusnuMain.currentMusclePercent == 1.0 - snusnuMain.moreChangesIncrements
-				applyMuscleNormals(snusnuMain.PlayerRef, 3)
-				
-				snusnuMain.updateBoobsPhysics(true, 1)
-				snusnuMain.updateAnimations(4) ;Was 3
-				
-				applyBarbarianSkin(snusnuMain.PlayerRef, 1)
-			EndIf
-			
-			
-			snusnuMain.PlayerRef.unequipItem(snusnuMain.FistsOfRage)
-			updateFistsPower(snusnuMain.currentMusclePercent)
-			Utility.wait(0.1)
-			snusnuMain.PlayerRef.equipItem(snusnuMain.FistsOfRage)
+			StorageUtil.SetIntValue(snusnuMain.PlayerRef, "SNU_UltraMuscle", 1+moreChangesCount)
 		EndIf
 		
-		moreChangesCount += 1
-		StorageUtil.SetIntValue(snusnuMain.PlayerRef, "SNU_UltraMuscle", 1+moreChangesCount)
-		If snusnuMain.currentMusclePercent < 1.0
-			tfTime = snusnuMain.GameDaysPassed.GetValue()
-		Else
-			;Break condition
-			Debug.Trace("SNU - More Changes Break condition!")
-			tfTime = -1.0
+		;Debug.Trace("SNU - tfTime="+tfTime+", Days passed: "+(snusnuMain.GameDaysPassed.GetValue() - tfTime))
+		If snusnuMain.applyMoreChangesOvertime && tfTime > 0.0 && snusnuMain.GameDaysPassed.GetValue() - tfTime >= snusnuMain.moreChangesInterval
+			Debug.Trace("SNU - Starting more changes stage "+moreChangesCount)
+			If snusnuMain.currentMusclePercent < 1.0
+				Float newCarryWeight = 400*snusnuMain.currentMusclePercent
+				
+				snusnuMain.currentMusclePercent += snusnuMain.moreChangesIncrements
+				
+				If snusnuMain.hardcoreMode
+					snusnuMain.updateAllowedItemsEquipedWeight()
+					snusnuMain.needEquipWeightUpdate = true
+				EndIf
+				
+				If snusnuMain.currentMusclePercent == 1.0
+					Debug.Notification("Gods i'm getting huge!")
+				ElseIf snusnuMain.currentMusclePercent == 1.0 - snusnuMain.moreChangesIncrements
+					Debug.Notification("Is my body growing again!?")
+				EndIf
+				
+				snusnuMain.PlayerRef.ModActorValue("CarryWeight", -newCarryWeight)
+				Utility.wait(1.0)
+				snusnuMain.PlayerRef.ModActorValue("CarryWeight", 400*snusnuMain.currentMusclePercent)
+				
+				;Apply more muscle morphs
+				applyQuickGrowthAnim(snusnuMain.PlayerRef, snusnuMain.currentMusclePercent)
+				
+				If snusnuMain.currentMusclePercent == 1.0
+					applyMuscleNormals(snusnuMain.PlayerRef, 5)
+					;snusnuMain.ClearMorphs(false)
+					NiOverride.ClearBodyMorphKeys(snusnuMain.PlayerRef, snusnuMain.SNUSNU_KEY)
+					
+					;Improved jump height
+					Game.SetGameSettingFloat("fJumpHeightMin", 180.0)
+					
+					snusnuMain.updateAnimations(4)
+					
+					applyBarbarianSkin(snusnuMain.PlayerRef, 2)
+				ElseIf snusnuMain.currentMusclePercent == 1.0 - snusnuMain.moreChangesIncrements
+					applyMuscleNormals(snusnuMain.PlayerRef, 3)
+					
+					snusnuMain.updateBoobsPhysics(true, 1)
+					snusnuMain.updateAnimations(4) ;Was 3
+					
+					applyBarbarianSkin(snusnuMain.PlayerRef, 1)
+				EndIf
+				
+				
+				snusnuMain.PlayerRef.unequipItem(snusnuMain.FistsOfRage)
+				updateFistsPower(snusnuMain.currentMusclePercent)
+				Utility.wait(0.1)
+				snusnuMain.PlayerRef.equipItem(snusnuMain.FistsOfRage)
+			EndIf
+			
+			moreChangesCount += 1
+			StorageUtil.SetIntValue(snusnuMain.PlayerRef, "SNU_UltraMuscle", 1+moreChangesCount)
+			If snusnuMain.currentMusclePercent < 1.0
+				tfTime = snusnuMain.GameDaysPassed.GetValue()
+			Else
+				;Break condition
+				Debug.Trace("SNU - More Changes Break condition!")
+				tfTime = -1.0
+			EndIf
 		EndIf
 	EndIf
 	
@@ -477,17 +482,28 @@ Event OnSleepStop(bool abInterrupted)
 EndEvent
 
 Event OnObjectUnequipped(Form type, ObjectReference ref)
-	if !snusnuMain.useAltBody && !snusnuMain.isTransforming && type == snusnuMain.handsFix && moreChangesCount >= 1
+	if !snusnuMain.useAltBody && snusnuMain.applyMoreChangesOvertime && !snusnuMain.isTransforming && type == snusnuMain.handsFix && moreChangesCount >= 1
 		Utility.wait(0.4)
 		Debug.Trace("SNU - Apply fix over hand fix. tfTime="+tfTime)
-		applyBarbarianSkin(snusnuMain.PlayerRef, moreChangesCount, false)
-	endIf
+		
+		If snusnuMain.currentMusclePercent == 1.0
+			applyBarbarianSkin(snusnuMain.PlayerRef, 2, false)
+		ElseIf snusnuMain.currentMusclePercent == 1.0 - snusnuMain.moreChangesIncrements
+			applyBarbarianSkin(snusnuMain.PlayerRef, 1, false)
+		EndIf
+	EndIf
 EndEvent
 
 Event OnEffectFinish(Actor akTarget, Actor akCaster)
 	If alreadyTransformed
 		return
 	EndIf
+	
+	;We really don't want to revert back during a fight
+	;ToDo- Maybe it would be a good idea to have a toggle option for this
+	While akTarget.isInCombat() || reloadUpdate
+		Utility.wait(4)
+	EndWhile
 	
 	snusnuMain.isTransforming = true
 	
@@ -547,7 +563,7 @@ Event OnEffectFinish(Actor akTarget, Actor akCaster)
 				Utility.wait(0.04)
 			endWhile
 			
-			updateBones(akTarget, 0, False)
+			updateBones(akTarget, 0, False, True)
 			
 			clearMuscleMorphs(akTarget)
 			snusnuMain.clearBoneScales(akTarget)
@@ -682,15 +698,6 @@ Function applyFMGBuffs(Actor akTarget)
 	Debug.Notification("My body has stopped growing")
 EndFunction
 
-Bool Function canPlayAnimation(Actor animatedDude)
-	If animatedDude.isInCombat() || animatedDude.IsOnMount() || animatedDude.IsSwimming() || animatedDude.IsSprinting() || \
-	animatedDude.GetSleepState() != 0 || animatedDude.GetSitState() != 0 || !Game.IsMovementControlsEnabled()
-		return false
-	EndIf
-	
-	return true
-EndFunction
-
 Function applyQuickGrowthAnim(Actor tfActor, Float magnitude)
 	Debug.Trace("applyQuickGrowthAnim("+magnitude+")")
 	If snusnuMain.tfAnimation
@@ -721,24 +728,38 @@ Function applyQuickGrowthAnim(Actor tfActor, Float magnitude)
 	snusnuMain.removeNormalMuscle(tfActor, magnitude)
 	muscleChange(tfActor, magnitude )
 	
-	updateBones(tfActor, magnitude)
+	updateBones(tfActor, magnitude, True, True)
 	
 	Debug.Trace("SNU - Finished growing to "+magnitude)
 	;snusnuMain.showInfoNotification("Finished growing to "+(magnitude*100)+"%")
 EndFunction
 
-Function updateBones(Actor theActor, Float magnitude, Bool growingUp = true)
-	;/ToDo- Check if the current bone scale is actually smaller than what we want to change it to
-	Bool actorIsFemale = theActor.GetActorBase().GetSex()
-	Float currentScale = NiOverride.GetNodeTransformScale(theActor, false, actorIsFemale, snusnuMain.boneSliders[0], snusnuMain.SNUSNU_KEY)
-	Float scaleValue = 1.0 + magnitude
-	/;
+Bool Function updateBones(Actor theActor, Float magnitude, Bool growingUp = true, Bool forceUpdate = false)
 	
+	;ToDo- WE NEED TO CHECK FOR CHANGES ON AN INDIVIDUAL BONE BASIS!!!!!!
+	
+	;Check if the current bone scale is actually bigger or smaller than what we want to change it to
+	;/Int changedBone = snusnuMain.findFirstActiveBoneMorph(theActor)
+	If changedBone != -1 && !forceUpdate
+		Bool actorIsFemale = theActor.GetActorBase().GetSex()
+		Float changedBoneVal = NiOverride.GetNodeTransformScale(theActor, false, actorIsFemale, snusnuMain.getBoneMorphName(changedBone), snusnuMain.SNUSNU_KEY)
+		If growingUp && changedBoneVal >= snusnuMain.getBoneSize(magnitude, bonesValuesFMG[changedBone])
+			Debug.Trace("SNU - Bone is already bigger, bailing out!!")
+			return false
+		ElseIf !growingUp && changedBoneVal <= snusnuMain.getBoneSize(magnitude, bonesValuesFMG[changedBone])
+			Debug.Trace("SNU - Bone is already smaller, bailing out!!")
+			return false
+		EndIf
+	EndIf
+	/;
+	Debug.Trace("SNU - Updating all bones! magnitude="+magnitude+", growingUp="+growingUp)
 	Int boneCounter = 0
 	While boneCounter < snusnuMain.totalCurrentBones
 		snusnuMain.changeBoneScale(theActor, boneCounter, snusnuMain.getBoneSize(magnitude, bonesValuesFMG[boneCounter]))
 		boneCounter += 1
 	EndWhile
+	
+	return true
 EndFunction
 
 ;Head index: 0=Original, 1=Muscle, 2=Muscle tan, 3=Muscle tan 2
@@ -978,11 +999,13 @@ Function applyOverlayStrings(Actor target, String slot)
 EndFunction
 
 Function applyBarbarianSkin(Actor target, Int skinIndex, Bool applyFix = true)
-	If snusnuMain.isVampireLord
+	Bool isFemale = target.GetActorBase().GetSex() != 0
+	;Due to restrictions on original textures usage, skin switching will be disabled for males
+	If snusnuMain.isVampireLord || !isFemale
 		return
 	EndIf
 	
-	Debug.Trace("SNU - applyBarbarianSkin()")
+	Debug.Trace("SNU - applyBarbarianSkin(skinIndex="+skinIndex+")")
 	Bool hasHandFix = false
 	Armor handsArmor = target.GetWornForm(0x00000008) as Armor
 	if !handsArmor && applyFix
@@ -992,7 +1015,6 @@ Function applyBarbarianSkin(Actor target, Int skinIndex, Bool applyFix = true)
 		hasHandFix = true
 	endIf
 	
-	Bool isFemale = target.GetActorBase().GetSex() != 0
 	If skinIndex > 0 && (!snusnuMain.PlayerRef.hasKeyword(snusnuMain.isVampire) || snusnuMain.applyVampireFix)
 		String tempNormalsPath = snusnuMain.normalsPath+snusnuMain.getNormalsByBodyType(target)+"Ultra"+skinIndex+"\\"
 		

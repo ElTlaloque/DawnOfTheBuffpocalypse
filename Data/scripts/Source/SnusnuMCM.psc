@@ -311,12 +311,21 @@ Event OnPageReset(String a_page)
 		AddEmptyOption()
 		_myApplyMoreChanges = AddToggleOption("More changes while TF", snusnuMain.applyMoreChangesOvertime, altBodyFlag)
 		AddEmptyOption()
-		_myChangesInterval = AddSliderOption("More changes interval", snusnuMain.moreChangesInterval, "{2}", altBodyFlag)
-		AddEmptyOption()
-		_myChangesIncrements = AddSliderOption("More changes growth increments", snusnuMain.moreChangesIncrements, "{2}", altBodyFlag)
-		AddEmptyOption()
-		_myDynamicChanges = AddToggleOption("Dynamic changes calculation", snusnuMain.dynamicChangesCalculation, altBodyFlag)
-		AddEmptyOption()
+		If !snusnuMain.applyMoreChangesOvertime
+			_myChangesInterval = AddSliderOption("More changes interval", snusnuMain.moreChangesInterval, "{2}", OPTION_FLAG_DISABLED)
+			AddEmptyOption()
+			_myChangesIncrements = AddSliderOption("More changes growth increments", snusnuMain.moreChangesIncrements, "{2}", OPTION_FLAG_DISABLED)
+			AddEmptyOption()
+			_myDynamicChanges = AddToggleOption("Dynamic changes calculation", snusnuMain.dynamicChangesCalculation, OPTION_FLAG_DISABLED)
+			AddEmptyOption()
+		Else
+			_myChangesInterval = AddSliderOption("More changes interval", snusnuMain.moreChangesInterval, "{2}", altBodyFlag)
+			AddEmptyOption()
+			_myChangesIncrements = AddSliderOption("More changes growth increments", snusnuMain.moreChangesIncrements, "{2}", altBodyFlag)
+			AddEmptyOption()
+			_myDynamicChanges = AddToggleOption("Dynamic changes calculation", snusnuMain.dynamicChangesCalculation, altBodyFlag)
+			AddEmptyOption()
+		EndIf
 		_myVampireFix = AddToggleOption("Seam fix for vampires", snusnuMain.applyVampireFix)
 		
 	ElseIf (a_page == Pages[1] && snusnuMain.selectedBody != 2)
@@ -772,6 +781,18 @@ Event OnOptionSelect(Int a_option)
 	ElseIf a_option == _myApplyMoreChanges
 		snusnuMain.applyMoreChangesOvertime = !snusnuMain.applyMoreChangesOvertime
 		SetToggleOptionValue(a_option, snusnuMain.applyMoreChangesOvertime)
+		
+		If !snusnuMain.applyMoreChangesOvertime
+			Self.SetOptionFlags(_myChangesInterval, Self.OPTION_FLAG_DISABLED, True)
+			Self.SetOptionFlags(_myChangesIncrements, Self.OPTION_FLAG_DISABLED, True)
+			Self.SetOptionFlags(_myDynamicChanges, Self.OPTION_FLAG_DISABLED, True)
+		Else
+			Self.SetOptionFlags(_myChangesInterval, Self.OPTION_FLAG_NONE, True)
+			Self.SetOptionFlags(_myChangesIncrements, Self.OPTION_FLAG_NONE, True)
+			Self.SetOptionFlags(_myDynamicChanges, Self.OPTION_FLAG_NONE, True)
+		EndIf
+		
+		ForcePageReset()
 	ElseIf a_option == _myDynamicChanges
 		snusnuMain.dynamicChangesCalculation = !snusnuMain.dynamicChangesCalculation
 		SetToggleOptionValue(a_option, snusnuMain.dynamicChangesCalculation)

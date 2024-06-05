@@ -1,0 +1,4 @@
+IsActorBase("Skyrim.esm"|0x000007) AND
+ValueEqualTo("EVGConditionalIdles.esp"|0x00000d69, 1) AND
+IsActorValuePercentageLessThan(26, 0.25) OR
+ValueEqualTo("Snusnu.esp"|0x00013B6B, 1)

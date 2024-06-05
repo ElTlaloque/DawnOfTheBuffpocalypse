@@ -364,8 +364,8 @@ Event OnCellLoad()
 	applyNPCMuscle()
 	
 	Location playerLocation = PlayerRef.GetCurrentLocation()
-	If playerLocation.HasKeywordString("LocTypeHouse") || playerLocation.HasKeywordString("LocTypeInn") || \
-	playerLocation.HasKeywordString("LocTypeTemple") ;|| playerLocation.HasKeywordString("LocTypeStore")
+	If playerLocation.HasKeywordString("LocTypeHouse") || playerLocation.HasKeywordString("LocTypeInn") ;|| \
+	;playerLocation.HasKeywordString("LocTypeTemple") || playerLocation.HasKeywordString("LocTypeStore")
 		
 		updateCarryWeight()
 		
@@ -522,6 +522,11 @@ Event OnUpdate()
 				PlayerRef.ModActorValue("CarryWeight", -modWeight)
 				heavyItemsEquiped = 1
 				IsOverwhelmed.setValue(1)
+				
+				If canPlayAnimation(PlayerRef)
+					Utility.Wait(1)
+					Debug.SendAnimationEvent(PlayerRef,"IdleForceDefaultState")
+				EndIf
 			ElseIf heavyItemsEquiped && itemsEquipedWeight <= allowedItemsEquipedWeight && PlayerRef.GetActorValue("CarryWeight") < -100
 				Debug.Trace("SNU - All heavy items were removed. Restoring carryWeight")
 				;showInfoNotification("Restoring carry weight: "+actualCarryWeight+"+500")
@@ -530,6 +535,11 @@ Event OnUpdate()
 				PlayerRef.ModActorValue("CarryWeight", actualCarryWeight + 500)
 				heavyItemsEquiped = 0
 				IsOverwhelmed.setValue(0)
+				
+				If canPlayAnimation(PlayerRef)
+					Utility.Wait(1)
+					Debug.SendAnimationEvent(PlayerRef,"IdleForceDefaultState")
+				EndIf
 				
 				;DEBUG
 				Debug.Trace("SNU - CarryWeight after items unequipped = "+PlayerRef.GetActorValue("CarryWeight"))
@@ -548,13 +558,18 @@ Bool Function IsValidSlotForEquipWeight(Armor itemArmor)
 	;47=Backpacks, 52=Underwear, 55=Wig, 57=Bras, 58=Armlets
 	
 	;Helmets use slots 30, 31, 42 & 43
-	;!Math.LogicalAnd(itemArmor.getSlotMask(), itemArmor.kSlotMask31) && !Math.LogicalAnd(itemArmor.getSlotMask(), itemArmor.kSlotMask43) && \
-	return !Math.LogicalAnd(itemArmor.getSlotMask(), itemArmor.kSlotMask35) && !Math.LogicalAnd(itemArmor.getSlotMask(), itemArmor.kSlotMask36) && \
-	       !Math.LogicalAnd(itemArmor.getSlotMask(), itemArmor.kSlotMask40) && !Math.LogicalAnd(itemArmor.getSlotMask(), itemArmor.kSlotMask41) && \
-		   !Math.LogicalAnd(itemArmor.getSlotMask(), itemArmor.kSlotMask44) && !Math.LogicalAnd(itemArmor.getSlotMask(), itemArmor.kSlotMask45) && \
-		   !Math.LogicalAnd(itemArmor.getSlotMask(), itemArmor.kSlotMask47) && !Math.LogicalAnd(itemArmor.getSlotMask(), itemArmor.kSlotMask52) && \
-		   !Math.LogicalAnd(itemArmor.getSlotMask(), itemArmor.kSlotMask55) && !Math.LogicalAnd(itemArmor.getSlotMask(), itemArmor.kSlotMask57) && \
-		   !Math.LogicalAnd(itemArmor.getSlotMask(), itemArmor.kSlotMask58) && itemArmor != HandsFix
+	If itemArmor.HasKeywordString("ArmorHelmet") ;|| itemArmor.HasKeywordString("ArmorBoots") || itemArmor.HasKeywordString("ArmorGauntlets")
+		return true
+	Else
+		return !Math.LogicalAnd(itemArmor.getSlotMask(), itemArmor.kSlotMask35) && \
+	           !Math.LogicalAnd(itemArmor.getSlotMask(), itemArmor.kSlotMask36) && !Math.LogicalAnd(itemArmor.getSlotMask(), itemArmor.kSlotMask40) && \
+		       !Math.LogicalAnd(itemArmor.getSlotMask(), itemArmor.kSlotMask41) && !Math.LogicalAnd(itemArmor.getSlotMask(), itemArmor.kSlotMask43) && \
+		       !Math.LogicalAnd(itemArmor.getSlotMask(), itemArmor.kSlotMask44) && !Math.LogicalAnd(itemArmor.getSlotMask(), itemArmor.kSlotMask45) && \
+		       !Math.LogicalAnd(itemArmor.getSlotMask(), itemArmor.kSlotMask47) && !Math.LogicalAnd(itemArmor.getSlotMask(), itemArmor.kSlotMask52) && \
+		       !Math.LogicalAnd(itemArmor.getSlotMask(), itemArmor.kSlotMask55) && !Math.LogicalAnd(itemArmor.getSlotMask(), itemArmor.kSlotMask57) && \
+		       !Math.LogicalAnd(itemArmor.getSlotMask(), itemArmor.kSlotMask58) && itemArmor != HandsFix
+	           ;!Math.LogicalAnd(itemArmor.getSlotMask(), itemArmor.kSlotMask31) && 
+	EndIf
 EndFunction
 
 ;ITEM TYPES:
@@ -1089,15 +1104,34 @@ Float Function getMuscleValuePercent(Float theValue)
 	return (theValue / muscleScoreMax) * 100
 EndFunction
 
-Float Function getBoneSize(Float baseModifier, Float boneModifier)
-	If boneModifier > 1.0
-		return baseModifier * Math.abs( 1.0 - boneModifier )
+Float Function getBoneSize(Float modifierMagnitude, Float baseModifier)
+	Float modifiedVal
+	If baseModifier > 1.0
+		modifiedVal = modifierMagnitude * Math.abs( 1.0 - baseModifier )
 	Else
-		;Debug.Trace("SNU - Found bone smaller than 1.0, baseModifier="+baseModifier+", boneModifier="+boneModifier)
-		Float modifiedVal = baseModifier * (boneModifier - 1.0)
+		;Debug.Trace("SNU - Found bone smaller than 1.0, modifierMagnitude="+modifierMagnitude+", baseModifier="+baseModifier)
+		modifiedVal = modifierMagnitude * (baseModifier - 1.0)
 		;Debug.Trace("SNU -            boneSize result: "+modifiedVal)
-		return modifiedVal
 	EndIf
+	
+	return 1.0 + modifiedVal
+EndFunction
+
+Int Function findFirstActiveBoneMorph(Actor theActor)
+	Int counter = 0
+	Bool actorIsFemale = theActor.GetActorBase().GetSex()
+	While counter < totalCurrentBones
+		If NiOverride.GetNodeTransformScale(theActor, false, actorIsFemale, boneSliders[counter], SNUSNU_KEY) != 1.0
+			return counter
+		EndIf
+		counter += 1
+	endWhile
+	
+	return -1
+EndFunction
+
+String Function getBoneMorphName(Int boneIndex)
+	Return boneSliders[boneIndex]
 EndFunction
 
 Function UpdateWeight(Bool applyNow = True)
@@ -1309,7 +1343,6 @@ EndFunction
 Function changeBoneScale(Actor theActor, Int boneIndex, Float scaleValue)
 	Bool actorIsFemale = theActor.GetActorBase().GetSex()
 	Float currentScale = NiOverride.GetNodeTransformScale(theActor, false, actorIsFemale, boneSliders[boneIndex], SNUSNU_KEY)
-	scaleValue = 1.0 + scaleValue
 	
 	;TLALOC- BUG FIX: changes applied to main bones will cause a one frame glitch in the character animation, so we need to avoid it
 	;         as much as we can and only apply it when the change difference is big enough
@@ -3125,6 +3158,15 @@ Function updateAnimations(Int newBuildStage)
 	EndIf
 EndFunction
 
+Bool Function canPlayAnimation(Actor animatedDude) Global
+	If animatedDude.isInCombat() || animatedDude.IsOnMount() || animatedDude.IsSwimming() || animatedDude.IsSprinting() || \
+	animatedDude.GetSleepState() != 0 || animatedDude.GetSitState() != 0 || !Game.IsMovementControlsEnabled()
+		return false
+	EndIf
+	
+	return true
+EndFunction
+
 Function ReloadHotkeys()
 	UnregisterForAllKeys()
 	
@@ -3220,6 +3262,10 @@ Function removeNormalMuscle(Actor buffTarget, Float changePercent)
 		Float tWeight = buffTarget.GetLeveledActorBase().GetWeight()
 		Float tNeckdelta = (tWeight/100) - (newWeight/100)
 		
+		If tWeight == 0
+			Return
+		EndIf
+		
 		;Debug.Trace("SNU - currentWeight="+tWeight+", newWeight="+newWeight)
 		If newWeight - tWeight > 5.0 || newWeight - tWeight < -5.0
 			;TLALOC- The following code can produce small lags
@@ -3228,8 +3274,12 @@ Function removeNormalMuscle(Actor buffTarget, Float changePercent)
 			buffTarget.QueueNiNodeUpdate()
 		EndIf
 	Else
-		Debug.Trace("SNU - Removing normal muscle: "+getfightingMuscle())
+		If getfightingMuscle() == 0
+			Return
+		EndIf
+		
 		Float fightingMuscle = getfightingMuscle() * (1 - changePercent)
+		Debug.Trace("SNU - Removing normal muscle: "+fightingMuscle)
 		
 		Int totalSliders = StorageUtil.IntListCount(buffTarget, SNUSNU_KEY)
 		Int slidersLoop = 0
@@ -3306,7 +3356,7 @@ Function applyNPCMuscle()
 		If muscleScoreNPC == 0.0
 			muscleScoreNPC = floatListGet(none, "MUSCLE_NPCS_SCORE", npcsLoop)
 		EndIf /;
-		Debug.Trace("SNU - Checking muscle on actor: "+currentActor.GetBaseObject().getName()+", Score: "+muscleScoreNPC)
+		;Debug.Trace("SNU - Checking muscle on actor: "+currentActor.GetBaseObject().getName()+", Score: "+muscleScoreNPC)
 		
 		If currentActor.GetBaseObject().getName() == ""
 			Debug.Trace("SNU - Found invalid actor. Removing from list")

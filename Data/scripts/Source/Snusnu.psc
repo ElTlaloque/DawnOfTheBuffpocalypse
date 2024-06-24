@@ -321,6 +321,7 @@ Event OnRaceSwitchComplete()
 		If isWerewolf
 			isWerewolf = false
 			addWerewolfBuild()
+			;ToDo- Reapply changes if FMG spell is active (Just bones. Skin should be managed by the spell itself. Normals are reapplied later in this function)
 		ElseIf isVampireLord
 			isVampireLord = false
 			Debug.Trace("SNU - Dispeling VampireLordMuscleSpell")
@@ -341,6 +342,9 @@ Event OnRaceSwitchComplete()
 		
 	ElseIf PlayerRef.getRace().getName() == "Werewolf"
 		isWerewolf = true
+		If useWerewolfMorphs
+			updateWerewolfMuscle(getfightingMuscle())
+		EndIf
 	ElseIf PlayerRef.getRace().getName() == "Vampire Lord"
 		If isVampireLordReVampedLoaded
 			isVampireLord = true
@@ -364,8 +368,8 @@ Event OnCellLoad()
 	applyNPCMuscle()
 	
 	Location playerLocation = PlayerRef.GetCurrentLocation()
-	If playerLocation.HasKeywordString("LocTypeHouse") || playerLocation.HasKeywordString("LocTypeInn") ;|| \
-	;playerLocation.HasKeywordString("LocTypeTemple") || playerLocation.HasKeywordString("LocTypeStore")
+	If playerLocation.HasKeywordString("LocTypePlayerHouse") || playerLocation.HasKeywordString("LocTypeInn") ;|| \
+	;playerLocation.HasKeywordString("LocTypeTemple") || playerLocation.HasKeywordString("LocTypeStore") || playerLocation.HasKeywordString("LocTypeHouse")
 		
 		updateCarryWeight()
 		
@@ -503,6 +507,8 @@ Event OnUpdate()
 					NiOverride.RemoveSkinOverride(PlayerRef, true, true, 0x04, 9, 1)
 				EndIf
 				/;
+			ElseIf useWerewolfMorphs && isWerewolf
+				updateWerewolfMuscle()
 			EndIf
 ;		Else
 ;			LastDegradationTime = GameDaysPassed.GetValue()
@@ -945,7 +951,7 @@ Event OnSleepStop(bool abInterrupted)
 		
 		totalMuscleToAdd += 0.01
 	Else
-		muscleMightAffinity -= 0.005
+		muscleMightAffinity -= 0.01 ;Was 0.005
 		If muscleMightAffinity < 0.0
 			muscleMightAffinity = 0.0
 		EndIf
@@ -959,7 +965,7 @@ Event OnSleepStop(bool abInterrupted)
 	If StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle", 0) == 0 && !isVampireLord && affinityScore > randomProbability
 		Utility.wait(3)
 		Debug.Notification("I had a dream i was mighty unstoppable")
-		If affinityScore <= muscleMightProbability * 0.9
+		If affinityScore <= muscleMightProbability * 0.95
 			MusclePowerSpell.Cast(PlayerRef)
 		Else
 			UltraMusclePowerSpell.Cast(PlayerRef)
@@ -1180,22 +1186,8 @@ Function UpdateWeight(Bool applyNow = True)
 					
 					;TLALOC- Werewolf body morph --------------------------------------------------------------------
 					;ToDo- Add slider support for all Werewolf morphs
-					If useWerewolfMorphs
-						;NiOverride.SetBodyMorph(PlayerRef, "BodyHigh", SNUSNU_KEY, fightingMuscle * 1.5) ;1.5
-						;NiOverride.SetBodyMorph(PlayerRef, "BreastsLowHDT", SNUSNU_KEY, fightingMuscle * -1.0)
-						
-						;SMALL version
-						NiOverride.SetBodyMorph(PlayerRef, "BodyHigh", SNUSNU_KEY, fightingMuscle * 2.0)
-						NiOverride.SetBodyMorph(PlayerRef, "BreastsLowHDT", SNUSNU_KEY, fightingMuscle * -0.5)
-						
-						;WeightMorphs;
-						If isWeightMorphsLoaded 
-							WeightMorphsMCM WMCM = Game.GetFormFromFile(0x05000888, "WeightMorphs.esp") As WeightMorphsMCM
-							If WMCM.WMorphs.Weight >= 0.0
-								NiOverride.SetBodyMorph(PlayerRef, "BodyHighHDT", SNUSNU_KEY, WMCM.WMorphs.Weight * 0.5);0.8
-								;NiOverride.SetBodyMorph(PlayerRef, "BodyVeryHighHDT", SNUSNU_KEY, fightingMuscle * 0.4)
-							EndIf
-						EndIf
+					If useWerewolfMorphs && isWerewolf
+						updateWerewolfMuscle(fightingMuscle)
 					EndIf
 					;TLALOC- Werewolf body morph --------------------------------------------------------------------
 				EndIf
@@ -3289,6 +3281,35 @@ Function removeNormalMuscle(Actor buffTarget, Float changePercent)
 			slidersLoop += 1
 		endWhile
 	EndIf
+EndFunction
+
+Function updateWerewolfMuscle(Float sizeFactor = 1.0)
+	If StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle", 0) == 0
+		;NiOverride.SetBodyMorph(PlayerRef, "BodyHigh", SNUSNU_KEY, sizeFactor * 1.5) ;1.5
+		;NiOverride.SetBodyMorph(PlayerRef, "BreastsLowHDT", SNUSNU_KEY, sizeFactor * -1.0)
+		Debug.Trace("SNU - Updating werewolf shape, sizeFactor="+sizeFactor)
+		;SMALL version
+		NiOverride.SetBodyMorph(PlayerRef, "BodyHigh", SNUSNU_KEY, sizeFactor * 2.0)
+		NiOverride.SetBodyMorph(PlayerRef, "BreastsLowHDT", SNUSNU_KEY, sizeFactor * -0.5)
+		
+		;WeightMorphs;
+		If isWeightMorphsLoaded 
+			WeightMorphsMCM WMCM = Game.GetFormFromFile(0x05000888, "WeightMorphs.esp") As WeightMorphsMCM
+			If WMCM.WMorphs.Weight >= 0.0
+				NiOverride.SetBodyMorph(PlayerRef, "BodyHighHDT", SNUSNU_KEY, WMCM.WMorphs.Weight * 0.5);0.8
+				;NiOverride.SetBodyMorph(PlayerRef, "BodyVeryHighHDT", SNUSNU_KEY, sizeFactor * 0.4)
+			EndIf
+		EndIf
+	Else
+		Debug.Trace("SNU - Updating werewolf shape, currentMusclePercent="+currentMusclePercent)
+		NiOverride.SetBodyMorph(PlayerRef, "BodyHigh", SNUSNU_KEY, currentMusclePercent * 2.0)
+		NiOverride.SetBodyMorph(PlayerRef, "BreastsLowHDT", SNUSNU_KEY, currentMusclePercent * -0.5)
+		
+		;Add some thickness
+		NiOverride.SetBodyMorph(PlayerRef, "BodyHighHDT", SNUSNU_KEY, 0.5)
+	EndIf
+	
+	NiOverride.UpdateModelWeight(PlayerRef)
 EndFunction
 
 Function addWerewolfBuild()

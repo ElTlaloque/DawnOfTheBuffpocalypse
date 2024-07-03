@@ -24,6 +24,7 @@
 		"applymorechangesovertime" : 1,
 		"applyvampirefix" : 0,
 		"changeheadpart" : 1,
+		"changetobarbarianvoice" : 1,
 		"disablenormals" : 0,
 		"dynamicchangescalculation" : 0,
 		"enabled" : 1,

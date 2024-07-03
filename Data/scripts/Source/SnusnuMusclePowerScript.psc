@@ -238,6 +238,17 @@ Event OnPlayerLoadGame()
 	RegisterForSleep()
 EndEvent
 
+Event OnRaceSwitchComplete()
+	If snusnuMain.PlayerRef.getRace().getName() != "Werewolf" && snusnuMain.PlayerRef.getRace().getName() != "Vampire Lord"
+		;Race is neither vampire or werewolf, so we assume whatever they were transformed into they reverted back
+	
+		If !snusnuMain.PlayerRef.isEquipped(snusnuMain.FistsOfRage)
+			snusnuMain.PlayerRef.equipItem(snusnuMain.FistsOfRage)
+			Debug.Trace("SNU - FistsOfRage were restored")
+		EndIf
+	EndIf
+EndEvent
+
 Event OnUpdate()
 	If alreadyTransformed
 		return
@@ -961,12 +972,26 @@ Function applyMuscleNormals(Actor buffTarget, int stage)
 EndFunction
 
 ;TLALOC- Blatantly ripped from Blush When Aroused
-string Function initOverlaySlot(Actor buffTarget) Global
+string Function initOverlaySlot(Actor buffTarget, Int bodyPart) Global
 	;String normalsPath = snusnuMain.normalsPath+snusnuMain.getNormalsByBodyType(buffTarget)
 	string deftex = "Actors\\Character\\Overlays\\Default.dds"
 	string newOverlayID = "x"
 	int i = 0
-	int maxOverlays = NiOverride.GetNumBodyOverlays()
+	
+	int maxOverlays
+	If bodyPart == 0 ;Body
+		maxOverlays = NiOverride.GetNumBodyOverlays()
+	ElseIf bodyPart == 1 ;Hands
+		maxOverlays = NiOverride.GetNumHandOverlays()
+	ElseIf bodyPart == 2 ;Feet
+		maxOverlays = NiOverride.GetNumFeetOverlays()
+	ElseIf bodyPart == 3 ;Face
+		maxOverlays = NiOverride.GetNumFaceOverlays()
+	Else
+		Debug.Trace("SNU - ERROR: body part index for overlay slots is INVALID!")
+		return "x"
+	EndIf
+	
 	;Debug.Trace("SNU - maxOverlays="+maxOverlays)
 	string overlayString
 	while i < maxOverlays && newOverlayID == "x"
@@ -1040,10 +1065,6 @@ Function applyBarbarianSkin(Actor target, Int skinIndex, Bool applyFix = true)
 	If skinIndex > 0 && (!snusnuMain.PlayerRef.hasKeyword(snusnuMain.isVampire) || snusnuMain.applyVampireFix)
 		String tempNormalsPath = snusnuMain.normalsPath+snusnuMain.getNormalsByBodyType(target)+"Ultra"+skinIndex+"\\"
 		
-		;Body
-		NiOverride.AddSkinOverrideString(target, isFemale, false, 0x04, 9, 0, tempNormalsPath+"Body.dds", true)
-		NiOverride.AddSkinOverrideString(target, isFemale, true, 0x04, 9, 0, tempNormalsPath+"Body.dds", true)
-		
 		;Face
 		;NiOverride.AddSkinOverrideString(target, isFemale, false, 0x04, 9, 0, tempNormalsPath+"Face.dds", true)
 		;NiOverride.AddSkinOverrideString(target, isFemale, true, 0x04, 9, 0, tempNormalsPath+"Face.dds", true)
@@ -1055,6 +1076,10 @@ Function applyBarbarianSkin(Actor target, Int skinIndex, Bool applyFix = true)
 			switchHeads(target, 3)
 		EndIf
 		
+		;Body
+		NiOverride.AddSkinOverrideString(target, isFemale, false, 0x04, 9, 0, tempNormalsPath+"Body.dds", true)
+		NiOverride.AddSkinOverrideString(target, isFemale, true, 0x04, 9, 0, tempNormalsPath+"Body.dds", true)
+		
 		;Hands
 		NiOverride.AddSkinOverrideString(target, isFemale, false, 0x08, 9, 0, tempNormalsPath+"Hands.dds", true)
 		NiOverride.AddSkinOverrideString(target, isFemale, true, 0x08, 9, 0, tempNormalsPath+"Hands.dds", true)
@@ -1062,8 +1087,14 @@ Function applyBarbarianSkin(Actor target, Int skinIndex, Bool applyFix = true)
 		;Feet
 		NiOverride.AddSkinOverrideString(target, isFemale, false, 0x80, 9, 0, tempNormalsPath+"Body.dds", true)
 		NiOverride.AddSkinOverrideString(target, isFemale, true, 0x80, 9, 0, tempNormalsPath+"Body.dds", true)
+		
+		;Change to a more rough voice
+		changeVoice(target)
 	Else
 		;RemoveAllReferenceSkinOverrides(target)
+		
+		;Face
+		switchHeads(target, 0)
 		;Body
 		NiOverride.RemoveSkinOverride(target, isFemale, false, 0x04, 9, 0)
 		NiOverride.RemoveSkinOverride(target, isFemale, true, 0x04, 9, 0)
@@ -1074,11 +1105,12 @@ Function applyBarbarianSkin(Actor target, Int skinIndex, Bool applyFix = true)
 		NiOverride.RemoveSkinOverride(target, isFemale, false, 0x80, 9, 0)
 		NiOverride.RemoveSkinOverride(target, isFemale, true, 0x80, 9, 0)
 		
-		switchHeads(target, 0)
-		
 		If !target.IsOnMount()
 			target.QueueNiNodeUpdate()
 		EndIf
+		
+		;Revert to original voice
+		changeVoice(target, true)
 	EndIf
 	
 	
@@ -1090,6 +1122,26 @@ Function applyBarbarianSkin(Actor target, Int skinIndex, Bool applyFix = true)
 	endIf
 EndFunction
 
+Function changeVoice(Actor victim, Bool removeCustomVoice = false)
+	;Check if "PC Head Tracking" mod is installed
+	If snusnuMain.changeToBarbarianVoice ;&& Game.GetModByName("PC Head Tracking - MCM.esp") != 255
+		Bool isFemale = victim.GetActorBase().GetSex() != 0
+		If !removeCustomVoice
+			snusnuMain.originalPCVoice = victim.GetRace().GetDefaultVoiceType(isFemale)
+			
+			VoiceType customVoice
+			If isFemale
+				customVoice = Game.GetFormFromFile(98176, "Dragonborn.esm") as VoiceType ;Frea
+			Else
+				customVoice = Game.GetFormFromFile(31812, "Dawnguard.esm") as VoiceType ;Isran
+			EndIf
+			
+			victim.GetRace().SetDefaultVoiceType(isFemale, customVoice)
+		ElseIf snusnuMain.originalPCVoice
+			victim.GetRace().SetDefaultVoiceType(isFemale, snusnuMain.originalPCVoice)
+		EndIf
+	EndIf
+EndFunction
 
 Function initFMGSliders()
 	cbbeValuesFMG = new Float[52]

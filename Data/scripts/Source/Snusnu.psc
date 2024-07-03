@@ -95,13 +95,13 @@ Int Property npcMuscleKey = 37 Auto ;K
 Int Property selectedBody = 0 Auto ;0=UUNP, 1=CBBE SE, 2=Vanilla
 
 ;TLALOC- WeightMorphs related values
-Bool Property isWeightMorphsLoaded Auto
+Bool Property isWeightMorphsLoaded = false Auto
 Bool Property removeWeightMorphs = true Auto
 ;PlayerSuccubusMenu PSQM
 ;WeightMorphsMCM WMCM
 
 Bool Property useDynamicPhysics = true Auto
-Bool Property is3BAPhysicsLoaded Auto
+Bool Property is3BAPhysicsLoaded = false Auto
 
 ;TLALOC- TF related stuff
 Bool Property isTransforming = false Auto
@@ -132,6 +132,8 @@ Float Property muscleMightAffinity = 0.0  Auto
 Float Property muscleMightProbability = 0.25  Auto
 Float Property totalMuscleToAdd = 0.01 Auto
 Float Property currentMusclePercent = 1.0 Auto
+Bool Property changeToBarbarianVoice = true Auto
+VoiceType Property originalPCVoice = none Auto
 
 ;Alt FMG body. No morphs, just a different body mesh
 Bool Property useAltBody = false Auto
@@ -172,7 +174,7 @@ Float Property addVampireStrength = 0.125 Auto
 Bool Property isVampireLord = false Auto
 SPELL Property VampireLordMuscleSpell Auto
 Float Property vampireLordMusclePercent = 0.0 Auto
-Bool Property isVampireLordReVampedLoaded Auto
+Bool Property isVampireLordReVampedLoaded = false Auto
 FormList Property SnusnuPlayableRaces Auto
 FormList Property SnusnuVampireRaces Auto
 Bool Property applyVampireFix = false Auto
@@ -367,17 +369,19 @@ Event OnCellLoad()
 	Utility.Wait(1)
 	applyNPCMuscle()
 	
-	Location playerLocation = PlayerRef.GetCurrentLocation()
-	If playerLocation.HasKeywordString("LocTypePlayerHouse") || playerLocation.HasKeywordString("LocTypeInn") ;|| \
-	;playerLocation.HasKeywordString("LocTypeTemple") || playerLocation.HasKeywordString("LocTypeStore") || playerLocation.HasKeywordString("LocTypeHouse")
-		
-		updateCarryWeight()
-		
-		If hardcoreMode
-			;Fix for hardcore mode values not being updated often enough (specially happens for vampires. Or not going to bed in general...)
-			showInfoNotification("Updating allowed equipped weight")
-			updateAllowedItemsEquipedWeight()
-			needEquipWeightUpdate = true
+	If Enabled
+		Location playerLocation = PlayerRef.GetCurrentLocation()
+		If playerLocation.HasKeywordString("LocTypePlayerHouse") || playerLocation.HasKeywordString("LocTypeInn") ;|| \
+		;playerLocation.HasKeywordString("LocTypeTemple") || playerLocation.HasKeywordString("LocTypeStore") || playerLocation.HasKeywordString("LocTypeHouse")
+			
+			updateCarryWeight()
+			
+			If hardcoreMode
+				;Fix for hardcore mode values not being updated often enough (specially happens for vampires. Or not going to bed in general...)
+				showInfoNotification("Updating allowed equipped weight")
+				updateAllowedItemsEquipedWeight()
+				needEquipWeightUpdate = true
+			EndIf
 		EndIf
 	EndIf
 EndEvent
@@ -747,11 +751,14 @@ EndFunction
 
 Event OnObjectEquipped(Form type, ObjectReference ref)
 	;Debug.Trace("SNU -----------------OnObjectEquipped()-----------------")
-	Potion iaExercise = Game.GetFormFromFile(0x05084235, "ImmersiveInteractions.esp") As Potion
-	If !checkVampirism() && StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle", 0) == 0 && iaExercise && type == iaExercise
-		updateMuscleScore(0.75 * MultGainMisc)
-		Debug.Notification("I'm getting a little stronger")
-		return
+	If Game.GetModByName("ImmersiveInteractions.esp") != 255
+		;Debug.Trace("SNU - ImmersiveInteractions found in load order")
+		Potion iaExercise = Game.GetFormFromFile(0x05084235, "ImmersiveInteractions.esp") As Potion
+		If !checkVampirism() && StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle", 0) == 0 && iaExercise && type == iaExercise
+			updateMuscleScore(0.75 * MultGainMisc)
+			Debug.Notification("I'm getting a little stronger")
+			return
+		EndIf
 	EndIf
 	
 	If !hardcoreMode
@@ -1063,8 +1070,7 @@ Event OnKeyDown(Int KeyCode)
 		
 		;WeightMorphs info
 		If isWeightMorphsLoaded
-			WeightMorphsMCM WMCM = Game.GetFormFromFile(0x05000888, "WeightMorphs.esp") As WeightMorphsMCM
-			Debug.Notification("WeightMorphs Weight="+WMCM.WMorphs.Weight)
+			Debug.Notification("WeightMorphs Weight="+getWeightmorphsWeight())
 		EndIf
 		If carryWeightBoost != 0.0
 			Debug.Notification("ExtraCarryWeight="+currentExtraCarryWeight)
@@ -1083,17 +1089,35 @@ Event OnKeyDown(Int KeyCode)
 	EndIf
 EndEvent
 
+Float Function getWeightmorphsWeight()
+	;;/
+	If isWeightMorphsLoaded
+		WeightMorphsMCM WMCM = Game.GetFormFromFile(0x05000888, "WeightMorphs.esp") As WeightMorphsMCM
+		return WMCM.WMorphs.Weight
+	EndIf
+	;
+	return 0
+EndFunction
+
+Function changeWeightmorphsWeight(Float amount, Bool applyNow = True)
+	;;/
+	If isWeightMorphsLoaded
+		WeightMorphsMCM WMCM = Game.GetFormFromFile(0x05000888, "WeightMorphs.esp") As WeightMorphsMCM
+		WMCM.WMorphs.ChangeWeight(amount, true)
+	EndIf
+	;
+EndFunction
+
 Float Function getfightingMuscle()
 	Float fightingMuscle = muscleScore / muscleScoreMax
 		
 	; Female
 	If isWeightMorphsLoaded
-		WeightMorphsMCM WMCM = Game.GetFormFromFile(0x05000888, "WeightMorphs.esp") As WeightMorphsMCM
 		Int PlayerSex = PlayerRef.GetActorBase().GetSex()
-		If PlayerSex == 1 && WMCM.WMorphs.Weight > 0.2 ;There will be always at least 20% muscularity
+		If PlayerSex == 1 && getWeightmorphsWeight() > 0.2 ;There will be always at least 20% muscularity
 			;TLALOC- If getting chubbier, muscle mass gets smaller (This is to avoid overly big arms and thighs on bigger muscleScore)
 			;Debug.Trace("SNU - fightingMuscle="+fightingMuscle)
-			fightingMuscle = fightingMuscle * ( 1.2 - WMCM.WMorphs.Weight )
+			fightingMuscle = fightingMuscle * ( 1.2 - getWeightmorphsWeight() )
 			;Debug.Trace("SNU - chubbyMuscle="+fightingMuscle)
 		EndIf
 	EndIf
@@ -1256,8 +1280,7 @@ Function updateMuscleScore(float incValue)
 		
 		;TLALOC- If Weight is too low muscle can't grow much due to lack of carbs
 		If isWeightMorphsLoaded
-			WeightMorphsMCM WMCM = Game.GetFormFromFile(0x05000888, "WeightMorphs.esp") As WeightMorphsMCM
-			If WMCM.WMorphs.Weight < malnourishmentValue
+			If getWeightmorphsWeight() < malnourishmentValue
 				If !malnourishmentWarning
 					Debug.Notification("I can barely develop any muscle mass with this diet!")
 					malnourishmentWarning = true
@@ -1583,19 +1606,18 @@ Function chooseBoobsPhysics(Int buildStage)
 	
 	;weightMorphs calculations
 	If isWeightMorphsLoaded
-		WeightMorphsMCM WMCM = Game.GetFormFromFile(0x05000888, "WeightMorphs.esp") As WeightMorphsMCM
 		If boobsLevel > 1
-			If WMCM.WMorphs.Weight < -0.75 ;-0.7
+			If getWeightmorphsWeight() < -0.75 ;-0.7
 				;Boobs too small to have noticeable physics
 				boobsLevel = 1
-			ElseIf WMCM.WMorphs.Weight < -0.25 && boobsLevel > 2
-				;Was: WMCM.WMorphs.Weight < 0.0
+			ElseIf getWeightmorphsWeight() < -0.25 && boobsLevel > 2
+				;Was: getWeightmorphsWeight() < 0.0
 				;Boobs still too small to have full physics
 				boobsLevel = 2
-			ElseIf WMCM.WMorphs.Weight < 0.5 && boobsLevel > 3
+			ElseIf getWeightmorphsWeight() < 0.5 && boobsLevel > 3
 				boobsLevel = 3
-			ElseIf WMCM.WMorphs.Weight >= 0.5
-				;Was WMCM.WMorphs.Weight > 0.4
+			ElseIf getWeightmorphsWeight() >= 0.5
+				;Was getWeightmorphsWeight() > 0.4
 				boobsLevel = 4
 			EndIf
 		EndIf
@@ -1751,11 +1773,10 @@ Function checkBodyNormalsState()
 	
 	;TLALOC- Expand the range of the changes if muscleScore is below 0.25 (This logic will allow to have a extreme muscular definition 
 	;      even at that muscleScore, but only if score is high enough
-	If isWeightMorphsLoaded 
-		WeightMorphsMCM WMCM = Game.GetFormFromFile(0x05000888, "WeightMorphs.esp") As WeightMorphsMCM
-		If WMCM.WMorphs.Weight < 0.3
+	If isWeightMorphsLoaded
+		If getWeightmorphsWeight() < 0.3
 			Float changeDelta = (muscleScoreMax * 0.3)
-			Float changeFactor = (WMCM.WMorphs.Weight * changeDelta)
+			Float changeFactor = (getWeightmorphsWeight() * changeDelta)
 			stage2Score = stage2Score + changeFactor
 			stage3Score = (muscleScoreMax * 0.2) + (Math.abs(changeFactor) / 4)
 			stage4Score = stage3Score * 2
@@ -1782,16 +1803,15 @@ Function checkBodyNormalsState()
 	
 	;Rangos originales: 0.12-0.225, 0.225-0.30
 	If isWeightMorphsLoaded
-		WeightMorphsMCM WMCM = Game.GetFormFromFile(0x05000888, "WeightMorphs.esp") As WeightMorphsMCM
-		If currentBuildStage >= 2 && WMCM.WMorphs.Weight >= 0.25
+		If currentBuildStage >= 2 && getWeightmorphsWeight() >= 0.25
 			currentBuildStage = 1
-		ElseIf currentBuildStage >= 3 && WMCM.WMorphs.Weight >= 0.175 && WMCM.WMorphs.Weight < 0.25
+		ElseIf currentBuildStage >= 3 && getWeightmorphsWeight() >= 0.175 && getWeightmorphsWeight() < 0.25
 			currentBuildStage = 2
-		ElseIf currentBuildStage >= 4 && WMCM.WMorphs.Weight >= 0.10 && WMCM.WMorphs.Weight < 0.175
+		ElseIf currentBuildStage >= 4 && getWeightmorphsWeight() >= 0.10 && getWeightmorphsWeight() < 0.175
 			currentBuildStage = 3
 		EndIf
 		
-		If WMCM.WMorphs.Weight < -0.5
+		If getWeightmorphsWeight() < -0.5
 			currentSlimStage = 1
 		Else
 			currentSlimStage = 0
@@ -1829,8 +1849,7 @@ Function checkBodyNormalsState()
 	Else
 		;TLALOC- Special condition for weightMorphs
 		If isWeightMorphsLoaded
-			WeightMorphsMCM WMCM = Game.GetFormFromFile(0x05000888, "WeightMorphs.esp") As WeightMorphsMCM
-			If currentBuildStage == 1 && WMCM.WMorphs.Weight > 0.5
+			If currentBuildStage == 1 && getWeightmorphsWeight() > 0.5
 				tempNormalsPath = tempNormalsPath + "_FAT"
 			EndIf
 		EndIf
@@ -3294,19 +3313,18 @@ Function updateWerewolfMuscle(Float sizeFactor = 1.0)
 		
 		;WeightMorphs;
 		If isWeightMorphsLoaded 
-			WeightMorphsMCM WMCM = Game.GetFormFromFile(0x05000888, "WeightMorphs.esp") As WeightMorphsMCM
-			If WMCM.WMorphs.Weight >= 0.0
-				NiOverride.SetBodyMorph(PlayerRef, "BodyHighHDT", SNUSNU_KEY, WMCM.WMorphs.Weight * 0.5);0.8
+			If getWeightmorphsWeight() >= 0.0
+				NiOverride.SetBodyMorph(PlayerRef, "BodyHighHDT", SNUSNU_KEY, getWeightmorphsWeight() * 0.5);0.8
 				;NiOverride.SetBodyMorph(PlayerRef, "BodyVeryHighHDT", SNUSNU_KEY, sizeFactor * 0.4)
 			EndIf
 		EndIf
 	Else
 		Debug.Trace("SNU - Updating werewolf shape, currentMusclePercent="+currentMusclePercent)
-		NiOverride.SetBodyMorph(PlayerRef, "BodyHigh", SNUSNU_KEY, currentMusclePercent * 2.0)
-		NiOverride.SetBodyMorph(PlayerRef, "BreastsLowHDT", SNUSNU_KEY, currentMusclePercent * -0.5)
+		NiOverride.SetBodyMorph(PlayerRef, "BodyHigh", SNUSNU_KEY, currentMusclePercent * 2.5)
+		NiOverride.SetBodyMorph(PlayerRef, "BreastsLowHDT", SNUSNU_KEY, currentMusclePercent * -1.0)
 		
 		;Add some thickness
-		NiOverride.SetBodyMorph(PlayerRef, "BodyHighHDT", SNUSNU_KEY, 0.5)
+		NiOverride.SetBodyMorph(PlayerRef, "BodyHighHDT", SNUSNU_KEY, 0.1)
 	EndIf
 	
 	NiOverride.UpdateModelWeight(PlayerRef)
@@ -3330,19 +3348,19 @@ Function addWerewolfBuild()
 		If isWeightMorphsLoaded
 			Float modFactor = 0.05
 			
-			WeightMorphsMCM WMCM = Game.GetFormFromFile(0x05000888, "WeightMorphs.esp") As WeightMorphsMCM
-			If WMCM.WMorphs.Weight < 0.075
-				If WMCM.WMorphs.Weight + modFactor > 0.075
-					modFactor = 0.075 - WMCM.WMorphs.Weight
+			Float wMorphsWeight = getWeightmorphsWeight()
+			If wMorphsWeight < 0.075
+				If wMorphsWeight + modFactor > 0.075
+					modFactor = 0.075 - wMorphsWeight
 				EndIf
-				WMCM.WMorphs.ChangeWeight(modFactor, true)
-			ElseIf WMCM.WMorphs.Weight > 0.075
+				changeWeightmorphsWeight(modFactor, true)
+			ElseIf wMorphsWeight > 0.075
 				modFactor = -modFactor
-				If WMCM.WMorphs.Weight + modFactor < 0.075
-					modFactor = -(WMCM.WMorphs.Weight - 0.075)
+				If wMorphsWeight + modFactor < 0.075
+					modFactor = -(wMorphsWeight - 0.075)
 				EndIf
 				
-				WMCM.WMorphs.ChangeWeight(modFactor, true)
+				changeWeightmorphsWeight(modFactor, true)
 			EndIf
 		EndIf
 	EndIf

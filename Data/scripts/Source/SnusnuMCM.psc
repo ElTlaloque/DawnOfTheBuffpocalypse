@@ -42,6 +42,7 @@ Int _myChangesIncrements
 Int _myUseAltBody
 Int _myVampireFix
 Int _myUseWufwufMorphs
+Int _myChangeVoice
 
 Int _myZeroSliders
 Int _myApplyDefault
@@ -308,6 +309,8 @@ Event OnPageReset(String a_page)
 		Else
 			_mychangeHeadPart = AddToggleOption("$SNUSNU_CHANGEHEAD", snusnuMain.changeHeadPart, isFemaleFlag)
 		EndIf
+		AddEmptyOption()
+		_myChangeVoice = AddToggleOption("Change voice while TF", snusnuMain.changeToBarbarianVoice)
 		AddEmptyOption()
 		_myApplyMoreChanges = AddToggleOption("More changes while TF", snusnuMain.applyMoreChangesOvertime, altBodyFlag)
 		AddEmptyOption()
@@ -685,6 +688,8 @@ Event OnOptionHighlight(Int a_option)
 		SetInfoText("$SNUSNU_USEALTANIMSNPC_DESC")
 	ElseIf a_option == _myApplyMoreChanges
 		SetInfoText("Apply gradual changes during FMG transformation. Muscle mass will start at 50% and it will grow in increments of 25% until it reaches 100%. Darker skin textures will also be applied every time a new increment is reached.")
+	ElseIf a_option == _myChangeVoice
+		SetInfoText("Change voice to a more rough one (currently using Frea's voice for females and Isran's for males) for the duration of the FMG spell.")
 	ElseIf a_option == _myDynamicChanges
 		SetInfoText("Use dynamic calculations for gradual changes. Gradual changes will be applied only if spell duration is longh enough. If it's not, then apply the full transformation since the begining.")
 	ElseIf a_option == _myChangesInterval
@@ -778,6 +783,9 @@ Event OnOptionSelect(Int a_option)
 	ElseIf a_option == _myplayTFSound
 		snusnuMain.playTFSound = !snusnuMain.playTFSound
 		SetToggleOptionValue(a_option, snusnuMain.playTFSound)
+	ElseIf a_option == _myChangeVoice
+		snusnuMain.changeToBarbarianVoice = !snusnuMain.changeToBarbarianVoice
+		SetToggleOptionValue(a_option, snusnuMain.changeToBarbarianVoice)
 	ElseIf a_option == _myApplyMoreChanges
 		snusnuMain.applyMoreChangesOvertime = !snusnuMain.applyMoreChangesOvertime
 		SetToggleOptionValue(a_option, snusnuMain.applyMoreChangesOvertime)
@@ -1782,6 +1790,7 @@ Bool Function saveSettings()
 	JsonUtil.SetIntValue(fileName, "getInfoKey", snusnuMain.getInfoKey)
 	JsonUtil.SetIntValue(fileName, "npcMuscleKey", snusnuMain.npcMuscleKey)
 	JsonUtil.SetFloatValue(fileName, "npcMuscleScore", snusnuMain.npcMuscleScore)
+	JsonUtil.SetIntValue(fileName, "changeToBarbarianVoice", snusnuMain.changeToBarbarianVoice as Int)
 	JsonUtil.SetIntValue(fileName, "useAltBody", snusnuMain.useAltBody as Int)
 	JsonUtil.SetIntValue(fileName, "applyVampireFix", snusnuMain.applyVampireFix as Int)
 	JsonUtil.SetIntValue(fileName, "useWerewolfMorphs", snusnuMain.useWerewolfMorphs as Int)
@@ -1867,6 +1876,7 @@ bool Function loadSettings()
 		snusnuMain.dynamicChangesCalculation = JsonUtil.GetIntValue(fileName, "dynamicChangesCalculation", snusnuMain.dynamicChangesCalculation as Int)
 		snusnuMain.moreChangesInterval = JsonUtil.GetFloatValue(fileName, "moreChangesInterval", snusnuMain.moreChangesInterval as Float)
 		snusnuMain.moreChangesIncrements = JsonUtil.GetFloatValue(fileName, "moreChangesIncrements", snusnuMain.moreChangesIncrements as Float)
+		snusnuMain.changeToBarbarianVoice = JsonUtil.GetIntValue(fileName, "changeToBarbarianVoice", snusnuMain.changeToBarbarianVoice as Int)
 		snusnuMain.useAltBody = JsonUtil.GetIntValue(fileName, "useAltBody", snusnuMain.useAltBody as Int)
 		snusnuMain.applyVampireFix = JsonUtil.GetIntValue(fileName, "applyVampireFix", snusnuMain.applyVampireFix as Int)
 		snusnuMain.useWerewolfMorphs = JsonUtil.GetIntValue(fileName, "useWerewolfMorphs", snusnuMain.useWerewolfMorphs as Int)

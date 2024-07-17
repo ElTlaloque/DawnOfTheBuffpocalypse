@@ -23,6 +23,7 @@ Float[] maleValuesFMG
 
 Bool reloadUpdate = false
 Bool alreadyTransformed = false
+Bool werewolfTransition = false ;We might not need this
 
 ;Moving all of the TF animation variables here to be used with the onUpdate flow
 float growSteps
@@ -68,6 +69,10 @@ event OnEffectStart(Actor akTarget, Actor akCaster)
 	removeSpells(snusnuMain.PlayerRef)
 	Utility.wait(1.0)
 	
+	If snusnuMain.isWerewolf
+		werewolfTransition = true
+	EndIf
+	
 	If snusnuMain.PlayerRef.hasKeyword(snusnuMain.isVampire) && snusnuMain.applyVampireFix
 		;Change to original race for the duration of the spell to avoid head texture mishaps
 		hasVampirism = true
@@ -109,6 +114,8 @@ event OnEffectStart(Actor akTarget, Actor akCaster)
 		If snusnuMain.dynamicChangesCalculation
 			Float intervalSeconds = snusnuMain.moreChangesInterval * 86400 ;Number of seconds in a day
 			intervalSeconds = intervalSeconds / 20
+			
+			;NOTE: 1 hour = 0.833 days in-game
 			
 			If GetDuration() >= (intervalSeconds * 2) + 300 ;2 days ingame plus 5 real minutes overhead
 				snusnuMain.currentMusclePercent = 1.0 - (snusnuMain.moreChangesIncrements * 2)
@@ -228,9 +235,15 @@ Event OnPlayerLoadGame()
 	Debug.Trace("SNU - OnPlayerLoadGame()")
 	
 	Debug.Trace("SNU - Stored TF Time is: "+tfTime)
-		
-	reloadUpdate = true
-	If snusnuMain.isTransforming
+	
+	If !snusnuMain.isWerewolf
+		reloadUpdate = true
+	Else
+		reloadUpdate = false
+		werewolfTransition = true
+	EndIf
+	
+	If snusnuMain.isTransforming && StorageUtil.GetIntValue(snusnuMain.PlayerRef, "SNU_UltraMuscle", 0) > 0
 		registerForSingleUpdate(4)
 	Else
 		registerForSingleUpdate(12)
@@ -239,6 +252,7 @@ Event OnPlayerLoadGame()
 EndEvent
 
 Event OnRaceSwitchComplete()
+	Debug.Trace("SNU - MusclePower-OnRaceSwitchComplete()")
 	If snusnuMain.PlayerRef.getRace().getName() != "Werewolf" && snusnuMain.PlayerRef.getRace().getName() != "Vampire Lord"
 		;Race is neither vampire or werewolf, so we assume whatever they were transformed into they reverted back
 	
@@ -246,6 +260,11 @@ Event OnRaceSwitchComplete()
 			snusnuMain.PlayerRef.equipItem(snusnuMain.FistsOfRage)
 			Debug.Trace("SNU - FistsOfRage were restored")
 		EndIf
+		Utility.wait(2) ;Wait for the werewolf bones to be reset in the main Snusnu script
+		refreshChanges(true)
+		
+		Utility.wait(2)
+		werewolfTransition = false
 	EndIf
 EndEvent
 
@@ -254,7 +273,7 @@ Event OnUpdate()
 		return
 	EndIf
 	
-	If snusnuMain.isTransforming
+	If snusnuMain.isTransforming && StorageUtil.GetIntValue(snusnuMain.PlayerRef, "SNU_UltraMuscle", 0) > 0
 		If snusnuMain.tfAnimation && !snusnuMain.useAltBody && (growVal != growSteps || goingUp)
 			If reloadUpdate
 				;Restore anims and facial expression
@@ -365,42 +384,7 @@ Event OnUpdate()
 	EndIf
 	
 	If reloadUpdate && !snusnuMain.isWerewolf ;ToDo- Check if this change works well with werewolf TF
-		If !snusnuMain.useAltBody
-			If !loadFMGMorphs(snusnuMain.PlayerRef)
-				Debug.Notification("Could not load the FMG morphs!")
-			EndIf
-			updateBones(snusnuMain.PlayerRef, snusnuMain.currentMusclePercent, False, True)
-				
-			If snusnuMain.currentMusclePercent == 1.0 - (snusnuMain.moreChangesIncrements * 2)
-				applyMuscleNormals(snusnuMain.PlayerRef, 2)
-				snusnuMain.updateBoobsPhysics(false, 2)
-			Else
-				If snusnuMain.currentMusclePercent < 1.0
-					applyMuscleNormals(snusnuMain.PlayerRef, 3)
-				Else
-					applyMuscleNormals(snusnuMain.PlayerRef, 5)
-					
-					;Jump height fix
-					If Game.GetGameSettingFloat("fJumpHeightMin") < 180.0
-						Game.SetGameSettingFloat("fJumpHeightMin", 180.0)
-					EndIf
-				EndIf
-				
-				snusnuMain.updateBoobsPhysics(false, 1)
-				If snusnuMain.applyMoreChangesOvertime
-					If snusnuMain.currentMusclePercent == 1.0
-						applyBarbarianSkin(snusnuMain.PlayerRef, 2)
-					ElseIf snusnuMain.currentMusclePercent == 1.0 - snusnuMain.moreChangesIncrements
-						applyBarbarianSkin(snusnuMain.PlayerRef, 1)
-					EndIf
-				EndIf
-				
-			EndIf
-		EndIf
-		
-		snusnuMain.updateAllowedItemsEquipedWeight()
-		snusnuMain.needEquipWeightUpdate = true
-	
+		refreshChanges()
 		reloadUpdate = false
 	EndIf
 	
@@ -523,17 +507,21 @@ Event OnEffectFinish(Actor akTarget, Actor akCaster)
 		return
 	EndIf
 	
-	;ToDo- Check what happens if player is currently a werewolf
+	Debug.Trace("SNU - Muscle spell has worn off!")
 	
 	;We really don't want to revert back during a fight
 	;ToDo- Maybe it would be a good idea to have a toggle option for this
-	While akTarget.isInCombat() || reloadUpdate
+	While akTarget.isInCombat() || reloadUpdate || snusnuMain.isWerewolf
+		Debug.Trace("SNU - Trying to detransform, but something is preventing it!")
+		Debug.Trace("SNU - isInCombat="+akTarget.isInCombat()+", isWerewolf="+snusnuMain.isWerewolf+", reloadUpdate="+reloadUpdate)
 		Utility.wait(4)
 	EndWhile
 	
 	snusnuMain.isTransforming = true
-	
 	StorageUtil.SetIntValue(akTarget, "SNU_UltraMuscle", 0)
+	
+	; Turn off saves & waiting while we shift.
+    Game.SetInCharGen(true, true, false)
 	
 	Debug.Trace("SNU - Starting removal of transformation effect")
 	Debug.Notification("The muscle spell is starting to wear off!")
@@ -650,11 +638,53 @@ Event OnEffectFinish(Actor akTarget, Actor akCaster)
 	
 	reAddSpells(snusnuMain.PlayerRef)
 	
+	;Turn saves & waiting back on
+    Game.SetInCharGen(false, false, false)
+	
 	Debug.Trace("SNU - Finished removal of transformation effect")
 	Debug.Notification("My body is now back to normal")
 	
 	snusnuMain.isTransforming = false
 EndEvent
+
+Function refreshChanges(Bool fromRaceChange = false)
+	If !snusnuMain.useAltBody
+		If !fromRaceChange
+			If !loadFMGMorphs(snusnuMain.PlayerRef)
+				Debug.Notification("Could not load the FMG morphs!")
+			EndIf
+		EndIf
+		updateBones(snusnuMain.PlayerRef, snusnuMain.currentMusclePercent, False, True)
+			
+		If snusnuMain.currentMusclePercent == 1.0 - (snusnuMain.moreChangesIncrements * 2)
+			applyMuscleNormals(snusnuMain.PlayerRef, 2)
+			snusnuMain.updateBoobsPhysics(false, 2)
+		Else
+			If snusnuMain.currentMusclePercent < 1.0
+				applyMuscleNormals(snusnuMain.PlayerRef, 3)
+			Else
+				applyMuscleNormals(snusnuMain.PlayerRef, 5)
+				
+				;Jump height fix
+				If Game.GetGameSettingFloat("fJumpHeightMin") < 180.0
+					Game.SetGameSettingFloat("fJumpHeightMin", 180.0)
+				EndIf
+			EndIf
+			
+			snusnuMain.updateBoobsPhysics(false, 1)
+			If snusnuMain.applyMoreChangesOvertime && !fromRaceChange
+				If snusnuMain.currentMusclePercent == 1.0
+					applyBarbarianSkin(snusnuMain.PlayerRef, 2)
+				ElseIf snusnuMain.currentMusclePercent == 1.0 - snusnuMain.moreChangesIncrements
+					applyBarbarianSkin(snusnuMain.PlayerRef, 1)
+				EndIf
+			EndIf
+		EndIf
+	EndIf
+
+	snusnuMain.updateAllowedItemsEquipedWeight()
+	snusnuMain.needEquipWeightUpdate = true
+EndFunction
 
 Function removeSpells(Actor magicActor)
 	If magicActor.hasSpell(snusnuMain.MusclePowerSpell)
@@ -830,7 +860,7 @@ Function switchHeads(Actor headOwner, Int newHeadIndex)
 	
 	headOwner.RegenerateHead()
 	Utility.wait(1)
-	headOwner.QueueNiNodeUpdate() ;Cleans previous head mesh. ToDo- Needs to be tested
+	;headOwner.QueueNiNodeUpdate() ;Cleans previous head mesh. ToDo- Needs to be tested
 EndFunction
 
 Function swapBodyMesh(Actor victim, Bool applyFMGBody = true)

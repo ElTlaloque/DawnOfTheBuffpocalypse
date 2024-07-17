@@ -182,7 +182,7 @@ EndEvent
 Event OnPageReset(String a_page)
 	If snusnuMain.showUpdateMessage
 		String Msg
-		Msg = "This mod now has support for CBBE, UUNP/BHUNP and Vanilla bodies. To get the best experience out of it, you need to set the \"Current body installed\" option to the body you are currently using."
+		Msg = "$SNUSNU_UPDATE_INFO"
 		ShowMessage(Msg, False)
 		snusnuMain.showUpdateMessage = false
 	EndIf
@@ -209,26 +209,26 @@ Event OnPageReset(String a_page)
 		AddEmptyOption()
 		
 		_myEnabled = AddToggleOption("$SNUSNU_ENABLED", snusnuMain.Enabled)
-		_myHardcoreMode = AddToggleOption("Hardcore Mode", snusnuMain.hardcoreMode)
-		_myShowMessages = AddToggleOption("Show info notifications", snusnuMain.showInfoMessages)
-		_mymaxItemsEquiped = AddSliderOption("Maximum equipment weight", snusnuMain.maxItemsEquipedWeight, "{0}")
+		_myHardcoreMode = AddToggleOption("$SNUSNU_HARDCORE_MODE", snusnuMain.hardcoreMode)
+		_myShowMessages = AddToggleOption("$SNUSNU_SHOW_NOTIFICATIONS", snusnuMain.showInfoMessages)
+		_mymaxItemsEquiped = AddSliderOption("$SNUSNU_HARDCORE_MAXWEIGHT", snusnuMain.maxItemsEquipedWeight, "{0}")
 		AddEmptyOption()
 		AddEmptyOption()
 		
 		;_mySelectedBody = AddToggleOption("$SNUSNU_SELECTEDBODY", snusnuMain.selectedBody)
 		AddMenuOptionST("InstalledBody", "$SNUSNU_SELECTEDBODY", GetConditionalString(snusnuMain.selectedBody))
 		_myUseWeightSlider = AddToggleOption("$SNUSNU_USEWEIGHTSLIDER", snusnuMain.useWeightSlider)
-		AddMenuOptionST("LoadDefaults", "Load default morphs", GetDefaultMorphString(selectedDefaultMorphs))
+		AddMenuOptionST("LoadDefaults", "$SNUSNU_LOAD_DEFAULT_MORPHS", GetDefaultMorphString(selectedDefaultMorphs))
 		_myDisableNormals = AddToggleOption("$SNUSNU_DISABLENORMALS", snusnuMain.disableNormals)
-		_myDynamicPhysics = AddToggleOption("Dynamic Breasts Physics", snusnuMain.useDynamicPhysics, isFemaleFlag)
-		_myHavePecs = AddToggleOption("Treat breasts as pecs", snusnuMain.usePecs, isFemaleFlag)
-		_myChangeAnims = AddToggleOption("Change to muscular anims", snusnuMain.useMuscleAnims)
-		_myUseDARAnims = AddToggleOption("Use DAR for animations", snusnuMain.useDARAnims)
-		_myMuscleAnimsLevel = AddSliderOption("Muscular level anims", snusnuMain.muscleAnimsLevel.getValue() as Float, "{0}")
+		_myDynamicPhysics = AddToggleOption("$SNUSNU_DYNAMIC_BOOBS", snusnuMain.useDynamicPhysics, isFemaleFlag)
+		_myHavePecs = AddToggleOption("$SNUSNU_NO_BOOBS_JIGGLE", snusnuMain.usePecs, isFemaleFlag)
+		_myChangeAnims = AddToggleOption("$SNUSNU_BUFF_ANIMS", snusnuMain.useMuscleAnims)
+		_myUseDARAnims = AddToggleOption("$SNUSNU_DAR_ANIMS", snusnuMain.useDARAnims)
+		_myMuscleAnimsLevel = AddSliderOption("$SNUSNU_BUFF_ANIMS_LVL", snusnuMain.muscleAnimsLevel.getValue() as Float, "{0}")
 		If snusnuMain.isWerewolvesLoaded
-			_myUseWufwufMorphs = AddToggleOption("Use Werewolf morphs", snusnuMain.useWerewolfMorphs)
+			_myUseWufwufMorphs = AddToggleOption("$SNUSNU_WUFWUF_MORPHS", snusnuMain.useWerewolfMorphs)
 		Else
-			_myUseWufwufMorphs = AddToggleOption("Use Werewolf morphs", snusnuMain.useWerewolfMorphs, OPTION_FLAG_DISABLED)
+			_myUseWufwufMorphs = AddToggleOption("$SNUSNU_WUFWUF_MORPHS", snusnuMain.useWerewolfMorphs, OPTION_FLAG_DISABLED)
 		EndIf
 		
 		AddEmptyOption()
@@ -237,7 +237,7 @@ Event OnPageReset(String a_page)
 		_myStamina = AddSliderOption("$SNUSNU_STAMINA", snusnuMain.Stamina, "{0}")
 		_mySpeed = AddSliderOption("$SNUSNU_SPEED", snusnuMain.Speed, "{0}")
 		_myCombatProficiency = AddSliderOption("$SNUSNU_COMBAT", snusnuMain.combatProficiency, "{0}")
-		_myBoostCarryWeight = AddSliderOption("Boost carry weight", snusnuMain.carryWeightBoost, "{0}")
+		_myBoostCarryWeight = AddSliderOption("$SNUSNU_CARRYWEIGHT", snusnuMain.carryWeightBoost, "{0}")
 		_myMaxWeight = AddSliderOption("$SNUSNU_MAXWEIGHT", snusnuMain.muscleScoreMax, "{2}")
 		AddEmptyOption()
 		AddEmptyOption()
@@ -253,15 +253,15 @@ Event OnPageReset(String a_page)
 		_myMultGainArmor = AddSliderOption("$SNUSNU_MULTGAINARMOR", snusnuMain.MultGainArmor, "{2}")
 		_myMultGainMisc = AddSliderOption("$SNUSNU_MULTGAINMISC", snusnuMain.MultGainMisc, "{2}")
 		_myMultGainWufwuf = AddSliderOption("$SNUSNU_MULTGAINWUF", snusnuMain.addWerewolfStrength*100, "{0}%")
-		_myVampGains = AddSliderOption("Vampire Feed Gains", snusnuMain.addVampireStrength*100, "{1}%")
+		_myVampGains = AddSliderOption("$SNUSNU_VAMPIRE_GAINS", snusnuMain.addVampireStrength*100, "{1}%")
 		AddEmptyOption()
 		AddEmptyOption()
 		
-		_myZeroSliders = AddToggleOption("Zero all sliders", False)
-		_myApplyDefault = AddToggleOption("Default slider values", False)
+		_myZeroSliders = AddToggleOption("$SNUSNU_ZERO_SLIDERS", False)
+		_myApplyDefault = AddToggleOption("$SNUSNU_DEFAULT_SLIDERS", False)
 		;_myPushupException = AddToggleOption("Add push-up exception", False)
 		If snusnuMain.isWeightMorphsLoaded
-			_myMalnourishment = AddSliderOption("Malnourishment", snusnuMain.malnourishmentValue, "{2}")
+			_myMalnourishment = AddSliderOption("$SNUSNU_MALNOURISHMENT", snusnuMain.malnourishmentValue, "{2}")
 			AddEmptyOption()
 		EndIf
 		
@@ -278,28 +278,28 @@ Event OnPageReset(String a_page)
 		AddEmptyOption()
 		
 		If StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle", 0) == 0
-			_myUseAltBody = AddToggleOption("Use alternate body mesh", snusnuMain.useAltBody)
+			_myUseAltBody = AddToggleOption("$SNUSNU_ALT_BODY", snusnuMain.useAltBody)
 		Else
-			_myUseAltBody = AddToggleOption("Use alternate body mesh", snusnuMain.useAltBody, OPTION_FLAG_DISABLED)
+			_myUseAltBody = AddToggleOption("$SNUSNU_ALT_BODY", snusnuMain.useAltBody, OPTION_FLAG_DISABLED)
 		EndIf
 		Int altBodyFlag = OPTION_FLAG_NONE
 		If snusnuMain.useAltBody
 			altBodyFlag = OPTION_FLAG_DISABLED
 		EndIf
 		AddEmptyOption()
-		_myCustomizeFMG = AddToggleOption("Customize FMG Morphs", editFMGMorphs, altBodyFlag)
+		_myCustomizeFMG = AddToggleOption("$SNUSNU_CUSTOMIZE_FMG", editFMGMorphs, altBodyFlag)
 		AddEmptyOption()
 		
-		AddHeaderOption("TF Player Options")
-		AddHeaderOption("TF NPC Options")
+		AddHeaderOption("$SNUSNU_TF_HEADER")
+		AddHeaderOption("$SNUSNU_TF_NPC_HEADER")
 		If snusnuMain.isWeightMorphsLoaded
 			_myRemoveWeightMorphs = AddToggleOption("$SNUSNU_NOWEIGHTMORPHS", snusnuMain.removeWeightMorphs)
 		Else
 			_myRemoveWeightMorphs = AddToggleOption("$SNUSNU_NOWEIGHTMORPHS", snusnuMain.removeWeightMorphs, OPTION_FLAG_DISABLED)
 		EndIf
-		_myNPCMuscleScore = AddSliderOption("NPC Custom Muscle", snusnuMain.npcMuscleScore*100, "{0}%")
+		_myNPCMuscleScore = AddSliderOption("$SNUSNU_NPC_MUSCLE_AMMOUNT", snusnuMain.npcMuscleScore*100, "{0}%")
 		_myplayTFSound = AddToggleOption("$SNUSNU_PLAYTFSOUND", snusnuMain.playTFSound)
-		AddKeyMapOptionST("SnusnuNPCMuscle","Reload NPC muscles", snusnuMain.npcMuscleKey)
+		AddKeyMapOptionST("SnusnuNPCMuscle","$SNUSNU_NPC_RELOAD", snusnuMain.npcMuscleKey)
 		_mytfAnimation = AddToggleOption("$SNUSNU_USETFANIM", snusnuMain.tfAnimation)
 		_mytfAnimationNPC = AddToggleOption("$SNUSNU_USETFANIMNPC", snusnuMain.tfAnimationNPC)
 		_myuseAltAnims = AddToggleOption("$SNUSNU_USEALTANIMS", snusnuMain.useAltAnims)
@@ -310,26 +310,26 @@ Event OnPageReset(String a_page)
 			_mychangeHeadPart = AddToggleOption("$SNUSNU_CHANGEHEAD", snusnuMain.changeHeadPart, isFemaleFlag)
 		EndIf
 		AddEmptyOption()
-		_myChangeVoice = AddToggleOption("Change voice while TF", snusnuMain.changeToBarbarianVoice)
+		_myChangeVoice = AddToggleOption("$SNUSNU_CHANGE_VOICE", snusnuMain.changeToBarbarianVoice)
 		AddEmptyOption()
-		_myApplyMoreChanges = AddToggleOption("More changes while TF", snusnuMain.applyMoreChangesOvertime, altBodyFlag)
+		_myApplyMoreChanges = AddToggleOption("$SNUSNU_MORE_CHANGES", snusnuMain.applyMoreChangesOvertime, altBodyFlag)
 		AddEmptyOption()
 		If !snusnuMain.applyMoreChangesOvertime
-			_myChangesInterval = AddSliderOption("More changes interval", snusnuMain.moreChangesInterval, "{2}", OPTION_FLAG_DISABLED)
+			_myChangesInterval = AddSliderOption("$SNUSNU_CHANGES_INTERVAL", snusnuMain.moreChangesInterval, "{2}", OPTION_FLAG_DISABLED)
 			AddEmptyOption()
-			_myChangesIncrements = AddSliderOption("More changes growth increments", snusnuMain.moreChangesIncrements, "{2}", OPTION_FLAG_DISABLED)
+			_myChangesIncrements = AddSliderOption("$SNUSNU_CHANGE_INCREMENTS", snusnuMain.moreChangesIncrements, "{2}", OPTION_FLAG_DISABLED)
 			AddEmptyOption()
-			_myDynamicChanges = AddToggleOption("Dynamic changes calculation", snusnuMain.dynamicChangesCalculation, OPTION_FLAG_DISABLED)
+			_myDynamicChanges = AddToggleOption("$SNUSNU_DYNAMIC_CHANGES", snusnuMain.dynamicChangesCalculation, OPTION_FLAG_DISABLED)
 			AddEmptyOption()
 		Else
-			_myChangesInterval = AddSliderOption("More changes interval", snusnuMain.moreChangesInterval, "{2}", altBodyFlag)
+			_myChangesInterval = AddSliderOption("$SNUSNU_CHANGES_INTERVAL", snusnuMain.moreChangesInterval, "{2}", altBodyFlag)
 			AddEmptyOption()
-			_myChangesIncrements = AddSliderOption("More changes growth increments", snusnuMain.moreChangesIncrements, "{2}", altBodyFlag)
+			_myChangesIncrements = AddSliderOption("$SNUSNU_CHANGE_INCREMENTS", snusnuMain.moreChangesIncrements, "{2}", altBodyFlag)
 			AddEmptyOption()
-			_myDynamicChanges = AddToggleOption("Dynamic changes calculation", snusnuMain.dynamicChangesCalculation, altBodyFlag)
+			_myDynamicChanges = AddToggleOption("$SNUSNU_DYNAMIC_CHANGES", snusnuMain.dynamicChangesCalculation, altBodyFlag)
 			AddEmptyOption()
 		EndIf
-		_myVampireFix = AddToggleOption("Seam fix for vampires", snusnuMain.applyVampireFix)
+		_myVampireFix = AddToggleOption("$SNUSNU_VAMPIRES_FIX", snusnuMain.applyVampireFix)
 		
 	ElseIf (a_page == Pages[1] && snusnuMain.selectedBody != 2)
 		SetCursorFillMode(LEFT_TO_RIGHT)
@@ -343,9 +343,7 @@ Event OnPageReset(String a_page)
 				counter += 1
 			endWhile
 		Else ;CBBE SE
-			;AddHeaderOption(pageNames[6])
-			;AddEmptyOption()
-			AddHeaderOption("BREASTS")
+			AddHeaderOption("$SNUSNU_BREASTS_HEADER")
 			AddEmptyOption()
 			cbbeSliders[0] = AddSliderOption(sliderHasValue(snusnuMain.cbbeValues[0])+"Size (Inverted)", snusnuMain.cbbeValues[0], "{2}")
 			cbbeSliders[1] = AddSliderOption(sliderHasValue(snusnuMain.cbbeValues[1])+"Smaller 1 (Inverted)", snusnuMain.cbbeValues[1], "{2}")
@@ -371,7 +369,7 @@ Event OnPageReset(String a_page)
 			cbbeSESliders[6] = AddSliderOption(sliderHasValue(snusnuMain.cbbeSEValues[6])+"Side Shape", snusnuMain.cbbeSEValues[6], "{2}")
 			cbbeSESliders[7] = AddSliderOption(sliderHasValue(snusnuMain.cbbeSEValues[7])+"Under Depth", snusnuMain.cbbeSEValues[7], "{2}")
 			cbbe3BASliders[1] = AddSliderOption(sliderHasValue(snusnuMain.cbbe3BAValues[1])+"Pressed", snusnuMain.cbbe3BAValues[1], "{2}")
-			AddHeaderOption("NIPPLES")
+			AddHeaderOption("$SNUSNU_NIPPLES_HEADER")
 			AddEmptyOption()
 			cbbeSESliders[8] = AddSliderOption(sliderHasValue(snusnuMain.cbbeSEValues[8])+"Areola Size", snusnuMain.cbbeSEValues[8], "{2}")
 			cbbe3BASliders[2] = AddSliderOption(sliderHasValue(snusnuMain.cbbe3BAValues[2])+"Areola Pull", snusnuMain.cbbe3BAValues[2], "{2}")
@@ -400,7 +398,7 @@ Event OnPageReset(String a_page)
 			cbbeSESliders[12] = AddSliderOption(sliderHasValue(snusnuMain.cbbeSEValues[12])+"Dip", snusnuMain.cbbeSEValues[12], "{2}")
 			bhunpSliders[8] = AddSliderOption(sliderHasValue(snusnuMain.bhunpValues[8])+"NipBGone", snusnuMain.bhunpValues[8], "{2}")
 			
-			AddHeaderOption("TORSO")
+			AddHeaderOption("$SNUSNU_TORSO_HEADER")
 			AddEmptyOption()
 			bhunpSliders[10] = AddSliderOption(sliderHasValue(snusnuMain.bhunpValues[10])+"Chest Depth", snusnuMain.bhunpValues[10], "{2}")
 			bhunpSliders[11] = AddSliderOption(sliderHasValue(snusnuMain.bhunpValues[11])+"Chest Width", snusnuMain.bhunpValues[11], "{2}")
@@ -432,9 +430,7 @@ Event OnPageReset(String a_page)
 				counter += 1
 			endWhile
 		Else ;CBBE SE
-			;AddHeaderOption(pageNames[7])
-			;AddEmptyOption()
-			AddHeaderOption("BUTT")
+			AddHeaderOption("$SNUSNU_BUTT_HEADER")
 			AddEmptyOption()
 			cbbeSESliders[14] = AddSliderOption(sliderHasValue(snusnuMain.cbbeSEValues[14])+"Shape Classic", snusnuMain.cbbeSEValues[14], "{2}")
 			cbbeSliders[37] = AddSliderOption(sliderHasValue(snusnuMain.cbbeValues[37])+"Shape Lower", snusnuMain.cbbeValues[37], "{2}")
@@ -453,7 +449,7 @@ Event OnPageReset(String a_page)
 			bhunpSliders[17] = AddSliderOption(sliderHasValue(snusnuMain.bhunpValues[17])+"Move Crotch", snusnuMain.bhunpValues[17], "{2}")
 			cbbeSliders[42] = AddSliderOption(sliderHasValue(snusnuMain.cbbeValues[42])+"Groin", snusnuMain.cbbeValues[42], "{2}")
 			
-			AddHeaderOption("LEGS AND FEET")
+			AddHeaderOption("$SNUSNU_LEGS_HEADER")
 			AddEmptyOption()
 			cbbeSESliders[18] = AddSliderOption(sliderHasValue(snusnuMain.cbbeSEValues[18])+"Shape Classic", snusnuMain.cbbeSEValues[18], "{2}")
 			cbbe3BASliders[20] = AddSliderOption(sliderHasValue(snusnuMain.cbbe3BAValues[20])+"7B Legs", snusnuMain.cbbe3BAValues[20], "{2}")
@@ -473,7 +469,7 @@ Event OnPageReset(String a_page)
 			cbbeSliders[51] = AddSliderOption(sliderHasValue(snusnuMain.cbbeValues[51])+"Calf Smooth", snusnuMain.cbbeValues[51], "{2}")
 			cbbe3BASliders[26] = AddSliderOption(sliderHasValue(snusnuMain.cbbe3BAValues[26])+"Calf Front-Back", snusnuMain.cbbe3BAValues[26], "{2}")
 			cbbeSESliders[19] = AddSliderOption(sliderHasValue(snusnuMain.cbbeSEValues[19])+"Feminine Feet", snusnuMain.cbbeSEValues[19], "{2}")
-			AddHeaderOption("HIPS")
+			AddHeaderOption("$SNUSNU_HIPS_HEADER")
 			AddEmptyOption()
 			cbbe3BASliders[39] = AddSliderOption(sliderHasValue(snusnuMain.cbbe3BAValues[39])+"Hip bone", snusnuMain.cbbe3BAValues[39], "{2}")
 			cbbeSliders[44] = AddSliderOption(sliderHasValue(snusnuMain.cbbeValues[44])+"Size", snusnuMain.cbbeValues[44], "{2}")
@@ -483,7 +479,7 @@ Event OnPageReset(String a_page)
 			cbbe3BASliders[31] = AddSliderOption(sliderHasValue(snusnuMain.cbbe3BAValues[31])+"Hip Narrow", snusnuMain.cbbe3BAValues[31], "{2}")
 			cbbe3BASliders[32] = AddSliderOption(sliderHasValue(snusnuMain.cbbe3BAValues[32])+"UNP Hip", snusnuMain.cbbe3BAValues[32], "{2}")
 			AddEmptyOption()
-			AddHeaderOption("ARMS")
+			AddHeaderOption("$SNUSNU_ARMS_HEADER")
 			AddEmptyOption()
 			cbbeSliders[21] = AddSliderOption(sliderHasValue(snusnuMain.cbbeValues[21])+"Size (Inverted)", snusnuMain.cbbeValues[21], "{2}")
 			bhunpSliders[28] = AddSliderOption(sliderHasValue(snusnuMain.bhunpValues[28])+"Forearm Size", snusnuMain.bhunpValues[28], "{2}")
@@ -493,7 +489,7 @@ Event OnPageReset(String a_page)
 			bhunpSliders[29] = AddSliderOption(sliderHasValue(snusnuMain.bhunpValues[29])+"Shoulder Tweak", snusnuMain.bhunpValues[29], "{2}")
 			cbbe3BASliders[33] = AddSliderOption(sliderHasValue(snusnuMain.cbbe3BAValues[33])+"Armpit", snusnuMain.cbbe3BAValues[33], "{2}")
 			AddEmptyOption()
-			AddHeaderOption("BELLY")
+			AddHeaderOption("$SNUSNU_BELLY_HEADER")
 			AddEmptyOption()
 			cbbeSliders[25] = AddSliderOption(sliderHasValue(snusnuMain.cbbeValues[25])+"Size", snusnuMain.cbbeValues[25], "{2}")
 			cbbeSliders[26] = AddSliderOption(sliderHasValue(snusnuMain.cbbeValues[26])+"Big", snusnuMain.cbbeValues[26], "{2}")
@@ -517,9 +513,7 @@ Event OnPageReset(String a_page)
 				counter += 1
 			endWhile
 		Else ;CBBE SE
-			;AddHeaderOption(pageNames[8])
-			;AddEmptyOption()
-			AddHeaderOption("MUSCLE DEFINITION")
+			AddHeaderOption("$SNUSNU_MUSCLE_HEADER")
 			AddEmptyOption()
 			bhunpSliders[21] = AddSliderOption(sliderHasValue(snusnuMain.bhunpValues[21])+"Abs", snusnuMain.bhunpValues[21], "{2}")
 			bhunpSliders[22] = AddSliderOption(sliderHasValue(snusnuMain.bhunpValues[22])+"Arms", snusnuMain.bhunpValues[22], "{2}")
@@ -531,7 +525,7 @@ Event OnPageReset(String a_page)
 			cbbe3BASliders[28] = AddSliderOption(sliderHasValue(snusnuMain.cbbe3BAValues[28])+"More Arms", snusnuMain.cbbe3BAValues[28], "{2}")
 			cbbe3BASliders[29] = AddSliderOption(sliderHasValue(snusnuMain.cbbe3BAValues[29])+"More Legs", snusnuMain.cbbe3BAValues[29], "{2}")
 			AddEmptyOption()
-			AddHeaderOption("FULL BODY")
+			AddHeaderOption("$SNUSNU_FULLBODY_HEADER")
 			AddEmptyOption()
 			cbbeSESliders[22] = AddSliderOption(sliderHasValue(snusnuMain.cbbeSEValues[22])+"VanillaSSELo", snusnuMain.cbbeSEValues[22], "{2}")
 			cbbeSESliders[23] = AddSliderOption(sliderHasValue(snusnuMain.cbbeSEValues[23])+"VanillaSSEHi", snusnuMain.cbbeSEValues[23], "{2}")
@@ -539,7 +533,7 @@ Event OnPageReset(String a_page)
 			cbbeSESliders[26] = AddSliderOption(sliderHasValue(snusnuMain.cbbeSEValues[26])+"7B Upper", snusnuMain.cbbeSEValues[26], "{2}")
 			cbbeSESliders[24] = AddSliderOption(sliderHasValue(snusnuMain.cbbeSEValues[24])+"OldBaseShape", snusnuMain.cbbeSEValues[24], "{2}")
 			AddEmptyOption()
-			AddHeaderOption("SEAMS")
+			AddHeaderOption("$SNUSNU_SEAMS_HEADER")
 			AddEmptyOption()
 			cbbeSESliders[20] = AddSliderOption(sliderHasValue(snusnuMain.cbbeSEValues[20])+"Ankle Size", snusnuMain.cbbeSEValues[20], "{2}")
 			cbbeSESliders[21] = AddSliderOption(sliderHasValue(snusnuMain.cbbeSEValues[21])+"Wrist Size", snusnuMain.cbbeSEValues[21], "{2}")
@@ -548,13 +542,13 @@ Event OnPageReset(String a_page)
 		SetCursorFillMode(LEFT_TO_RIGHT)
 		;AddHeaderOption("BONE MORPHS")
 		;AddEmptyOption()
-		AddHeaderOption("LEGACY BONES")
+		AddHeaderOption("$SNUSNU_LEGACYBONES_HEADER")
 		AddEmptyOption()
 		boneSliders[0] = AddSliderOption(boneSliderHasValue(snusnuMain.bonesValues[0])+boneStrings[0], snusnuMain.bonesValues[0], "{3}");Upper spine
 		boneSliders[1] = AddSliderOption(boneSliderHasValue(snusnuMain.bonesValues[1])+boneStrings[1], snusnuMain.bonesValues[1], "{3}");Advanced forearms
 		AddEmptyOption()
 		AddEmptyOption()
-		AddHeaderOption("NEW BONES")
+		AddHeaderOption("$SNUSNU_NEWBONES_HEADER")
 		AddEmptyOption()
 		boneSliders[2] = AddSliderOption(boneSliderHasValue(snusnuMain.bonesValues[2])+boneStrings[2], snusnuMain.bonesValues[2], "{3}");Upperarms
 		boneSliders[18] = AddSliderOption(boneSliderHasValue(snusnuMain.bonesValues[18])+boneStrings[18], snusnuMain.bonesValues[18], "{3}");Biceps
@@ -573,7 +567,7 @@ Event OnPageReset(String a_page)
 		AddEmptyOption()
 		AddEmptyOption()
 		;Female Only
-		AddHeaderOption("FEMALE ONLY BONES")
+		AddHeaderOption("$SNUSNU_FEMALEBONES_HEADER")
 		AddEmptyOption()
 		boneSliders[12] = AddSliderOption(boneSliderHasValue(snusnuMain.bonesValues[12])+boneStrings[12], snusnuMain.bonesValues[12], "{3}");Breasts (HDT)
 		boneSliders[13] = AddSliderOption(boneSliderHasValue(snusnuMain.bonesValues[13])+boneStrings[13], snusnuMain.bonesValues[13], "{3}");Breast Fullness (3BBB)
@@ -586,19 +580,19 @@ Event OnPageReset(String a_page)
 		EndIf
 		
 		SetCursorFillMode(TOP_TO_BOTTOM)
-		_mySaveOptions = AddToggleOption("Save Settings", False, currentFlag)
-		_myLoadOptions = AddToggleOption("Load Settings", False, currentFlag)
+		_mySaveOptions = AddToggleOption("$SNUSNU_SAVE", False, currentFlag)
+		_myLoadOptions = AddToggleOption("$SNUSNU_LOAD", False, currentFlag)
 		AddEmptyOption()
 		;AddEmptyOption()
-		_mySaveMorphs = AddToggleOption("Save Morphs", False, currentFlag)
-		_myLoadMorphs = AddToggleOption("Load Morphs", False, currentFlag)
+		_mySaveMorphs = AddToggleOption("$SNUSNU_SAVE_MORPHS", False, currentFlag)
+		_myLoadMorphs = AddToggleOption("$SNUSNU_LOAD_MORPHS", False, currentFlag)
 		SetCursorPosition(1)
-		_mySaveMorphsProfile = AddInputOption("Save Morphs Profile", "Default")
+		_mySaveMorphsProfile = AddInputOption("$SNUSNU_SAVE_PROFILE", "Default")
 		
 		If LoadSavedProfiles()
-			_myLoadMorphsProfile = AddMenuOption("Load Morphs Profile", savedProfilesList[0])
+			_myLoadMorphsProfile = AddMenuOption("$SNUSNU_LOAD_PROFILE", savedProfilesList[0])
 		Else
-			_myLoadMorphsProfile = AddMenuOption("Load Morphs Profile", "EMPTY", OPTION_FLAG_DISABLED)
+			_myLoadMorphsProfile = AddMenuOption("$SNUSNU_LOAD_PROFILE", "EMPTY", OPTION_FLAG_DISABLED)
 		EndIf
 	ElseIf ((a_page == Pages[6] && snusnuMain.selectedBody != 2) || (a_page == Pages[3] && snusnuMain.selectedBody == 2))
 		SetCursorFillMode(LEFT_TO_RIGHT)
@@ -630,12 +624,12 @@ Event OnPageReset(String a_page)
 		AddEmptyOption()
 		AddEmptyOption()
 		snusnuMain.tempDebugSliders()
-		AddToggleOption("Dumping sliders info into log file", True, OPTION_FLAG_DISABLED)
-		_myFoceScore = AddSliderOption("Set muscle score", snusnuMain.muscleScore, "{3}")
+		AddToggleOption("$SNUSNU_DUMP_LOG", True, OPTION_FLAG_DISABLED)
+		_myFoceScore = AddSliderOption("$SNUSNU_SET_SCORE", snusnuMain.muscleScore, "{3}")
 		
 		AddEmptyOption()
 		AddEmptyOption()
-		AddHeaderOption("NPCs with muscle:")
+		AddHeaderOption("$SNUSNU_NPC_LIST_HEADER")
 		AddEmptyOption()
 		SetCursorFillMode(TOP_TO_BOTTOM)
 		Int totalNPCs = FormListCount(none, "MUSCLE_NPCS")
@@ -651,33 +645,33 @@ EndEvent
 
 Event OnOptionHighlight(Int a_option)
 	If a_option == _myEnabled
-		SetInfoText("Enables/disables the mod and its registered events.")
+		SetInfoText("$SNUSNU_ENABLE_DESC")
 	ElseIf a_option == _myHardcoreMode
-		SetInfoText("Toggles hardcore mode on or off.")
+		SetInfoText("$SNUSNU_HARDCORE_DESC")
 	ElseIf a_option == _myStamina
-		SetInfoText("How much stamina gets boosted by muscle gain.")
+		SetInfoText("$SNUSNU_STAMINA_DESC")
 	ElseIf a_option == _mySpeed
-		SetInfoText("How much the movement speed gets boosted by muscle gain.")
+		SetInfoText("$SNUSNU_SPEED_DESC")
 	ElseIf a_option == _myCombatProficiency
-		SetInfoText("How much combat related skills (One Handed, Two Handed, Archery and Blocking) get boosted by muscle gain. Boost will start at half of max muscle score. Below that it will affect the skills negatively")
+		SetInfoText("$SNUSNU_SKILLS_DESC")
 	ElseIf a_option == _myMaxWeight
-		SetInfoText("Maximum muscle score that can be reached.")
+		SetInfoText("$SNUSNU_MAXSCORE_DESC")
 	ElseIf a_option == _myFightingScore
-		SetInfoText("Current muscular score")
+		SetInfoText("$SNUSNU_CURRENTSCORE_DESC")
 	ElseIf a_option == _myStoredScore
-		SetInfoText("Stored muscular score to be regained during sleep")
+		SetInfoText("$SNUSNU_STOREDSCORE_DESC")
 	ElseIf a_option == _myMultGainFight
-		SetInfoText("Multiplier for how much muscle is gained by combat actions (weapon swinging and power attacks). 2 means you will get twice as much, while 0.5 will give you only half of default value")
+		SetInfoText("$SNUSNU_GAINS_DESC")
 	ElseIf a_option == _myMultGainArmor
-		SetInfoText("Multiplier for how much extra muscle is gained by using heavy armor. 2 means you will get twice as much, while 0.5 will give you only half of default value")
+		SetInfoText("$SNUSNU_GAINSARMOR_DESC")
 	ElseIf a_option == _myMultGainMisc
-		SetInfoText("Multiplier for how much muscle is gained by other miscellaneous actions (Swimming, Wood chopping and Mining). 2 means you will get twice as much, while 0.5 will give you only half of default value")
+		SetInfoText("$SNUSNU_GAINSMISC_DESC")
 	ElseIf a_option == _myMultGainWufwuf
-		SetInfoText("Multiplier for how much muscle is gained by transforming into a Werewolf. Value is a percent for maximum muscle score.")
+		SetInfoText("$SNUSNU_WUFWUF_DESC")
 	ElseIf a_option == _myVampGains
-		SetInfoText("Multiplier for how much muscle is gained by feeding blood as a vampire. Consuming blood potions will not grant any gains though. Setting it to cero will disable this feature and muscle gains will work the same for vampires.")
+		SetInfoText("$SNUSNU_GAINSVAMP_DESC")
 	ElseIf a_option == _myBoostCarryWeight
-		SetInfoText("Maximum carry weight boost by getting more muscular. It will change depending on Muscle Score.")
+		SetInfoText("$SNUSNU_CARRYWEIGHT_DESC")
 	ElseIf a_option == _mytfAnimation
 		SetInfoText("$SNUSNU_USETFANIM_DESC")
 	ElseIf a_option == _mytfAnimationNPC
@@ -687,23 +681,23 @@ Event OnOptionHighlight(Int a_option)
 	ElseIf a_option == _myuseAltAnimsNPC
 		SetInfoText("$SNUSNU_USEALTANIMSNPC_DESC")
 	ElseIf a_option == _myApplyMoreChanges
-		SetInfoText("Apply gradual changes during FMG transformation. Muscle mass will start at 50% and it will grow in increments of 25% until it reaches 100%. Darker skin textures will also be applied every time a new increment is reached.")
+		SetInfoText("$SNUSNU_TF_MORECHANGES_DESC")
 	ElseIf a_option == _myChangeVoice
-		SetInfoText("Change voice to a more rough one (currently using Frea's voice for females and Isran's for males) for the duration of the FMG spell.")
+		SetInfoText("$SNUSNU_TF_VOICE_DESC")
 	ElseIf a_option == _myDynamicChanges
-		SetInfoText("Use dynamic calculations for gradual changes. Gradual changes will be applied only if spell duration is longh enough. If it's not, then apply the full transformation since the begining.")
+		SetInfoText("$SNUSNU_TF_DYNAMICCHANGES_DESC")
 	ElseIf a_option == _myChangesInterval
-		SetInfoText("How much to wait for the next change increment to be applied, in in-game days.")
+		SetInfoText("$SNUSNU_TF_CHANGESINTERVAL_DESC")
 	ElseIf a_option == _myChangesIncrements
-		SetInfoText("How much muscles will grow with each change interval. Changes go in two stages, so if you choose 0.25 then the initial FMG muscle will be at 50%, then the first change stage will be to 75% and the final stage will always be to 100%")
+		SetInfoText("$SNUSNU_TF_CHANGESINCREMENTS_DESC")
 	ElseIf a_option == _myCustomizeFMG
-		SetInfoText("Toggle FMG morphs customization.")
+		SetInfoText("$SNUSNU_TF_CUSTOMIZE_DESC")
 	ElseIf a_option == _myUseAltBody
-		SetInfoText("Use a different body mesh for FMG transformation instead of body morphs. A proper body mesh and textures need to be added to their respective folders.")
+		SetInfoText("$SNUSNU_ALTBODY_DESC")
 	ElseIf a_option == _myVampireFix
-		SetInfoText("Apply vampire race fix during the FMG transformation. This fix will remove the vampire race of your character during the FMG transformation. This will fix any texture neck seams but it will also mess the way the game and mods treat your character regarding their vampirism.")
+		SetInfoText("$SNUSNU_VAMPFIX_DESC")
 	ElseIf a_option == _myUseWufwufMorphs
-		SetInfoText("Apply muscle and weight morphs on werewolf form. Requieres \"TWO - Total Werewolf Overhaul\" mod.")
+		SetInfoText("$SNUSNU_WUFWUF_DESC")
 	ElseIf a_option == _myRemoveWeightMorphs
 		SetInfoText("$SNUSNU_NOWEIGHTMORPHS_DESC")
 	ElseIf a_option == _myUseWeightSlider
@@ -711,47 +705,47 @@ Event OnOptionHighlight(Int a_option)
 	ElseIf a_option == _myDisableNormals
 		SetInfoText("$SNUSNU_DISABLENORMALS_DESC")
 	ElseIf a_option == _myDynamicPhysics
-		SetInfoText("Change breasts physics depending on muscle score (CBPC needed). This will reduce breast bounciness to simulate muscular \"firmness\".")
+		SetInfoText("$SNUSNU_BOOBS_DESC")
 	ElseIf a_option == _myHavePecs
-		SetInfoText("This will treat breasts more like pecs during the dynamic physics calculations. Physics will be greatly reduced the bigger the muscle score is.")
+		SetInfoText("$SNUSNU_NOJIGGLE_DESC")
 ;	ElseIf a_option == _mySelectedBody
 ;		SetInfoText("$SNUSNU_SELECTEDBODY_DESC")
 	ElseIf a_option == _myZeroSliders
-		SetInfoText("Set all slider values to 0.0")
+		SetInfoText("$SNUSNU_ZEROSLIDERS_DESC")
 	ElseIf a_option == _myApplyDefault
-		SetInfoText("Apply recommended default morph values")
+		SetInfoText("$SNUSNU_DEFAULT_DESC")
 	ElseIf a_option == _myFoceScore
-		SetInfoText("Force muscle score value. Only for debug purposes!!")
+		SetInfoText("$SNUSNU_FORCESCORE_DESC")
 	ElseIf a_option == _myNPCMuscleScore
-		SetInfoText("How much FMG muscle to apply to NPCs")
+		SetInfoText("$SNUSNU_NPC_SCORE_DESC")
 	ElseIf a_option == _myMalnourishment
-		SetInfoText("At which WeightMorphs weigh value would the character be considered malnourished. Being malnourished greately reduces the muscle gain rate.")
+		SetInfoText("$SNUSNU_MALNOURISHMENT_DESC")
 	ElseIf a_option == _myPushupException
-		SetInfoText("Add current equiped gear to push-up exceptions list.")
+		SetInfoText("$SNUSNU_PUSHUP_DESC")
 	ElseIf a_option == _myChangeAnims
-		SetInfoText("Change to more muscular animations on high muscle score.")
+		SetInfoText("$SNUSNU_MUSCLEANIMS_DESC")
 	ElseIf a_option == _myUseDARAnims
-		SetInfoText("Use DAR instead of FNIS/Nemesis for animations")
+		SetInfoText("$SNUSNU_DARANIMS_DESC")
 	ElseIf a_option == _myMuscleAnimsLevel
-		SetInfoText("Muscular level at which to apply muscular animations (0=Civilian, 1=Athletic, 2=Muscular, 3=Very Muscular)")
+		SetInfoText("$SNUSNU_ANIMSLVL_DESC")
 	ElseIf a_option == _myShowMessages
-		SetInfoText("Show info notifications related to things you might want to be aware of during gameplay.")
+		SetInfoText("$SNUSNU_SHOWINFO_DESC")
 	ElseIf a_option == _mymaxItemsEquiped
-		SetInfoText("Hardcore mode's maximum allowed equiped weight. It will go beyond this value during a FMG transformation. It is highly recommended to leave this as it is since making it higher would just negate the reason to have a hardcore mode at all. It is here for specific situations like if you have armor or weapon mods that for some reason might have very high weight values. Or to make things more difficult by making it lower.")
+		SetInfoText("$SNUSNU_HARDCOREWEIGHT_DESC")
 	
 	;LOAD AND SAVE
 	ElseIf a_option == _mySaveOptions
-		SetInfoText("Save settings to an external file.")
+		SetInfoText("$SNUSNU_SAVE_DESC")
 	ElseIf a_option == _myLoadOptions
-		SetInfoText("Load settings from an external file.")
+		SetInfoText("$SNUSNU_LOAD_DESC")
 	ElseIf a_option == _mySaveMorphs
-		SetInfoText("Save all morphs to an external file.")
+		SetInfoText("$SNUSNU_SAVEMORPHS_DESC")
 	ElseIf a_option == _myLoadMorphs
-		SetInfoText("Load all morphs to an external file.")
+		SetInfoText("$SNUSNU_LOADMORPHS_DESC")
 	ElseIf a_option == _mySaveMorphsProfile
-		SetInfoText("Save morphs to an specific profile file.")
+		SetInfoText("$SNUSNU_SAVEPROFILE_DESC")
 	ElseIf a_option == _myLoadMorphsProfile
-		SetInfoText("Load morphs from an specific profile file.")
+		SetInfoText("$SNUSNU_LOADPROFILE_DESC")
 	EndIf
 EndEvent
 
@@ -845,7 +839,7 @@ Event OnOptionSelect(Int a_option)
 		String Msg
 		If editFMGMorphs
 			If !snusnuMain.isTransforming
-				Msg = "All morph changes you do while this option is selected will only affect the FMG body shape. To go back to normal muscle morphs just disable this option. It will take time to load the morphs, so please wait until the menu is fully updated."
+				Msg = "$SNUSNU_FMGEDIT_MSG"
 				ShowMessage(Msg, False)
 				
 				;Load FMG morphs profile here. All changes to the morphs must be saved after this
@@ -856,17 +850,17 @@ Event OnOptionSelect(Int a_option)
 				If loadErrorMsg
 					ShowMessage(loadErrorMsg, false)
 				Else
-					Msg = "Menu has finished updating."
+					Msg = "$SNUSNU_UPDATED_MSG"
 					ShowMessage(Msg, False)
 				EndIf
 			Else
-				Msg = "You can not edit the FMG morphs while a FMG transformation is currently ongoing!"
+				Msg = "$SNUSNU_TFEDITWARNING_MSG"
 				ShowMessage(Msg, False)
 				editFMGMorphs = !editFMGMorphs
 				SetToggleOptionValue(a_option, editFMGMorphs)
 			EndIf
 		Else
-			Msg = "Going back to normal muscle morphs customization, please wait until the menu is fully updated."
+			Msg = "$SNUSNU_FMGEDITOFF_MSG"
 			ShowMessage(Msg, False)
 			
 			;Save morphs to a FMG profile file and load the previous morphs
@@ -874,7 +868,7 @@ Event OnOptionSelect(Int a_option)
 			If loadErrorMsg
 				ShowMessage(loadErrorMsg, false)
 			Else
-				Msg = "Menu has finished updating."
+				Msg = "$SNUSNU_UPDATED_MSG"
 				ShowMessage(Msg, False)
 			EndIf
 			
@@ -902,20 +896,20 @@ Event OnOptionSelect(Int a_option)
 		applyDynamicPhysicsOption()
 	ElseIf a_option == _myZeroSliders
 		String Msg
-		Msg = "Setting body sliders to 0.0, please wait until confirmation message appears."
+		Msg = "$SNUSNU_ZEROED_MSG"
 		ShowMessage(Msg, False)
 		
 		snusnuMain.ClearMorphs()
 		SetToggleOptionValue(a_option, true)
 		
-		Msg = "All body sliders have been set to 0.0"
+		Msg = "$SNUSNU_ZEROEDFINISH_MSG"
 		ShowMessage(Msg, False)
 	ElseIf a_option == _myApplyDefault
 		snusnuMain.initDefaultSliders()
 		SetToggleOptionValue(a_option, true)
 		
 		String Msg
-		Msg = "All body sliders have been set to their initial default values"
+		Msg = "$SNUSNU_DEFAULTFINISH_MSG"
 		ShowMessage(Msg, False)
 	ElseIf a_option == _myPushupException
 		Armor mainArmor = PlayerRef.GetWornForm(0x00000004) as Armor
@@ -942,7 +936,7 @@ Event OnOptionSelect(Int a_option)
 		bool allowSave = true
 		
 		if JsonUtil.JsonExists("SnusnuSettings")
-			if !ShowMessage("WARNING: Saved user settings already present. Do you want to override them?", true)
+			if !ShowMessage("$SNUSNU_OVERRIDE_MSG", true)
 				allowSave = false
 			endIf
 		endIf
@@ -957,10 +951,10 @@ Event OnOptionSelect(Int a_option)
 			Self.SetOptionFlags(_mySaveMorphsProfile, Self.OPTION_FLAG_DISABLED, True)
 			Self.SetOptionFlags(_myLoadMorphsProfile, Self.OPTION_FLAG_DISABLED, True)
 			if saveSettings(); && savePushupExceptions()
-				ShowMessage("Settings have been saved successfully", false)
+				ShowMessage("$SNUSNU_SAVED_MSG", false)
 				ForcePageReset()
 			else
-				ShowMessage("ERROR: settings could not be saved properly", false)
+				ShowMessage("$SNUSNU_SAVEDERROR_MSG", false)
 			endIf
 			Self.SetOptionFlags(_mySaveOptions, Self.OPTION_FLAG_NONE, True)
 			Self.SetOptionFlags(_myLoadOptions, Self.OPTION_FLAG_NONE, True)
@@ -972,7 +966,7 @@ Event OnOptionSelect(Int a_option)
 			Self.SetOptionFlags(_myLoadMorphsProfile, Self.OPTION_FLAG_NONE, True)
 		endIf
 	ElseIf a_option == _myLoadOptions
-		if ShowMessage("Do you want to load previously saved settings?\n\nWARNING: All your current settings will be overriden.", true)
+		if ShowMessage("$SNUSNU_SAVEWARNING_MSG", true)
 			Self.SetOptionFlags(_mySaveOptions, Self.OPTION_FLAG_DISABLED, True)
 			Self.SetOptionFlags(_myLoadOptions, Self.OPTION_FLAG_DISABLED, True)
 			
@@ -984,10 +978,10 @@ Event OnOptionSelect(Int a_option)
 			
 			
 			if loadSettings()
-				ShowMessage("All settings have been loaded successfully", false)
+				ShowMessage("$SNUSNU_LOADED_MSG", false)
 				ForcePageReset()
 			else
-				ShowMessage("ERROR: settings could not be loaded", false)
+				ShowMessage("$SNUSNU_LOADEDERROR_MSG", false)
 			endIf
 			Self.SetOptionFlags(_mySaveOptions, Self.OPTION_FLAG_NONE, True)
 			Self.SetOptionFlags(_myLoadOptions, Self.OPTION_FLAG_NONE, True)
@@ -1982,11 +1976,11 @@ State InstalledBody
 	EndEvent
 	Event OnHighlightST()
 		If snusnuMain.selectedBody == 0
-			SetInfoText("The body you have installed in Skyrim is UUNP or BHUNP")
+			SetInfoText("$SNUSNU_BODYUNP_DESC")
 		ElseIf snusnuMain.selectedBody == 1
-			SetInfoText("The body you have installed in Skyrim is CBBE")
+			SetInfoText("$SNUSNU_BODYCBBE_DESC")
 		ElseIf snusnuMain.selectedBody == 2
-			SetInfoText("You don't have a custom body shape installed")
+			SetInfoText("$SNUSNU_BODYVANILLA_DESC")
 		EndIf
 	EndEvent
 EndState
@@ -2020,16 +2014,16 @@ State LoadDefaults
 		needBodyUpdate = true
 		
 		String Msg
-		Msg = "Selected morphs profile has been applied."
+		Msg = "$SNUSNU_PROFILEAPPLY_MSG"
 		ShowMessage(Msg, False)
 	EndEvent
 	Event OnHighlightST()
 		If selectedDefaultMorphs == 1
-			SetInfoText("Set all morphs for UUNP/BHUNP recommended body shape")
+			SetInfoText("$SNUSNU_PROFILE_UNP_DESC")
 		ElseIf selectedDefaultMorphs == 2
-			SetInfoText("Set all morphs for CBBE SE recommended body shape")
+			SetInfoText("$SNUSNU_PROFILE_3BA_DESC")
 		ElseIf selectedDefaultMorphs == 3
-			SetInfoText("Set all morphs for alternative CBBE SE body shape with enphasis on pectorals")
+			SetInfoText("$SNUSNU_PROFILE_3BAPECS_DESC")
 		EndIf
 	EndEvent
 EndState
@@ -2042,7 +2036,7 @@ EndState
 Function applyEnabledOption(Bool askHardcore)
 	SetToggleOptionValue(_myEnabled, snusnuMain.Enabled)
 	
-	If snusnuMain.Enabled && askHardcore && ShowMessage("Enable Hardcore Mode?\n\nIn Hardcore Mode your initial muscle score will be set depending on your race\n(Orc: 50%, Nord: 35%, WoodElf/Redguard/Khajiit/Imperial: 25%, HighElf/DarkElf/Breton/Argonian: 0%),\nand it also restricts the usage of armor and weapons depending on your muscle score.", true, "Activate", "Don't")
+	If snusnuMain.Enabled && askHardcore && ShowMessage("$SNUSNU_HARDCORE_MSG", true, "$SNUSNU_CHOICE_YES", "$SNUSNU_CHOICE_NO")
 		snusnuMain.hardcoreMode = true
 		applyHardcoreOption()
 		SetToggleOptionValue(_myHardcoreMode, snusnuMain.hardcoreMode)
@@ -2088,7 +2082,7 @@ Function applyBodyOption(Bool showMSG = true)
 	
 	If showMSG
 		String Msg
-		Msg = "Doing a full menu reset, please wait for confirmation."
+		Msg = "$SNUSNU_MENURESET_MSG"
 		ShowMessage(Msg, False)
 	EndIf
 	
@@ -2097,7 +2091,7 @@ Function applyBodyOption(Bool showMSG = true)
 	
 	If showMSG
 		String Msg
-		Msg = "Menu has been reset successfully."
+		Msg = "$SNUSNU_MENURESETFINISH_MSG"
 		ShowMessage(Msg, False)
 	EndIf
 EndFunction
@@ -2194,11 +2188,11 @@ Function applySaveMorphs(String profileName = "")
 	
 	Self.SetOptionFlags(_mySaveMorphsProfile, Self.OPTION_FLAG_DISABLED, True)
 	Self.SetOptionFlags(_myLoadMorphsProfile, Self.OPTION_FLAG_DISABLED, True)
-	ShowMessage("Saving morph values, please wait until confirmation message appears.", false)
+	ShowMessage("$SNUSNU_MORPHS_SAVEWARNING_MSG", false)
 	If snusnuMain.saveAllMorphs(profileName)
-		ShowMessage("Morphs have been saved successfully", false)
+		ShowMessage("$SNUSNU_MORPHS_SAVED_MSG", false)
 	Else
-		ShowMessage("ERROR! Morph values could not be saved!!", false)
+		ShowMessage("$SNUSNU_MORPHS_SAVEDERROR_MSG", false)
 	EndIf
 	ForcePageReset()
 	Self.SetOptionFlags(_mySaveOptions, Self.OPTION_FLAG_NONE, True)
@@ -2220,12 +2214,12 @@ Function applyLoadMorphs(String profileName = "")
 	
 	Self.SetOptionFlags(_mySaveMorphsProfile, Self.OPTION_FLAG_DISABLED, True)
 	Self.SetOptionFlags(_myLoadMorphsProfile, Self.OPTION_FLAG_DISABLED, True)
-	ShowMessage("Loading morph values, please wait until confirmation message appears.", false)
+	ShowMessage("$SNUSNU_MORPHS_LOADWARNING_MSG", false)
 	If snusnuMain.loadAllMorphs(profileName)
-		ShowMessage("Morphs have been loaded successfully", false)
+		ShowMessage("$SNUSNU_MORPHS_LOADED_MSG", false)
 		needBodyUpdate = true
 	Else
-		ShowMessage("ERROR! Morph values could not be loaded!!", false)
+		ShowMessage("$SNUSNU_MORPHS_LOADEDERROR_MSG", false)
 	EndIf
 	ForcePageReset()
 	Self.SetOptionFlags(_mySaveOptions, Self.OPTION_FLAG_NONE, True)
@@ -2242,17 +2236,17 @@ String Function switchFMGMorphs(Bool loadFMG)
 	String errorMSG
 	If loadFMG
 		If !snusnuMain.saveAllMorphs("SnuSnuProfiles/SnuTempMorphs")
-			errorMSG = "There was an error while saving current morphs!"
+			errorMSG = "$SNUSNU_FMG_ERROR1_MSG"
 		EndIf
 		If !snusnuMain.loadAllMorphs("SnuSnuProfiles/SnuDefaultFMG_" + snusnuMain.getNormalsByBodyType(PlayerRef, false))
-			errorMSG = "There was an error while loading FMG morphs!"
+			errorMSG = "$SNUSNU_FMG_ERROR2_MSG"
 		EndIf
 	Else
 		If !snusnuMain.saveAllMorphs("SnuSnuProfiles/SnuDefaultFMG_" + snusnuMain.getNormalsByBodyType(PlayerRef, false))
-			errorMSG = "There was an error while saving FMG morphs!"
+			errorMSG = "$SNUSNU_FMG_ERROR3_MSG"
 		EndIf
 		If !snusnuMain.loadAllMorphs("SnuSnuProfiles/SnuTempMorphs")
-			errorMSG = "There was an error while loading current morphs!"
+			errorMSG = "$SNUSNU_FMG_ERROR4_MSG"
 		EndIf
 	EndIf
 	

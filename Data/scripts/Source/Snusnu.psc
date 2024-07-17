@@ -72,6 +72,8 @@ Float Property normalsScore = 450.0 Auto ;This will change along with muscleScor
 Float prevMuscleScore = 0.0 ;Save the previous value so we can decide to apply changes based on difference
 Float Property scoreAddition = 0.0 Auto
 
+Float Property concoctionModifier = 1.0 Auto
+
 ;TLALOC - Normals related values
 Int Property currentBuildStage = 1 Auto
 Int Property currentPregStage = 0 Auto
@@ -223,6 +225,8 @@ Float[] Property maleValues Auto
 
 ;ToDo- Werewolf morphs
 Float[] Property wufwufValues Auto
+Float[] Property wufwufBoneValues Auto
+String[] Property wufwufBones Auto
 
 Int Function GetVersion()
 	Return Version
@@ -323,6 +327,7 @@ Event OnRaceSwitchComplete()
 		If isWerewolf
 			isWerewolf = false
 			addWerewolfBuild()
+			updateWerewolfBones(PlayerRef, 1.0, true)
 			;ToDo- Reapply changes if FMG spell is active (Just bones. Skin should be managed by the spell itself. Normals are reapplied later in this function)
 		ElseIf isVampireLord
 			isVampireLord = false
@@ -346,6 +351,9 @@ Event OnRaceSwitchComplete()
 		isWerewolf = true
 		If useWerewolfMorphs
 			updateWerewolfMuscle(getfightingMuscle())
+			If !wufwufBoneValues || wufwufBoneValues.length == 0
+				initWerewolfMorphArrays()
+			EndIf
 		EndIf
 	ElseIf PlayerRef.getRace().getName() == "Vampire Lord"
 		If isVampireLordReVampedLoaded
@@ -436,6 +444,16 @@ Event OnUpdate()
 					;ToDo- If PC is vampire and they are outside in the day, degradation should be twice as bad
 					;For now, degradation is always ten times faster
 					totalDegradation = totalDegradation * 15
+				EndIf
+				
+				If isWeightMorphsLoaded && getWeightmorphsWeight() < malnourishmentValue
+					totalDegradation = totalDegradation * 2
+				EndIf
+				
+				If concoctionModifier == 0.5
+					totalDegradation = totalDegradation * 2
+				ElseIf concoctionModifier == 2.0
+					totalDegradation = totalDegradation * 0.5
 				EndIf
 				
 				If justWakeUp
@@ -928,7 +946,7 @@ Event OnAnimationEvent(ObjectReference akSource, string asEventName)
 			;showInfoNotification("bowDrawTime: "+bowDrawTime)
 			
 			scoreAddition = scoreAddition + (0.25 * MultGainFight)
-			;Debug.Notification("Drawing my bow to full charge surely requieres a certain ammount of strenght")
+			;Debug.Notification("Drawing my bow to full charge surely requieres a certain ammount of strength")
 			
 			;bowDrawTime = 0.0
 		ElseIf asEventName == "FootRight" && (PlayerRef.IsOverEncumbered() || PO3_SKSEFunctions.IsActorUnderwater(PlayerRef))
@@ -944,6 +962,15 @@ EndEvent
 Event OnSleepStart(float afSleepStartTime, float afDesiredSleepEndTime)
 	;Debug.Trace("SNU - OnSleepStart()")
 	startSleepTime = GameDaysPassed.GetValue()
+	
+	;Cart lie down animation
+	If Game.IsMovementControlsEnabled()
+		Debug.Trace("SNU - Casting lay down spell animation!!")
+		Spell layDownSpell = Game.GetFormFromFile(0x02093F55, "DragonKillerCartSE.esp") As Spell
+		If layDownSpell
+			layDownSpell.Cast(PlayerRef)
+		EndIf
+	EndIf
 EndEvent
 
 Event OnSleepStop(bool abInterrupted)
@@ -1076,7 +1103,7 @@ Event OnKeyDown(Int KeyCode)
 			Debug.Notification("ExtraCarryWeight="+currentExtraCarryWeight)
 			
 		EndIf
-		Debug.Notification("muscleMightAffinity="+muscleMightAffinity)
+		Debug.Notification("concoctionModifier="+concoctionModifier+", muscleMightAffinity="+muscleMightAffinity)
 		Debug.Notification("itemsEquipedWeight="+itemsEquipedWeight+", allowedItemsEquipedWeight="+allowedItemsEquipedWeight)
 		Debug.Notification("muscleScore="+getMuscleValuePercent(muscleScore)+"%, normalsScore="+getMuscleValuePercent(normalsScore)+"%")
 		;Debug.Notification("lostMuscle="+getMuscleValuePercent(lostMuscle)+"%, storedMuscle="+getMuscleValuePercent(storedMuscle)+"%")
@@ -1291,6 +1318,8 @@ Function updateMuscleScore(float incValue)
 				malnourishmentWarning = false
 			EndIf
 		EndIf
+		
+		incValue = incValue * concoctionModifier
 		
 		storedMuscle = storedMuscle + incValue
 	EndIf
@@ -1652,7 +1681,7 @@ Function updateBoobsPhysics(Bool forceUpdate = false, Int newLevel = -1)
 				EndIf
 			EndIf
 			
-			Debug.Trace("SNU- Physics level is "+physicsLevel)
+			Debug.Trace("SNU - Physics level is "+physicsLevel)
 			If physicsLevel == 1
 				showInfoNotification("Switching to breasts physics level 1")
 				Debug.Trace("Switching to breasts physics level 1")
@@ -3165,6 +3194,11 @@ Function updateAnimations(Int newBuildStage)
 			ElseIf !isUsingFNIS && (MuscleLevel.getValue() as Int) >= (muscleAnimsLevel.getValue() as Int)
 				setMuscleAnimations(PlayerRef)
 			EndIf
+		Else
+			;Force an idle reset so that DAR can use the new animations
+			If canPlayAnimation(PlayerRef)
+				Debug.SendAnimationEvent(PlayerRef,"IdleForceDefaultState")
+			EndIf
 		EndIf
 	EndIf
 EndFunction
@@ -3302,6 +3336,78 @@ Function removeNormalMuscle(Actor buffTarget, Float changePercent)
 	EndIf
 EndFunction
 
+Function initWerewolfMorphArrays()
+	;wufwufValues = new Float[]
+	wufwufBones = new String[24]
+	wufwufBoneValues = new Float[24]
+	
+	wufwufBones[0] = "NPC"
+	wufwufBones[1] = "NPC Spine2 [Spn2]"
+	wufwufBones[2] = "NPC L UpperarmTwist1 [LUt1]"
+	wufwufBones[3] = "NPC R UpperarmTwist1 [RUt1]"
+	wufwufBones[4] = "NPC L UpperarmTwist2 [LUt2]"
+	wufwufBones[5] = "NPC R UpperarmTwist2 [RUt2]"
+	wufwufBones[6] = "NPC L Forearm [RLar]"
+	wufwufBones[7] = "NPC R Forearm [RLar]"
+	wufwufBones[8] = "NPC R RearCalf [RrClf]"
+	wufwufBones[9] = "NPC L RearCalf [LrClf]"
+	wufwufBones[10] = "NPC R RearThigh"
+	wufwufBones[11] = "NPC L RearThigh"
+	wufwufBones[12] = "NPC R FrontThigh"
+	wufwufBones[13] = "NPC L FrontThigh"
+	wufwufBones[14] = "XXX"
+	wufwufBones[15] = "XXX"
+	wufwufBones[16] = "XXX"
+	wufwufBones[17] = "XXX"
+	wufwufBones[18] = "XXX"
+	wufwufBones[19] = "XXX"
+	wufwufBones[20] = "XXX"
+	wufwufBones[21] = "XXX"
+	wufwufBones[22] = "XXX"
+	wufwufBones[23] = "XXX"
+	
+	wufwufBoneValues[0] = 1.075 ;Height
+	wufwufBoneValues[1] = 1.11 ;Spine2
+	wufwufBoneValues[2] = 1.25 ;UpperarmTwist1 L
+	wufwufBoneValues[3] = 1.25 ;UpperarmTwist1 R
+	wufwufBoneValues[4] = 1.125 ;UpperarmTwist2 L
+	wufwufBoneValues[5] = 1.125 ;UpperarmTwist2 R
+	wufwufBoneValues[6] = 1.25 ;Forearm R
+	wufwufBoneValues[7] = 1.25 ;Forearm L
+	wufwufBoneValues[8] = 1.5 ;RearCalf R
+	wufwufBoneValues[9] = 1.5 ;RearCalf L
+	wufwufBoneValues[10] = 1.5 ;RearThigh R
+	wufwufBoneValues[11] = 1.5 ;RearThigh L
+	wufwufBoneValues[12] = 1.5 ;FrontThigh R
+	wufwufBoneValues[13] = 1.5 ;FrontThigh L
+	wufwufBoneValues[14] = 1.0 ;XXX
+	wufwufBoneValues[15] = 1.0 ;XXX
+	wufwufBoneValues[16] = 1.0 ;XXX
+	wufwufBoneValues[17] = 1.0 ;XXX
+	wufwufBoneValues[18] = 1.0 ;XXX
+	wufwufBoneValues[19] = 1.0 ;XXX
+	wufwufBoneValues[20] = 1.0 ;XXX
+	wufwufBoneValues[21] = 1.0 ;XXX
+	wufwufBoneValues[22] = 1.0 ;XXX
+	wufwufBoneValues[23] = 1.0 ;XXX
+EndFunction
+
+Function updateWerewolfBones(Actor theWufwuf, Float sizeFactor = 1.0, Bool removeMorphs = false)
+	Bool actorIsFemale = theWufwuf.GetActorBase().GetSex()
+	Int wufBonesLoop = 0
+	while wufBonesLoop < wufwufBones.length && wufwufBones[wufBonesLoop] != "XXX"
+		Float wufBoneScale
+		If removeMorphs
+			wufBoneScale = 1.0
+		Else
+			wufBoneScale = getBoneSize(sizeFactor, wufwufBoneValues[wufBonesLoop])
+		EndIf
+		
+		SetNodeScale(theWufwuf, actorIsFemale, wufwufBones[wufBonesLoop], wufBoneScale, SNUSNU_KEY)
+		wufBonesLoop += 1
+	EndWhile
+EndFunction
+
 Function updateWerewolfMuscle(Float sizeFactor = 1.0)
 	If StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle", 0) == 0
 		;NiOverride.SetBodyMorph(PlayerRef, "BodyHigh", SNUSNU_KEY, sizeFactor * 1.5) ;1.5
@@ -3325,6 +3431,9 @@ Function updateWerewolfMuscle(Float sizeFactor = 1.0)
 		
 		;Add some thickness
 		NiOverride.SetBodyMorph(PlayerRef, "BodyHighHDT", SNUSNU_KEY, 0.1)
+		
+		;Big bones
+		updateWerewolfBones(PlayerRef, currentMusclePercent)
 	EndIf
 	
 	NiOverride.UpdateModelWeight(PlayerRef)

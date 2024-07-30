@@ -134,6 +134,7 @@ Float Property muscleMightAffinity = 0.0  Auto
 Float Property muscleMightProbability = 0.25  Auto
 Float Property totalMuscleToAdd = 0.01 Auto
 Float Property currentMusclePercent = 1.0 Auto
+Float Property forcedMusclePercent = -1.0 Auto
 Bool Property changeToBarbarianVoice = true Auto
 VoiceType Property originalPCVoice = none Auto
 
@@ -450,11 +451,7 @@ Event OnUpdate()
 					totalDegradation = totalDegradation * 2
 				EndIf
 				
-				If concoctionModifier == 0.5
-					totalDegradation = totalDegradation * 2
-				ElseIf concoctionModifier == 2.0
-					totalDegradation = totalDegradation * 0.5
-				EndIf
+				totalDegradation = totalDegradation / concoctionModifier
 				
 				If justWakeUp
 					Debug.Trace("SNU - justWakeUp, totalDegradation="+totalDegradation)
@@ -955,6 +952,7 @@ Event OnAnimationEvent(ObjectReference akSource, string asEventName)
 		Else
 			;TLALOC- Experimental custom events debug
 			;showInfoNotification(asEventName)
+			;Debug.Trace("SNU - "+asEventName)
 		EndIf
 	EndIf
 EndEvent
@@ -962,15 +960,6 @@ EndEvent
 Event OnSleepStart(float afSleepStartTime, float afDesiredSleepEndTime)
 	;Debug.Trace("SNU - OnSleepStart()")
 	startSleepTime = GameDaysPassed.GetValue()
-	
-	;Cart lie down animation
-	If Game.IsMovementControlsEnabled()
-		Debug.Trace("SNU - Casting lay down spell animation!!")
-		Spell layDownSpell = Game.GetFormFromFile(0x02093F55, "DragonKillerCartSE.esp") As Spell
-		If layDownSpell
-			layDownSpell.Cast(PlayerRef)
-		EndIf
-	EndIf
 EndEvent
 
 Event OnSleepStop(bool abInterrupted)
@@ -1000,9 +989,16 @@ Event OnSleepStop(bool abInterrupted)
 		Utility.wait(3)
 		Debug.Notification("I had a dream i was mighty unstoppable")
 		If affinityScore <= muscleMightProbability * 0.95
+			If muscleMightAffinity < 0.5
+				forcedMusclePercent = 1.0 - (moreChangesIncrements * 2)
+			Else
+				forcedMusclePercent = 1.0 - moreChangesIncrements
+			EndIf
 			MusclePowerSpell.Cast(PlayerRef)
 		Else
-			UltraMusclePowerSpell.Cast(PlayerRef)
+			forcedMusclePercent = 1.0
+			;UltraMusclePowerSpell.Cast(PlayerRef)
+			MusclePowerSpell.Cast(PlayerRef)
 		EndIf
 	Else
 		totalSleepTime = GameDaysPassed.GetValue() - startSleepTime
@@ -1107,7 +1103,9 @@ Event OnKeyDown(Int KeyCode)
 		Debug.Notification("itemsEquipedWeight="+itemsEquipedWeight+", allowedItemsEquipedWeight="+allowedItemsEquipedWeight)
 		Debug.Notification("muscleScore="+getMuscleValuePercent(muscleScore)+"%, normalsScore="+getMuscleValuePercent(normalsScore)+"%")
 		;Debug.Notification("lostMuscle="+getMuscleValuePercent(lostMuscle)+"%, storedMuscle="+getMuscleValuePercent(storedMuscle)+"%")
-		
+		If StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle", 0) > 0
+			Debug.Notification("totalMuscleToAdd="+totalMuscleToAdd+", currentBuildStage="+currentBuildStage)
+		EndIf
 		If !disableNormals
 			Debug.Notification("Normals="+getFinalNormalsPath())
 		EndIf
@@ -1784,7 +1782,7 @@ EndFunction
 ;     Pregnancy stages = 0=Not preg, 1=Preg
 Function checkBodyNormalsState()
 	;Debug.Trace("SNU - checkBodyNormalsState()")
-	If disableNormals || StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle", 0) != 0 || isVampireLord
+	If disableNormals || StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle", 0) != 0 || isVampireLord || isWerewolf
 		If isVampireLord
 			finalNormalsPath = "VAMP_EMPTY"
 		EndIf
@@ -2029,10 +2027,11 @@ Function RegisterEvents(Bool _enable)
 		;RegisterForAnimationEvent(PlayerRef, "FootLeft")
 		RegisterForAnimationEvent(PlayerRef, "FootRight")
 		
+		;ToDo- Temporal Go to Bed fix. Will move to MCBM
+		;RegisterForAnimationEvent(PlayerRef, "IdleBedEnterToSleep")
+		
 		;TLALOC- Experimental anim events!
 		;RegisterForAnimationEvent(PlayerRef, "IdleGreybeardWordTeach");Immersive interactions Dummy training
-		;RegisterForAnimationEvent(PlayerRef, "XXX")
-		;RegisterForAnimationEvent(PlayerRef, "XXX")
 		;RegisterForAnimationEvent(PlayerRef, "XXX")
 		;RegisterForAnimationEvent(PlayerRef, "XXX")
 		;RegisterForAnimationEvent(PlayerRef, "XXX")
@@ -2065,6 +2064,8 @@ Function RegisterEvents(Bool _enable)
 		
 		UnregisterForAnimationEvent(PlayerRef, "FootLeft")
 		UnregisterForAnimationEvent(PlayerRef, "FootRight")
+		
+		;UnRegisterForAnimationEvent(PlayerRef, "IdleBedEnterToSleep")
 		
 		UnRegisterForSleep()
 		UnregisterForUpdate()
@@ -3370,8 +3371,8 @@ Function initWerewolfMorphArrays()
 	wufwufBoneValues[1] = 1.11 ;Spine2
 	wufwufBoneValues[2] = 1.25 ;UpperarmTwist1 L
 	wufwufBoneValues[3] = 1.25 ;UpperarmTwist1 R
-	wufwufBoneValues[4] = 1.125 ;UpperarmTwist2 L
-	wufwufBoneValues[5] = 1.125 ;UpperarmTwist2 R
+	wufwufBoneValues[4] = 1.25 ;UpperarmTwist2 L
+	wufwufBoneValues[5] = 1.25 ;UpperarmTwist2 R
 	wufwufBoneValues[6] = 1.25 ;Forearm R
 	wufwufBoneValues[7] = 1.25 ;Forearm L
 	wufwufBoneValues[8] = 1.5 ;RearCalf R
@@ -3429,10 +3430,11 @@ Function updateWerewolfMuscle(Float sizeFactor = 1.0)
 		NiOverride.SetBodyMorph(PlayerRef, "BodyHigh", SNUSNU_KEY, currentMusclePercent * 2.5)
 		NiOverride.SetBodyMorph(PlayerRef, "BreastsLowHDT", SNUSNU_KEY, currentMusclePercent * -1.0)
 		
-		;Add some thickness
-		NiOverride.SetBodyMorph(PlayerRef, "BodyHighHDT", SNUSNU_KEY, 0.1)
+		;Add some thickness -- NOT NEEDED since we are using bone morphs now
+		;NiOverride.SetBodyMorph(PlayerRef, "BodyHighHDT", SNUSNU_KEY, 0.1)
 		
 		;Big bones
+		;ToDo- We might need to remove the human bone morphs during werewolf TF
 		updateWerewolfBones(PlayerRef, currentMusclePercent)
 	EndIf
 	

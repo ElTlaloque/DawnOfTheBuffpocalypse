@@ -107,25 +107,28 @@ event OnEffectStart(Actor akTarget, Actor akCaster)
 		EndIf
 	EndIf
 	
-	
 	Debug.Trace("SNU - FMG Spell duration: "+GetDuration())
 	snusnuMain.currentMusclePercent = 1.0
 	If snusnuMain.applyMoreChangesOvertime
-		If snusnuMain.dynamicChangesCalculation
-			Float intervalSeconds = snusnuMain.moreChangesInterval * 86400 ;Number of seconds in a day
-			intervalSeconds = intervalSeconds / 20
-			
-			;NOTE: 1 hour = 0.833 days in-game
-			
-			If GetDuration() >= (intervalSeconds * 2) + 300 ;2 days ingame plus 5 real minutes overhead
-				snusnuMain.currentMusclePercent = 1.0 - (snusnuMain.moreChangesIncrements * 2)
-			Else ;If GetDuration() >= intervalSeconds + 300 ;1 days ingame plus 5 real minutes overhead
-				;We never want to start at 100%, so we start at the next stage even if there is not enough time to reach 100%. Otherwise
-				;we might as well not use More Changes Overtime at all.
-				snusnuMain.currentMusclePercent = 1.0 - snusnuMain.moreChangesIncrements
-			EndIf
+		If snusnuMain.forcedMusclePercent != -1.0
+			snusnuMain.currentMusclePercent = snusnuMain.forcedMusclePercent
 		Else
-			snusnuMain.currentMusclePercent = 1.0 - (snusnuMain.moreChangesIncrements * 2)
+			If snusnuMain.dynamicChangesCalculation
+				Float intervalSeconds = snusnuMain.moreChangesInterval * 86400 ;Number of seconds in a day
+				intervalSeconds = intervalSeconds / 20
+				
+				;NOTE: 1 hour = 0.833 days in-game
+				
+				If GetDuration() >= (intervalSeconds * 2) + 300 ;2 days ingame plus 5 real minutes overhead
+					snusnuMain.currentMusclePercent = 1.0 - (snusnuMain.moreChangesIncrements * 2)
+				Else ;If GetDuration() >= intervalSeconds + 300 ;1 days ingame plus 5 real minutes overhead
+					;We never want to start at 100%, so we start at the next stage even if there is not enough time to reach 100%. Otherwise
+					;we might as well not use More Changes Overtime at all.
+					snusnuMain.currentMusclePercent = 1.0 - snusnuMain.moreChangesIncrements
+				EndIf
+			Else
+				snusnuMain.currentMusclePercent = 1.0 - (snusnuMain.moreChangesIncrements * 2)
+			EndIf
 		EndIf
 	EndIf
 			
@@ -207,18 +210,21 @@ event OnEffectStart(Actor akTarget, Actor akCaster)
 			updateBones(akTarget, maxGrowth, False)
 			
 			switchMuscleNormals(akTarget, 4, 100 )
+			
+			If snusnuMain.applyMoreChangesOvertime
+				If snusnuMain.currentMusclePercent == 1.0 - snusnuMain.moreChangesIncrements
+					applyBarbarianSkin(snusnuMain.PlayerRef, 1)
+				ElseIf snusnuMain.currentMusclePercent == 1.0
+					applyBarbarianSkin(snusnuMain.PlayerRef, 2)
+				EndIf
+			EndIf
 		EndIf
 		
-		If snusnuMain.currentMusclePercent >= 1.0 - snusnuMain.moreChangesIncrements
-			If snusnuMain.useAltAnims
-				If snusnuMain.currentMusclePercent != 1.0
-					snusnuMain.updateAnimations(4) ;Was 3
-					
-					;If currentMusclePercent is other than 1.0 its safe to assume applyMoreChangesOvertime option is active 
-					applyBarbarianSkin(snusnuMain.PlayerRef, 1)
-				Else
-					snusnuMain.updateAnimations(4)
-				EndIf
+		If snusnuMain.useAltAnims && snusnuMain.currentMusclePercent >= 1.0 - snusnuMain.moreChangesIncrements
+			If snusnuMain.currentMusclePercent != 1.0
+				snusnuMain.updateAnimations(4) ;Was 3
+			Else
+				snusnuMain.updateAnimations(4)
 			EndIf
 		EndIf
 	EndIf
@@ -286,6 +292,7 @@ Event OnUpdate()
 					Utility.wait(0.5)
 					Debug.SendAnimationEvent(snusnuMain.PlayerRef, "Snu_idle1")
 				EndIf
+				reloadUpdate = false
 			EndIf
 			
 			If goingUp
@@ -335,17 +342,20 @@ Event OnUpdate()
 				EndIf
 				
 				If snusnuMain.currentMusclePercent >= 1.0 - snusnuMain.moreChangesIncrements
+					If snusnuMain.applyMoreChangesOvertime
+						;If currentMusclePercent is other than 1.0 its safe to assume applyMoreChangesOvertime option is active 
+						If snusnuMain.currentMusclePercent != 1.0
+							applyBarbarianSkin(snusnuMain.PlayerRef, 1)
+						Else
+							applyBarbarianSkin(snusnuMain.PlayerRef, 2)
+						EndIf
+					EndIf
+					
 					If snusnuMain.useAltAnims
 						If snusnuMain.currentMusclePercent != 1.0
 							snusnuMain.updateAnimations(4) ;Was 3
-							
-							;If currentMusclePercent is other than 1.0 its safe to assume applyMoreChangesOvertime option is active 
-							applyBarbarianSkin(snusnuMain.PlayerRef, 1)
 						Else
 							snusnuMain.updateAnimations(4)
-							
-							;As far as i know we dont need to apply barbarian skin here because maximum muscle percent
-							;is not possible at the begining when applyMoreChangesOvertime option is active
 						EndIf
 						Utility.wait(1)
 					EndIf
@@ -383,7 +393,7 @@ Event OnUpdate()
 		return
 	EndIf
 	
-	If reloadUpdate && !snusnuMain.isWerewolf ;ToDo- Check if this change works well with werewolf TF
+	If reloadUpdate && !snusnuMain.isWerewolf
 		refreshChanges()
 		reloadUpdate = false
 	EndIf
@@ -408,8 +418,10 @@ Event OnUpdate()
 			StorageUtil.SetIntValue(snusnuMain.PlayerRef, "SNU_UltraMuscle", 1+moreChangesCount)
 		EndIf
 		
-		Debug.Trace("SNU - tfTime="+tfTime+", Days passed: "+(snusnuMain.GameDaysPassed.GetValue() - tfTime))
-		If snusnuMain.applyMoreChangesOvertime && tfTime > 0.0 && snusnuMain.GameDaysPassed.GetValue() - tfTime >= snusnuMain.moreChangesInterval && !snusnuMain.isWerewolf ;ToDo- Check if this change works well with werewolf TF
+		;If tfTime != -1.0
+		;	Debug.Trace("SNU - tfTime="+tfTime+", Days passed: "+(snusnuMain.GameDaysPassed.GetValue() - tfTime))
+		;EndIf
+		If snusnuMain.applyMoreChangesOvertime && tfTime > 0.0 && snusnuMain.GameDaysPassed.GetValue() - tfTime >= snusnuMain.moreChangesInterval && !snusnuMain.isWerewolf
 			Debug.Trace("SNU - Starting more changes stage "+moreChangesCount)
 			If snusnuMain.currentMusclePercent < 1.0
 				Float newCarryWeight = 400*snusnuMain.currentMusclePercent
@@ -461,8 +473,10 @@ Event OnUpdate()
 				snusnuMain.PlayerRef.equipItem(snusnuMain.FistsOfRage)
 			EndIf
 			
-			moreChangesCount += 1
-			StorageUtil.SetIntValue(snusnuMain.PlayerRef, "SNU_UltraMuscle", 1+moreChangesCount)
+			;This will now be managed internally by applyBarbarianSkin
+			;moreChangesCount += 1
+			;StorageUtil.SetIntValue(snusnuMain.PlayerRef, "SNU_UltraMuscle", 1+moreChangesCount)
+			
 			If snusnuMain.currentMusclePercent < 1.0
 				tfTime = snusnuMain.GameDaysPassed.GetValue()
 			Else
@@ -518,7 +532,7 @@ Event OnEffectFinish(Actor akTarget, Actor akCaster)
 	EndWhile
 	
 	snusnuMain.isTransforming = true
-	StorageUtil.SetIntValue(akTarget, "SNU_UltraMuscle", 0)
+	;StorageUtil.SetIntValue(akTarget, "SNU_UltraMuscle", 0) ;Moved at the end
 	
 	; Turn off saves & waiting while we shift.
     Game.SetInCharGen(true, true, false)
@@ -641,9 +655,12 @@ Event OnEffectFinish(Actor akTarget, Actor akCaster)
 	;Turn saves & waiting back on
     Game.SetInCharGen(false, false, false)
 	
+	StorageUtil.SetIntValue(akTarget, "SNU_UltraMuscle", 0)
+	
 	Debug.Trace("SNU - Finished removal of transformation effect")
 	Debug.Notification("My body is now back to normal")
 	
+	snusnuMain.forcedMusclePercent = -1.0
 	snusnuMain.isTransforming = false
 EndEvent
 
@@ -718,20 +735,19 @@ Function applyFMGBuffs(Actor akTarget)
 	akTarget.AddItem(snusnuMain.FistsOfRage, 1, True)
 	akTarget.EquipItem(snusnuMain.FistsOfRage, True, True)
 	
-	If snusnuMain.currentMusclePercent == 1.0 - (snusnuMain.moreChangesIncrements * 2)
-		If !snusnuMain.useAltBody
+	If !snusnuMain.useAltBody
+		If snusnuMain.currentMusclePercent == 1.0 - (snusnuMain.moreChangesIncrements * 2)
 			snusnuMain.updateBoobsPhysics(true, 2)
 			switchHeads(akTarget, 1)
-		EndIf
-	Else
-		If !snusnuMain.useAltBody
+		Else
 			snusnuMain.updateBoobsPhysics(true, 1)
+		EndIf
+		
+		If !snusnuMain.applyMoreChangesOvertime
+			switchHeads(akTarget, 1)
 		EndIf
 	EndIf
 	
-	If !snusnuMain.applyMoreChangesOvertime
-		switchHeads(akTarget, 1)
-	EndIf
 	
 	If snusnuMain.currentMusclePercent == 1.0
 		;Improved jump height
@@ -1120,6 +1136,9 @@ Function applyBarbarianSkin(Actor target, Int skinIndex, Bool applyFix = true)
 		
 		;Change to a more rough voice
 		changeVoice(target)
+		
+		moreChangesCount = skinIndex
+		StorageUtil.SetIntValue(snusnuMain.PlayerRef, "SNU_UltraMuscle", 1+moreChangesCount)
 	Else
 		;RemoveAllReferenceSkinOverrides(target)
 		

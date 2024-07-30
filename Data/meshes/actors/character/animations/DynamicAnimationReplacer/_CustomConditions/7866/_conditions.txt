@@ -1,0 +1,4 @@
+NOT ValueLessThan("Snusnu.esp"|0x00011055, "Snusnu.esp"|0x00013607) AND
+IsActorBase("Skyrim.esm"|0x000007) AND
+IsInCombat() AND
+Random(0.5)

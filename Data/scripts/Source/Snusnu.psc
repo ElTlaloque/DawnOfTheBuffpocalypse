@@ -104,6 +104,8 @@ Bool Property removeWeightMorphs = true Auto
 
 Bool Property useDynamicPhysics = true Auto
 Bool Property is3BAPhysicsLoaded = false Auto
+Int property BreastsPhysicsLevel = 3 auto ;Moved from the 3BBB scripts
+Int Property physicsLevelKey = 48 Auto ;B
 
 ;TLALOC- TF related stuff
 Bool Property isTransforming = false Auto
@@ -548,7 +550,7 @@ Event OnUpdate()
 				heavyItemsEquiped = 1
 				IsOverwhelmed.setValue(1)
 				
-				If canPlayAnimation(PlayerRef)
+				If SnusnuUtil.canPlayAnimation(PlayerRef)
 					Utility.Wait(1)
 					Debug.SendAnimationEvent(PlayerRef,"IdleForceDefaultState")
 				EndIf
@@ -561,7 +563,7 @@ Event OnUpdate()
 				heavyItemsEquiped = 0
 				IsOverwhelmed.setValue(0)
 				
-				If canPlayAnimation(PlayerRef)
+				If SnusnuUtil.canPlayAnimation(PlayerRef)
 					Utility.Wait(1)
 					Debug.SendAnimationEvent(PlayerRef,"IdleForceDefaultState")
 				EndIf
@@ -1111,6 +1113,34 @@ Event OnKeyDown(Int KeyCode)
 		EndIf
 	ElseIf KeyCode == npcMuscleKey && !UI.IsTextInputEnabled() && !Utility.IsInMenuMode()
 		applyNPCMuscle()
+	ElseIf KeyCode == physicsLevelKey && !UI.IsTextInputEnabled() && !Utility.IsInMenuMode()
+		If !useDynamicPhysics || SnusnuUtil.checkSMPPhysics(PlayerRef)
+			;Player is using SMP for body physics so we stop here
+			return
+		EndIf
+	
+		BreastsPhysicsLevel = BreastsPhysicsLevel + 1
+		If BreastsPhysicsLevel > 4
+			BreastsPhysicsLevel = 1
+		EndIf
+		
+		If BreastsPhysicsLevel == 1
+			Debug.Notification("Switching to breasts physics level 1")
+			SnusnuUtil.setCBPCBreastsPhysics(PlayerRef, true)
+			SnusnuUtil.CBPCBreastsSmall(PlayerRef)
+		ElseIf BreastsPhysicsLevel == 2
+			Debug.Notification("Switching to breasts physics level 2")
+			SnusnuUtil.CBPCBreastsSmall(PlayerRef, true)
+			SnusnuUtil.CBPCBreastsMid(PlayerRef)
+		ElseIf BreastsPhysicsLevel == 3
+			Debug.Notification("Switching to breasts physics level 3")
+			SnusnuUtil.CBPCBreastsMid(PlayerRef, true)
+			SnusnuUtil.CBPCBreastsBig(PlayerRef)
+		ElseIf BreastsPhysicsLevel == 4
+			Debug.Notification("Switching to breasts physics level 4")
+			SnusnuUtil.CBPCBreastsBig(PlayerRef, true)
+			SnusnuUtil.setCBPCBreastsPhysics(PlayerRef)
+		EndIf
 	EndIf
 EndEvent
 
@@ -1603,7 +1633,7 @@ Function clearBoneScales(Actor theActor)
 	SetNodePosition(theActor, actorIsFemale, "NPC R Thigh [RThg]", _thigh_Length)
 EndFunction
 
-Function SetNodeScale(Actor akActor, bool isFemale, string nodeName, float value, string modkey) global
+Function SetNodeScale(Actor akActor, bool isFemale, string nodeName, float value, string modkey)
 	If value != 1.0
 		NiOverride.AddNodeTransformScale(akActor, false, isFemale, nodeName, modkey, value)
 		NiOverride.AddNodeTransformScale(akActor, true, isFemale, nodeName, modkey, value)
@@ -1660,87 +1690,50 @@ Function updateBoobsPhysics(Bool forceUpdate = false, Int newLevel = -1)
 		return
 	EndIf
 	
-	If checkSMPPhysics()
+	If SnusnuUtil.checkSMPPhysics(PlayerRef)
 		;Player is using SMP for body physics so we stop here
 		return
 	EndIf
 	
 	;TLALOC- Boobs physics only get updated once, unless a significant muscle change is made
 	If is3BAPhysicsLoaded && (firstUpdateForBoobs || forceUpdate)
-		Mus3BPhysicsManager PhysicsManager = Game.GetFormFromFile(0x0500084A, "3BBB.esp") As Mus3BPhysicsManager
 		;Debug.Trace("SNU- Checking for boobs physics")
-		If PhysicsManager != none
-			Int physicsLevel = PhysicsManager.getPhysicsLevel()
-			
-			If newLevel != -1
-				If forceUpdate && physicsLevel == newLevel
-					return
-				Else
-					physicsLevel = newLevel
-					PhysicsManager.setPhysicsLevel(physicsLevel)
-				EndIf
+		If newLevel != -1
+			If forceUpdate && BreastsPhysicsLevel == newLevel
+				return
+			Else
+				BreastsPhysicsLevel = newLevel
 			EndIf
-			
-			Debug.Trace("SNU - Physics level is "+physicsLevel)
-			If physicsLevel == 1
-				showInfoNotification("Switching to breasts physics level 1")
-				Debug.Trace("Switching to breasts physics level 1")
-				PhysicsManager.CBPCBreasts(PlayerRef, true)
-				PhysicsManager.CBPCBreastsSmall(PlayerRef)
-			ElseIf physicsLevel == 2
-				showInfoNotification("Switching to breasts physics level 2")
-				Debug.Trace("Switching to breasts physics level 2")
-				PhysicsManager.CBPCBreasts(PlayerRef, true)
-				PhysicsManager.CBPCBreastsMid(PlayerRef)
-			ElseIf physicsLevel == 3
-				showInfoNotification("Switching to breasts physics level 3")
-				Debug.Trace("Switching to breasts physics level 3")
-				PhysicsManager.CBPCBreasts(PlayerRef, true)
-				PhysicsManager.CBPCBreastsBig(PlayerRef)
-			ElseIf physicsLevel == 4
-				;ToDo- Change physics to SMP if body weight (from WeightMorphs) is big enough
-				;NOTE: As of right now, CBPC physics are more than enough to simulate big breasts Physics,
-				;      so there is no need for complicated SMP switching
-				showInfoNotification("Switching to breasts physics level 4")
-				Debug.Trace("Switching to breasts physics level 4")
-				PhysicsManager.CBPCBreasts(PlayerRef, true)
-				PhysicsManager.CBPCBreasts(PlayerRef)
-			EndIf
-		Endif
+		EndIf
+		
+		Debug.Trace("SNU - Physics level is "+BreastsPhysicsLevel)
+		If BreastsPhysicsLevel == 1
+			showInfoNotification("Switching to breasts physics level 1")
+			Debug.Trace("SNU - Switching to breasts physics level 1")
+			SnusnuUtil.setCBPCBreastsPhysics(PlayerRef, true)
+			SnusnuUtil.CBPCBreastsSmall(PlayerRef)
+		ElseIf BreastsPhysicsLevel == 2
+			showInfoNotification("Switching to breasts physics level 2")
+			Debug.Trace("SNU - Switching to breasts physics level 2")
+			SnusnuUtil.setCBPCBreastsPhysics(PlayerRef, true)
+			SnusnuUtil.CBPCBreastsMid(PlayerRef)
+		ElseIf BreastsPhysicsLevel == 3
+			showInfoNotification("Switching to breasts physics level 3")
+			Debug.Trace("SNU - Switching to breasts physics level 3")
+			SnusnuUtil.setCBPCBreastsPhysics(PlayerRef, true)
+			SnusnuUtil.CBPCBreastsBig(PlayerRef)
+		ElseIf BreastsPhysicsLevel == 4
+			;ToDo- Change physics to SMP if body weight (from WeightMorphs) is big enough
+			;NOTE: As of right now, CBPC physics are more than enough to simulate big breasts Physics,
+			;      so there is no need for complicated SMP switching
+			showInfoNotification("Switching to breasts physics level 4")
+			Debug.Trace("SNU - Switching to breasts physics level 4")
+			SnusnuUtil.setCBPCBreastsPhysics(PlayerRef, true)
+			SnusnuUtil.setCBPCBreastsPhysics(PlayerRef)
+		EndIf
 		
 		firstUpdateForBoobs = false
 	EndIf
-EndFunction
-
-Bool Function checkSMPPhysics()
-	;/	
-	armor property SMPONObjectP48 auto
-	armor property SMPONObjectP50 auto
-	armor property SMPONObjectP51 auto
-	armor property SMPONObjectP60 auto
-	/;
-	
-	Armor smpArmor = PlayerRef.GetWornForm(Armor.GetMaskForSlot(48)) as Armor
-	If smpArmor && StringUtil.Find(smpArmor.getName(), "3BBB Body SMP", 0) != -1
-		return true
-	Else
-		smpArmor = PlayerRef.GetWornForm(Armor.GetMaskForSlot(50)) as Armor
-		If smpArmor && StringUtil.Find(smpArmor.getName(), "3BBB Body SMP", 0) != -1
-			return true
-		Else
-			smpArmor = PlayerRef.GetWornForm(Armor.GetMaskForSlot(51)) as Armor
-			If smpArmor && StringUtil.Find(smpArmor.getName(), "3BBB Body SMP", 0) != -1
-				return true
-			Else
-				smpArmor = PlayerRef.GetWornForm(Armor.GetMaskForSlot(60)) as Armor
-				If smpArmor && StringUtil.Find(smpArmor.getName(), "3BBB Body SMP", 0) != -1
-					return true
-				EndIf
-			EndIf
-		EndIf
-	EndIf
-	
-	return false
 EndFunction
 
 Function tempDebugSliders()
@@ -2147,6 +2140,7 @@ Function ResetWeight(Bool _enable)
 			isWerewolf = true
 		ElseIf PlayerRef.getRace().getName() == "Vampire Lord" && isVampireLordReVampedLoaded
 			isVampireLord = true
+			;ToDo- We really NEED a toggle for this!
 			VampireLordMuscleSpell.cast(PlayerRef)
 		EndIf
 	Else
@@ -3199,20 +3193,11 @@ Function updateAnimations(Int newBuildStage)
 			EndIf
 		Else
 			;Force an idle reset so that DAR can use the new animations
-			If canPlayAnimation(PlayerRef)
+			If SnusnuUtil.canPlayAnimation(PlayerRef)
 				Debug.SendAnimationEvent(PlayerRef,"IdleForceDefaultState")
 			EndIf
 		EndIf
 	EndIf
-EndFunction
-
-Bool Function canPlayAnimation(Actor animatedDude) Global
-	If animatedDude.isInCombat() || animatedDude.IsOnMount() || animatedDude.IsSwimming() || animatedDude.IsSprinting() || \
-	animatedDude.IsWeaponDrawn() || animatedDude.GetSleepState() != 0 || animatedDude.GetSitState() != 0 || !Game.IsMovementControlsEnabled()
-		return false
-	EndIf
-	
-	return true
 EndFunction
 
 Function ReloadHotkeys()
@@ -3222,6 +3207,9 @@ Function ReloadHotkeys()
 	
 	;Experimental NPC muscle gain
 	RegisterForKey(npcMuscleKey);K
+	
+	;Switch breast physics. Migrated from changes made to 3BBB scripts
+	RegisterForKey(physicsLevelKey);B
 EndFunction
 
 Function updateCarryWeight()

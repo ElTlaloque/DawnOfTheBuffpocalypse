@@ -271,8 +271,9 @@ Event OnPageReset(String a_page)
 		AddEmptyOption()
 		
 		AddKeyMapOptionST("SnusnuDumpInfo","$SNUSNU_DUMPINFO", snusnuMain.getInfoKey)
-		
-		AddEmptyOption()
+		AddKeyMapOptionST("SnusnuPhysicsLevel", "$SNUSNU_PHYSICS_LEVEL", snusnuMain.physicsLevelKey)
+
+		;AddEmptyOption()
 		AddEmptyOption()
 		AddEmptyOption()
 		
@@ -1369,6 +1370,11 @@ Event OnKeyMapChangeST(Int KeyCode, String ConflictControl, String ConflictName)
 			snusnuMain.npcMuscleKey = KeyCode
 			SetKeyMapOptionValueST(snusnuMain.npcMuscleKey)
 		EndIf
+	ElseIf Option == "SnusnuPhysicsLevel"
+		If !KeyConflict(KeyCode, ConflictControl, ConflictName)
+			snusnuMain.physicsLevelKey = KeyCode
+			SetKeyMapOptionValueST(snusnuMain.physicsLevelKey)
+		EndIf
 	EndIf
 	snusnuMain.ReloadHotkeys()
 EndEvent
@@ -1769,6 +1775,7 @@ Bool Function saveSettings()
 	JsonUtil.SetFloatValue(fileName, "moreChangesIncrements", snusnuMain.moreChangesIncrements)
 	JsonUtil.SetIntValue(fileName, "getInfoKey", snusnuMain.getInfoKey)
 	JsonUtil.SetIntValue(fileName, "npcMuscleKey", snusnuMain.npcMuscleKey)
+	JsonUtil.SetIntValue(fileName, "physicsLevelKey", snusnuMain.physicsLevelKey)
 	JsonUtil.SetFloatValue(fileName, "npcMuscleScore", snusnuMain.npcMuscleScore)
 	JsonUtil.SetIntValue(fileName, "changeToBarbarianVoice", snusnuMain.changeToBarbarianVoice as Int)
 	JsonUtil.SetIntValue(fileName, "useAltBody", snusnuMain.useAltBody as Int)
@@ -1872,6 +1879,10 @@ bool Function loadSettings()
 		If snusnuMain.npcMuscleKey != JsonUtil.GetIntValue(fileName, "npcMuscleKey", snusnuMain.npcMuscleKey)
 			snusnuMain.npcMuscleKey = JsonUtil.GetIntValue(fileName, "npcMuscleKey", snusnuMain.npcMuscleKey)
 			SetKeyMapOptionValueST(snusnuMain.npcMuscleKey)
+		EndIf
+		If snusnuMain.physicsLevelKey != JsonUtil.GetIntValue(fileName, "physicsLevelKey", snusnuMain.physicsLevelKey)
+			snusnuMain.physicsLevelKey = JsonUtil.GetIntValue(fileName, "physicsLevelKey", snusnuMain.physicsLevelKey)
+			SetKeyMapOptionValueST(snusnuMain.physicsLevelKey)
 		EndIf
 		If snusnuMain.npcMuscleScore != JsonUtil.GetFloatValue(fileName, "npcMuscleScore", snusnuMain.npcMuscleScore)
 			applyNPCMuscleValue(JsonUtil.GetFloatValue(fileName, "npcMuscleScore", snusnuMain.npcMuscleScore))

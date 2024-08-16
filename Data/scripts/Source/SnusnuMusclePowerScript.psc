@@ -141,7 +141,7 @@ event OnEffectStart(Actor akTarget, Actor akCaster)
 			tfSoundInstance = snusnuMain.snusnuTFSound.Play(akTarget)
 		EndIf
 		
-		If Snusnu.canPlayAnimation(akTarget)
+		If SnusnuUtil.canPlayAnimation(akTarget)
 			;Unequip weapons
 			akTarget.SheatheWeapon()
 			Utility.wait(0.5)
@@ -188,7 +188,7 @@ event OnEffectStart(Actor akTarget, Actor akCaster)
 			EndIf
 		EndIf
 		
-		If Snusnu.canPlayAnimation(akTarget)
+		If SnusnuUtil.canPlayAnimation(akTarget)
 			Debug.SendAnimationEvent(akTarget,"IdleForceDefaultState")
 		EndIf
 		
@@ -286,7 +286,7 @@ Event OnUpdate()
 				snusnuMain.PlayerRef.SetExpressionOverride(8, 65)
 				snusnuMain.PlayerRef.SetExpressionPhoneme(0, 0.4)
 				
-				If Snusnu.canPlayAnimation(snusnuMain.PlayerRef)
+				If SnusnuUtil.canPlayAnimation(snusnuMain.PlayerRef)
 					;Unequip weapons
 					snusnuMain.PlayerRef.SheatheWeapon()
 					Utility.wait(0.5)
@@ -361,7 +361,7 @@ Event OnUpdate()
 					EndIf
 				EndIf
 				
-				If Snusnu.canPlayAnimation(snusnuMain.PlayerRef)
+				If SnusnuUtil.canPlayAnimation(snusnuMain.PlayerRef)
 					Debug.SendAnimationEvent(snusnuMain.PlayerRef,"IdleForceDefaultState")
 				EndIf
 				

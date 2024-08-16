@@ -584,6 +584,11 @@ Event OnEffectFinish(Actor akTarget, Actor akCaster)
 					If normalsStage >= snusnuMain.currentBuildStage
 						applyMuscleNormals(akTarget, normalsStage)
 					EndIf
+					
+					If snusnuMain.useMuscleAnims && snusnuMain.currentBuildStage < normalsStage && \
+					(normalsStage - 1) < (snusnuMain.muscleAnimsLevel.getValue() as Int)
+						snusnuMain.updateAnimations(normalsStage)
+					EndIf
 				EndIf
 				
 				deflateVal -= 0.02
@@ -591,14 +596,11 @@ Event OnEffectFinish(Actor akTarget, Actor akCaster)
 			endWhile
 			
 			updateBones(akTarget, 0, False, True)
-			
-			clearMuscleMorphs(akTarget)
-			snusnuMain.clearBoneScales(akTarget)
-		Else
-			clearMuscleMorphs(akTarget)
-			snusnuMain.clearBoneScales(akTarget)
-			snusnuMain.UpdateWeight(true)
 		EndIf
+		
+		clearMuscleMorphs(akTarget)
+		snusnuMain.clearBoneScales(akTarget)
+		snusnuMain.UpdateWeight(true)
 	EndIf
 	
 	;TLALOC-ToDo- Remove normals overlay
@@ -613,6 +615,8 @@ Event OnEffectFinish(Actor akTarget, Actor akCaster)
 			akTarget.QueueNiNodeUpdate()
 		EndIf
 	EndIf
+	
+	StorageUtil.SetIntValue(akTarget, "SNU_UltraMuscle", 0)
 	
 	If snusnuMain.useAltAnims
 		;We need to check for the actual muscle level which is already done in checkBodyNormalsState()
@@ -654,8 +658,6 @@ Event OnEffectFinish(Actor akTarget, Actor akCaster)
 	
 	;Turn saves & waiting back on
     Game.SetInCharGen(false, false, false)
-	
-	StorageUtil.SetIntValue(akTarget, "SNU_UltraMuscle", 0)
 	
 	Debug.Trace("SNU - Finished removal of transformation effect")
 	Debug.Notification("My body is now back to normal")
@@ -884,6 +886,15 @@ Function swapBodyMesh(Actor victim, Bool applyFMGBody = true)
 	HeadPart FaceToChange
 	TextureSet FaceTextureSetToChange
 	
+	int loopCount = 0
+	While victim.IsOnMount()
+		If loopCount % 4 == 0
+			Debug.Notification("You need to dismount for the changes to be applied!")
+		EndIf
+		loopCount += 1
+		Utility.wait(3)
+	EndWhile
+	
 	;victim.UnequipItemSlot(32)
 	;Utility.wait(0.5)
 	victim.UnequipAll()
@@ -1015,63 +1026,6 @@ Function applyMuscleNormals(Actor buffTarget, int stage)
 		buffTarget.unequipItemslot(33)
 		buffTarget.removeitem(snusnuMain.handsFix, 1, true)
 	endIf
-EndFunction
-
-;TLALOC- Blatantly ripped from Blush When Aroused
-string Function initOverlaySlot(Actor buffTarget, Int bodyPart) Global
-	;String normalsPath = snusnuMain.normalsPath+snusnuMain.getNormalsByBodyType(buffTarget)
-	string deftex = "Actors\\Character\\Overlays\\Default.dds"
-	string newOverlayID = "x"
-	int i = 0
-	
-	int maxOverlays
-	If bodyPart == 0 ;Body
-		maxOverlays = NiOverride.GetNumBodyOverlays()
-	ElseIf bodyPart == 1 ;Hands
-		maxOverlays = NiOverride.GetNumHandOverlays()
-	ElseIf bodyPart == 2 ;Feet
-		maxOverlays = NiOverride.GetNumFeetOverlays()
-	ElseIf bodyPart == 3 ;Face
-		maxOverlays = NiOverride.GetNumFaceOverlays()
-	Else
-		Debug.Trace("SNU - ERROR: body part index for overlay slots is INVALID!")
-		return "x"
-	EndIf
-	
-	;Debug.Trace("SNU - maxOverlays="+maxOverlays)
-	string overlayString
-	while i < maxOverlays && newOverlayID == "x"
-		overlayString = getCurrentOverlayString(buffTarget, i)
-		Debug.Trace("SNU - overlayString="+overlayString)
-		if overlayString == "" || overlayString == deftex || StringUtil.Find(overlayString, "blank.dds") != -1
-			newOverlayID = "[Ovl" + i + "]"
-		endIf
-		i += 1
-	endWhile
-	
-	If newOverlayID == "x"
-		Debug.Trace("SNU - ERROR: No free slot was found to apply muscle overlays")
-	;/Else
-		;TLALOC- Don't assume actor is female in all of niOverride calls
-		NiOverride.AddNodeOverrideString(buffTarget, true, "Body "+newOverlayID, 9, 0, normalsPath+"tan.dds", true)
-		NiOverride.AddNodeOverrideString(buffTarget, true, "Body "+newOverlayID, 9, 1, normalsPath+"ultra.dds", true)
-		Debug.Trace("SNU - overlay slot was found: "+newOverlayID)/;
-	EndIf
-	
-	return newOverlayID
-EndFunction
-
-string Function getCurrentOverlayString(Actor target, int index) Global
-	string overlayID = "Body [Ovl" + index + "]"
-	string tx = ""
-
-	if NetImmerse.HasNode(target, overlayID, false)
-		tx = NiOverride.GetNodepropertyString(target, false, overlayID, 9, 0)
-	else
-		tx = NiOverride.GetNodeOverrideString(target, true, overlayID, 9, 0)
-	endIf
-
-	return tx
 EndFunction
 
 Function applyOverlayStrings(Actor target, String slot)

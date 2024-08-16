@@ -80,14 +80,14 @@ String[] cbbeSEStrings
 String[] cbbe3BAStrings
 
 ;TLALOC - Bone sliders
-Int _myMultSpineBone
-Int _myMultForearmBone
+;Int _myMultSpineBone
+;Int _myMultForearmBone
 Int[] boneSliders
 String[] boneStrings
 
 ; Male morphs
-Int _myMultSamuel
-Int _myMultSamson
+;Int _myMultSamuel
+;Int _myMultSamson
 
 String[] pageNames
 Int selectedDefaultMorphs = 1
@@ -262,9 +262,11 @@ Event OnPageReset(String a_page)
 		;_myPushupException = AddToggleOption("Add push-up exception", False)
 		If snusnuMain.isWeightMorphsLoaded
 			_myMalnourishment = AddSliderOption("$SNUSNU_MALNOURISHMENT", snusnuMain.malnourishmentValue, "{2}")
-			AddEmptyOption()
+		Else
+			_myMalnourishment = AddSliderOption("$SNUSNU_MALNOURISHMENT", snusnuMain.malnourishmentValue, "{2}", OPTION_FLAG_DISABLED)
 		EndIf
 		
+		AddEmptyOption()
 		AddEmptyOption()
 		AddEmptyOption()
 		
@@ -720,8 +722,6 @@ Event OnOptionHighlight(Int a_option)
 		SetInfoText("$SNUSNU_NPC_SCORE_DESC")
 	ElseIf a_option == _myMalnourishment
 		SetInfoText("$SNUSNU_MALNOURISHMENT_DESC")
-	ElseIf a_option == _myPushupException
-		SetInfoText("$SNUSNU_PUSHUP_DESC")
 	ElseIf a_option == _myChangeAnims
 		SetInfoText("$SNUSNU_MUSCLEANIMS_DESC")
 	ElseIf a_option == _myUseDARAnims
@@ -911,19 +911,6 @@ Event OnOptionSelect(Int a_option)
 		String Msg
 		Msg = "$SNUSNU_DEFAULTFINISH_MSG"
 		ShowMessage(Msg, False)
-	ElseIf a_option == _myPushupException
-		Armor mainArmor = PlayerRef.GetWornForm(0x00000004) as Armor
-		If mainArmor
-			String Msg
-			If snusnuMain.PushupExceptions.find(mainArmor) != -1
-				snusnuMain.PushupExceptions.RemoveAddedForm(mainArmor)
-				Msg = "Item "+mainArmor.getName()+" has been removed from the push-up exceptions list."
-			Else
-				snusnuMain.PushupExceptions.AddForm(mainArmor)
-				Msg = "Item "+mainArmor.getName()+" has been added to the push-up exceptions list."
-			EndIf
-			ShowMessage(Msg, False)
-		EndIf
 	ElseIf a_option == _myChangeAnims
 		snusnuMain.useMuscleAnims = !snusnuMain.useMuscleAnims
 		applyChangeAnimsOption()
@@ -1090,7 +1077,7 @@ Event OnOptionSliderOpen(Int a_option)
 		SetSliderDialogDefaultValue(2.0)
 		SetSliderDialogRange(0.0, 4.0)
 		SetSliderDialogInterval(1.0)
-	
+	;/
 	;MALE SLIDERS - UNUSED FOR NOW
 	ElseIf a_option == _myMultSamuel
 		SetSliderDialogStartValue(snusnuMain.maleValues[0])
@@ -1113,7 +1100,7 @@ Event OnOptionSliderOpen(Int a_option)
 		SetSliderDialogDefaultValue(1.0)
 		SetSliderDialogRange(1.0, 2.0)
 		SetSliderDialogInterval(0.001)
-		
+	/;
 	Else 
 		bool found=false
 		int counter = 0
@@ -1254,7 +1241,7 @@ Event OnOptionSliderAccept(Int a_option, Float a_value)
 		SetSliderOptionValue(a_option, snusnuMain.maxItemsEquipedWeight, "{0}")
 	ElseIf a_option == _myMuscleAnimsLevel
 		applyMuscleAnimsLevelValue(a_value)
-		
+	;/
 	;MALE SLIDERS - UNUSED FOR NOW
 	ElseIf a_option == _myMultSamuel
 		snusnuMain.maleValues[0] = a_value
@@ -1274,7 +1261,7 @@ Event OnOptionSliderAccept(Int a_option, Float a_value)
 		snusnuMain.bonesValues[1] = a_value
 		SetSliderOptionValue(a_option, snusnuMain.bonesValues[1], "{3}")
 		needBodyUpdate = true
-		
+	/;
 	Else
 		int sliderIndex = 0
 		
@@ -1365,7 +1352,6 @@ Event OnOptionSliderAccept(Int a_option, Float a_value)
 					found = true
 				EndIf
 				counter += 1
-				sliderIndex += 1
 			endWhile
 		EndIf	
 	EndIf

@@ -988,7 +988,7 @@ Event OnSleepStop(bool abInterrupted)
 	If StorageUtil.GetIntValue(PlayerRef, "SNU_UltraMuscle", 0) == 0 && !isVampireLord && affinityScore > randomProbability
 		Utility.wait(3)
 		Debug.Notification("I had a dream i was mighty unstoppable")
-		If affinityScore <= muscleMightProbability * 0.95
+		If applyMoreChangesOvertime && affinityScore <= muscleMightProbability * 0.95
 			If muscleMightAffinity < 0.5
 				forcedMusclePercent = 1.0 - (moreChangesIncrements * 2)
 			Else
@@ -1204,7 +1204,9 @@ Function UpdateWeight(Bool applyNow = True)
 				;TLALOC- The following code can produce small lags
 				PlayerRef.GetActorBase().SetWeight(newWeight)
 				PlayerRef.UpdateWeight(tNeckdelta)
-				PlayerRef.QueueNiNodeUpdate()
+				If !PlayerRef.IsOnMount()
+					PlayerRef.QueueNiNodeUpdate()
+				EndIf
 				;Debug.Trace("SNU - New weight was set")
 			EndIf
 			
@@ -3206,7 +3208,7 @@ EndFunction
 
 Bool Function canPlayAnimation(Actor animatedDude) Global
 	If animatedDude.isInCombat() || animatedDude.IsOnMount() || animatedDude.IsSwimming() || animatedDude.IsSprinting() || \
-	animatedDude.GetSleepState() != 0 || animatedDude.GetSitState() != 0 || !Game.IsMovementControlsEnabled()
+	animatedDude.IsWeaponDrawn() || animatedDude.GetSleepState() != 0 || animatedDude.GetSitState() != 0 || !Game.IsMovementControlsEnabled()
 		return false
 	EndIf
 	
@@ -3317,7 +3319,9 @@ Function removeNormalMuscle(Actor buffTarget, Float changePercent)
 			;TLALOC- The following code can produce small lags
 			buffTarget.GetActorBase().SetWeight(newWeight)
 			buffTarget.UpdateWeight(tNeckdelta)
-			buffTarget.QueueNiNodeUpdate()
+			If !PlayerRef.IsOnMount()
+				buffTarget.QueueNiNodeUpdate()
+			EndIf
 		EndIf
 	Else
 		If getfightingMuscle() == 0

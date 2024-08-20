@@ -18,6 +18,7 @@ Float[] uunpValuesFMG
 Float[] bhunpValuesFMG
 Float[] cbbeSEValuesFMG
 Float[] cbbe3BAValuesFMG
+Float[] bhunp3ValuesFMG
 Float[] bonesValuesFMG
 Float[] maleValuesFMG
 
@@ -141,7 +142,7 @@ event OnEffectStart(Actor akTarget, Actor akCaster)
 			tfSoundInstance = snusnuMain.snusnuTFSound.Play(akTarget)
 		EndIf
 		
-		If SnusnuUtil.canPlayAnimation(akTarget)
+		If !akTarget.isInCombat()
 			;Unequip weapons
 			akTarget.SheatheWeapon()
 			Utility.wait(0.5)
@@ -1152,6 +1153,7 @@ Function initFMGSliders()
 	bhunpValuesFMG = new Float[43]
 	cbbeSEValuesFMG = new Float[27]
 	cbbe3BAValuesFMG = new Float[40]
+	bhunp3ValuesFMG = new Float[43]
 	bonesValuesFMG = new Float[68]
 	maleValuesFMG = new Float[2]
 EndFunction
@@ -1175,6 +1177,7 @@ Bool Function loadFMGMorphs(Actor buffedActor)
 		bhunpValuesFMG = JsonUtil.FloatListToArray(fileName, "BHUNPMorphs")
 		cbbeSEValuesFMG = JsonUtil.FloatListToArray(fileName, "CBBESEMorphs")
 		cbbe3BAValuesFMG = JsonUtil.FloatListToArray(fileName, "3BAMorphs")
+		bhunp3ValuesFMG = JsonUtil.FloatListToArray(fileName, "BHUNP3Morphs")
 		
 		bonesValuesFMG = JsonUtil.FloatListToArray(fileName, "BoneMorphs")
 		maleValuesFMG = JsonUtil.FloatListToArray(fileName, "MaleMorphs")
@@ -1199,6 +1202,8 @@ Float Function getSliderValue(int newIndex)
 		return cbbeSEValuesFMG[newIndex - 52 - 74 - 43]
 	ElseIf group == 5
 		return cbbe3BAValuesFMG[newIndex - 52 - 74 - 43 - 27]
+	ElseIf group == 6
+		return bhunp3ValuesFMG[newIndex - 52 - 74 - 43 - 27 - 40]
 	EndIf
 	
 	return 0.0

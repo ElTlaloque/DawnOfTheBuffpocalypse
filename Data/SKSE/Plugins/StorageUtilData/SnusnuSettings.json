@@ -2,16 +2,16 @@
 	"float" : 
 	{
 		"addvampirestrength" : 0.125,
-		"addwerewolfstrength" : 0.05000000074505806,
+		"addwerewolfstrength" : 0.019999999552965164,
 		"carryweightboost" : 100.0,
 		"combatproficiency" : 15.0,
-		"malnourishmentvalue" : -0.95999997854232788,
+		"malnourishmentvalue" : -0.97999995946884155,
 		"maxitemsequipedweight" : 100.0,
 		"morechangesincrements" : 0.34999999403953552,
 		"morechangesinterval" : 1.0,
 		"multgainarmor" : 1.0,
 		"multgainfight" : 1.0,
-		"multgainmisc" : 1.5,
+		"multgainmisc" : 1.0,
 		"multloss" : 1.0,
 		"muscleanimslevel" : 2.0,
 		"musclescoremax" : 4000.0,
@@ -31,6 +31,7 @@
 		"getinfokey" : 52,
 		"hardcoremode" : 1,
 		"npcmusclekey" : 37,
+		"physicslevelkey" : 48,
 		"playtfsound" : 1,
 		"removeweightmorphs" : 1,
 		"selectedbody" : 1,
@@ -43,7 +44,7 @@
 		"usedaranims" : 1,
 		"usedynamicphysics" : 1,
 		"usemuscleanims" : 1
-		"usepecs" : 1,
+		"usepecs" : 0,
 		"usewerewolfmorphs" : 0
 	}
 }

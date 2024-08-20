@@ -204,12 +204,14 @@ String[] uunpSliders
 String[] bhunpSliders
 String[] cbbeSESliders
 String[] cbbe3BASliders
+String[] bhunp3Sliders
 
 Float[] Property cbbeValues Auto
 Float[] Property uunpValues Auto
 Float[] Property bhunpValues Auto
 Float[] Property cbbeSEValues Auto
 Float[] Property cbbe3BAValues Auto
+Float[] Property bhunp3Values Auto
 
 ;Bone related sliders
 ;XPMSEE Has 129 different bones. Not sure if all of them can be interacted with
@@ -2210,12 +2212,25 @@ Function initSliderArrays()
 	bhunpSliders = new String[43]
 	cbbeSESliders = new String[27]
 	cbbe3BASliders = new String[40]
+	bhunp3Sliders = new String[43]
 	
 	boneSliders = new String[68]
 	totalCurrentBones = 20 ;This is meant to be updated as we add support for more bones
 	
 	
+	
 	;Check if new arrays havent been initialized
+	
+	If !bhunp3Values || bhunp3Values.length == 0
+		bhunp3Values = new Float[43]
+		Debug.Trace("SNU - Initializing bhunp3Values array!!")
+		Int bhunp3Counter = 0
+		While bhunp3Counter < 43
+			bhunp3Values[bhunp3Counter] = 0.0
+			bhunp3Counter += 1
+		EndWhile
+	EndIf
+	
 	If !bonesValues || bonesValues.length < totalCurrentBones
 		bonesValues = new Float[68]
 		
@@ -2590,6 +2605,54 @@ Function initSliderArrays()
 	cbbe3BASliders[18] = "WristSize"
 	/;
 	
+	bhunp3Sliders[0] = "BreastSaggy"
+	bhunp3Sliders[1] = "BreastsSpread"
+	bhunp3Sliders[2] = "BreastDiameter"
+	bhunp3Sliders[3] = "AreolaPull"
+	bhunp3Sliders[4] = "NippleErection"
+	bhunp3Sliders[5] = "NeckSmooth"
+	bhunp3Sliders[6] = "RibsMore"
+	bhunp3Sliders[7] = "BackWing"
+	bhunp3Sliders[8] = "BackValley"
+	bhunp3Sliders[9] = "ButtSaggy"
+	bhunp3Sliders[10] = "ButtConverge"
+	bhunp3Sliders[11] = "ThighApart"
+	bhunp3Sliders[12] = "ThighOuter"
+	bhunp3Sliders[13] = "ThighThicker"
+	bhunp3Sliders[14] = "ThighInnerThicker"
+	bhunp3Sliders[15] = "ThighFBThicker"
+	bhunp3Sliders[16] = "LegSpread"
+	bhunp3Sliders[17] = "CrotchGap"
+	bhunp3Sliders[18] = "Soleus"
+	bhunp3Sliders[19] = "HipNarrow"
+	bhunp3Sliders[20] = "ArmpitShape"
+	bhunp3Sliders[21] = "Clavicle"
+	bhunp3Sliders[22] = "ClaviclesSize"
+	bhunp3Sliders[23] = "ClaviclesFront"
+	bhunp3Sliders[24] = "ClaviclesAngle"
+	bhunp3Sliders[25] = "BellyUnder"
+	
+	;Muscle related
+	bhunp3Sliders[26] = "BellyDefine"
+	bhunp3Sliders[27] = "RectusOuterDetail"
+	bhunp3Sliders[28] = "RectusAbdominis"
+	bhunp3Sliders[29] = "Biceps"
+	bhunp3Sliders[30] = "Triceps"
+	bhunp3Sliders[31] = "Deltoid"
+	bhunp3Sliders[32] = "Brachioradialis"
+	bhunp3Sliders[33] = "Flexor"
+	bhunp3Sliders[34] = "ExtensorDigitorum"
+	bhunp3Sliders[35] = "TricepsLateral"
+	bhunp3Sliders[36] = "Sartorius"
+	bhunp3Sliders[37] = "RectusFemoris"
+	bhunp3Sliders[38] = "VastusLateralis"
+	bhunp3Sliders[39] = "VastusMedialis"
+	bhunp3Sliders[40] = "Hamstrings"
+	bhunp3Sliders[41] = "BicepsFemoris"
+	bhunp3Sliders[42] = "BackTrapezius"
+	
+	
+	
 	boneSliders[0] = "NPC Spine2 [Spn2]" ;Original upper back FMG enhancement
 	boneSliders[1] = "NPC L Forearm [LLar]" ;UUNP forearm FMG enhancement
 	boneSliders[2] = "NPC L UpperArm [LUar]" ;Upper arm
@@ -2671,6 +2734,8 @@ Function clearSliderData(Int group, Int position)
 		NiOverride.ClearBodyMorph(PlayerRef, cbbeSESliders[position], SNUSNU_KEY)
 	ElseIf group == 5
 		NiOverride.ClearBodyMorph(PlayerRef, cbbe3BASliders[position], SNUSNU_KEY)
+	ElseIf group == 6
+		NiOverride.ClearBodyMorph(PlayerRef, bhunp3Sliders[position], SNUSNU_KEY)
 	EndIf
 EndFunction
 
@@ -2687,6 +2752,8 @@ String Function getSliderString(int newIndex)
 		return cbbeSESliders[newIndex - 52 - 74 - 43]
 	ElseIf group == 5
 		return cbbe3BASliders[newIndex - 52 - 74 - 43 - 27]
+	ElseIf group == 6
+		return bhunp3Sliders[newIndex - 52 - 74 - 43 - 27 - 40]
 	EndIf
 	
 	return ""
@@ -2705,6 +2772,8 @@ Float Function getSliderValue(int newIndex)
 		return cbbeSEValues[newIndex - 52 - 74 - 43]
 	ElseIf group == 5
 		return cbbe3BAValues[newIndex - 52 - 74 - 43 - 27]
+	ElseIf group == 6
+		return bhunp3Values[newIndex - 52 - 74 - 43 - 27 - 40]
 	EndIf
 	
 	return 0.0
@@ -2723,6 +2792,8 @@ Function setSliderValue(Int position, Float value, Bool updateWeightNow = true)
 		cbbeSEValues[position - 52 - 74 - 43] = value
 	ElseIf group == 5
 		cbbe3BAValues[position - 52 - 74 - 43 - 27] = value
+	ElseIf group == 6
+		bhunp3Values[position - 52 - 74 - 43 - 27 - 40] = value
 	EndIf
 	
 	If value == 0.0
@@ -2764,6 +2835,7 @@ Function initDefaultSliders()
 	bhunpValues = new Float[43]
 	cbbeSEValues = new Float[27]
 	cbbe3BAValues = new Float[40]
+	bhunp3Values = new Float[43]
 	
 	;48 usable bones plus 20 overhead for future additions
 	bonesValues = new Float[68]
@@ -3023,6 +3095,12 @@ Function initDefaultSliders()
 	cbbe3BAValues[38] = 0.0 ;BellyUnder_v2
 	cbbe3BAValues[39] = 0.0 ;HipBone
 	
+	Int bhunp3Counter = 0
+	While bhunp3Counter < 43
+		bhunp3Values[bhunp3Counter] = 0.0
+		bhunp3Counter += 1
+	EndWhile
+	
 	;Male and Unisex Bone sliders
 	bonesValues[0] = 1.05 ;MultSpineBone
 	bonesValues[0] = 1.0 ;MultForearmBone
@@ -3080,6 +3158,12 @@ Function LoadDefaultProfile(Int profileID)
 		loadAllMorphs("SnuSnuProfiles/SnuDefault3BA")
 	ElseIf profileID == 3 ;CBBE 3BA Pecs
 		loadAllMorphs("SnuSnuProfiles/SnuDefault3BAPecs")
+	ElseIf profileID == 4 ;FMG UUNP
+		loadAllMorphs("SnuSnuProfiles/SnuDefaultFMG_UNP")
+	ElseIf profileID == 5 ;FMG CBBE 3BA
+		loadAllMorphs("SnuSnuProfiles/SnuDefaultFMG_CBBE")
+	ElseIf profileID == 6 ;FMG Vanilla (Bone morphs)
+		loadAllMorphs("SnuSnuProfiles/SnuDefaultFMG_MALE")
 	Else
 		Debug.Trace("SNU - ERROR Default profile index not recognized!")
 	EndIf
@@ -3552,6 +3636,10 @@ Bool Function saveAllMorphs(String profileName = "")
 		Debug.Trace("SNU - ERROR: 3BA array could not be saved!!")
 		Return false
 	EndIf
+	If !JsonUtil.FloatListCopy(fileName, "BHUNP3Morphs", bhunp3Values)
+		Debug.Trace("SNU - ERROR: BHUNPv3 array could not be saved!!")
+		Return false
+	EndIf
 	
 	If !JsonUtil.FloatListCopy(fileName, "BoneMorphs", bonesValues)
 		Debug.Trace("SNU - ERROR: Bone array could not be saved!!")
@@ -3590,6 +3678,7 @@ Bool Function loadAllMorphs(String profileName = "")
 		bhunpValues = JsonUtil.FloatListToArray(fileName, "BHUNPMorphs")
 		cbbeSEValues = JsonUtil.FloatListToArray(fileName, "CBBESEMorphs")
 		cbbe3BAValues = JsonUtil.FloatListToArray(fileName, "3BAMorphs")
+		bhunp3Values = JsonUtil.FloatListToArray(fileName, "BHUNP3Morphs")
 		
 		bonesValues = JsonUtil.FloatListToArray(fileName, "BoneMorphs")
 		maleValues = JsonUtil.FloatListToArray(fileName, "MaleMorphs")
@@ -3684,6 +3773,21 @@ Function cleanupCurrentMorphsList(Bool cleanValues)
 			EndIf
 		EndIf
 		cbbe3BALoop += 1
+	endWhile
+	
+	;BHUNPv3 Sliders
+	Int bhunp3Loop = 0
+	while bhunp3Loop < 43
+		If bhunp3Values[bhunp3Loop] != 0.0
+			If cleanValues
+				If !IntListHas(PlayerRef, SNUSNU_KEY, cbbeLoop+uunpLoop+bhunpLoop+cbbeSELoop+cbbe3BALoop+bhunp3Loop)
+					bhunp3Values[bhunp3Loop] = 0.0
+				EndIf
+			Else
+				IntListAdd(PlayerRef, SNUSNU_KEY, cbbeLoop+uunpLoop+bhunpLoop+cbbeSELoop+cbbe3BALoop+bhunp3Loop, false)
+			EndIf
+		EndIf
+		bhunp3Loop += 1
 	endWhile
 EndFunction
 

@@ -72,12 +72,14 @@ Int[] uunpSliders
 Int[] bhunpSliders
 Int[] cbbeSESliders
 Int[] cbbe3BASliders
+Int[] bhunp3Sliders
 
 String[] cbbeStrings
 String[] uunpStrings
 String[] bhunpStrings
 String[] cbbeSEStrings
 String[] cbbe3BAStrings
+String[] bhunp3Strings
 
 ;TLALOC - Bone sliders
 ;Int _myMultSpineBone
@@ -95,7 +97,14 @@ Bool editFMGMorphs = False
 Bool needBodyUpdate = False
 
 Function setMenuPages()
-	Pages = new String[7]
+	If snusnuMain.selectedBody == 0
+		Pages = new String[8]
+	ElseIf snusnuMain.selectedBody == 1
+		Pages = new String[7]
+	ElseIf snusnuMain.selectedBody == 2
+		Pages = new String[4]
+	EndIf
+	
 	String fmgString = ""
 	
 	If editFMGMorphs
@@ -107,21 +116,23 @@ Function setMenuPages()
 		Pages[1] = fmgString+pageNames[3]
 		Pages[2] = fmgString+pageNames[4]
 		Pages[3] = fmgString+pageNames[5]
+		Pages[4] = fmgString+pageNames[6]
+		Pages[5] = fmgString+pageNames[10]
+		Pages[6] = pageNames[1]
+		Pages[7] = pageNames[2]
 	ElseIf snusnuMain.selectedBody == 1 ;CBBE
-		Pages[1] = fmgString+pageNames[6]
-		Pages[2] = fmgString+pageNames[7]
-		Pages[3] = fmgString+pageNames[8]
-	EndIf
-	
-	If snusnuMain.selectedBody != 2
-		Pages[4] = fmgString+pageNames[9]
+		Pages[1] = fmgString+pageNames[7]
+		Pages[2] = fmgString+pageNames[8]
+		Pages[3] = fmgString+pageNames[9]
+		Pages[4] = fmgString+pageNames[10]
 		Pages[5] = pageNames[1]
 		Pages[6] = pageNames[2]
-	Else
-		Pages[1] = fmgString+pageNames[9]
+	ElseIf snusnuMain.selectedBody == 2
+		Pages[1] = fmgString+pageNames[10]
 		Pages[2] = pageNames[1]
 		Pages[3] = pageNames[2]
 	EndIf
+	
 EndFunction
 
 Event OnConfigInit()
@@ -138,6 +149,7 @@ Event OnConfigInit()
 	bhunpSliders = new Int[43]
 	cbbeSESliders = new Int[27]
 	cbbe3BASliders = new Int[40]
+	bhunp3Sliders = new Int[43]
 	boneSliders = new Int[68]
 	
 	cbbeStrings = new String[52]
@@ -145,6 +157,7 @@ Event OnConfigInit()
 	bhunpStrings = new String[43]
 	cbbeSEStrings = new String[27]
 	cbbe3BAStrings = new String[40]
+	bhunp3Strings = new String[43]
 	boneStrings = new String[68]
 	
 	initStringArrays()
@@ -509,7 +522,6 @@ Event OnPageReset(String a_page)
 		If snusnuMain.selectedBody == 0 ;UUNP/BHUNP
 			;AddHeaderOption(pageNames[5])
 			;AddEmptyOption()
-			
 			Int counter = 0
 			while counter < 43
 				bhunpSliders[counter] = AddSliderOption(sliderHasValue(snusnuMain.bhunpValues[counter])+bhunpStrings[counter], snusnuMain.bhunpValues[counter], "{2}")
@@ -541,7 +553,19 @@ Event OnPageReset(String a_page)
 			cbbeSESliders[20] = AddSliderOption(sliderHasValue(snusnuMain.cbbeSEValues[20])+"Ankle Size", snusnuMain.cbbeSEValues[20], "{2}")
 			cbbeSESliders[21] = AddSliderOption(sliderHasValue(snusnuMain.cbbeSEValues[21])+"Wrist Size", snusnuMain.cbbeSEValues[21], "{2}")
 		EndIf
-	ElseIf ((a_page == Pages[4] && snusnuMain.selectedBody != 2) || (a_page == Pages[1] && snusnuMain.selectedBody == 2))
+	ElseIf a_page == Pages[4] && snusnuMain.selectedBody == 0
+		;UUNP/BHUNP
+		;AddHeaderOption(pageNames[5])
+		;AddEmptyOption()
+		Int counter = 0
+		while counter < 43
+			bhunp3Sliders[counter] = AddSliderOption(sliderHasValue(snusnuMain.bhunp3Values[counter])+bhunp3Strings[counter], snusnuMain.bhunp3Values[counter], "{2}")
+			counter += 1
+		endWhile
+	ElseIf (a_page == Pages[5] && snusnuMain.selectedBody == 0) || \
+	       (a_page == Pages[4] && snusnuMain.selectedBody == 1) || \
+	       (a_page == Pages[1] && snusnuMain.selectedBody == 2)
+		   
 		SetCursorFillMode(LEFT_TO_RIGHT)
 		;AddHeaderOption("BONE MORPHS")
 		;AddEmptyOption()
@@ -576,7 +600,10 @@ Event OnPageReset(String a_page)
 		boneSliders[13] = AddSliderOption(boneSliderHasValue(snusnuMain.bonesValues[13])+boneStrings[13], snusnuMain.bonesValues[13], "{3}");Breast Fullness (3BBB)
 		boneSliders[14] = AddSliderOption(boneSliderHasValue(snusnuMain.bonesValues[14])+boneStrings[14], snusnuMain.bonesValues[14], "{3}");Belly
 		boneSliders[15] = AddSliderOption(boneSliderHasValue(snusnuMain.bonesValues[15])+boneStrings[15], snusnuMain.bonesValues[15], "{3}");Butt
-	ElseIf ((a_page == Pages[5] && snusnuMain.selectedBody != 2) || (a_page == Pages[2] && snusnuMain.selectedBody == 2))
+	ElseIf (a_page == Pages[6] && snusnuMain.selectedBody == 0) || \
+	       (a_page == Pages[5] && snusnuMain.selectedBody == 1) || \
+		   (a_page == Pages[2] && snusnuMain.selectedBody == 2)
+		   
 		Int currentFlag = OPTION_FLAG_NONE
 		If editFMGMorphs
 			currentFlag = OPTION_FLAG_DISABLED
@@ -597,7 +624,10 @@ Event OnPageReset(String a_page)
 		Else
 			_myLoadMorphsProfile = AddMenuOption("$SNUSNU_LOAD_PROFILE", "EMPTY", OPTION_FLAG_DISABLED)
 		EndIf
-	ElseIf ((a_page == Pages[6] && snusnuMain.selectedBody != 2) || (a_page == Pages[3] && snusnuMain.selectedBody == 2))
+	ElseIf (a_page == Pages[7] && snusnuMain.selectedBody == 0) || \
+	       (a_page == Pages[6] && snusnuMain.selectedBody == 1) || \
+		   (a_page == Pages[3] && snusnuMain.selectedBody == 2)
+		   
 		SetCursorFillMode(LEFT_TO_RIGHT)
 		AddHeaderOption("Mod Version: " + snusnuMain.GetVersion())
 		AddEmptyOption()
@@ -663,6 +693,8 @@ Event OnOptionHighlight(Int a_option)
 		SetInfoText("$SNUSNU_CURRENTSCORE_DESC")
 	ElseIf a_option == _myStoredScore
 		SetInfoText("$SNUSNU_STOREDSCORE_DESC")
+	ElseIf a_option == _myMultLoss
+		SetInfoText("$SNUSNU_MULTLOSS_DESC")
 	ElseIf a_option == _myMultGainFight
 		SetInfoText("$SNUSNU_GAINS_DESC")
 	ElseIf a_option == _myMultGainArmor
@@ -670,7 +702,7 @@ Event OnOptionHighlight(Int a_option)
 	ElseIf a_option == _myMultGainMisc
 		SetInfoText("$SNUSNU_GAINSMISC_DESC")
 	ElseIf a_option == _myMultGainWufwuf
-		SetInfoText("$SNUSNU_WUFWUF_DESC")
+		SetInfoText("$SNUSNU_GAINSWUFWUF_DESC")
 	ElseIf a_option == _myVampGains
 		SetInfoText("$SNUSNU_GAINSVAMP_DESC")
 	ElseIf a_option == _myBoostCarryWeight
@@ -1175,6 +1207,20 @@ Event OnOptionSliderOpen(Int a_option)
 		endIf
 		if !found
 			counter = 0
+			;BHUNPv3 SLIDERS
+			while(counter < 43 && !found)
+				if a_option == bhunp3Sliders[counter]
+					SetSliderDialogStartValue(snusnuMain.bhunp3Values[counter])
+					SetSliderDialogDefaultValue(0.0)
+					SetSliderDialogRange(-2.0, 2.0)
+					SetSliderDialogInterval(0.01)
+					found = true
+				endIf
+				counter += 1
+			endWhile
+		endIf
+		if !found
+			counter = 0
 			;BONE SLIDERS
 			while(counter < snusnuMain.totalCurrentBones && !found)
 				if a_option == boneSliders[counter]
@@ -1343,6 +1389,21 @@ Event OnOptionSliderAccept(Int a_option, Float a_value)
 		EndIf
 		if !found
 			counter = 0
+			;BHUNPv3 SLIDERS
+			while(counter < 43 && !found)
+				If a_option == bhunp3Sliders[counter]
+					SetSliderOptionValue(a_option, a_value, "{2}")
+					;ForcePageReset()
+					snusnuMain.setSliderValue(sliderIndex, a_value)
+					needBodyUpdate = true
+					found = true
+				EndIf
+				counter += 1
+				sliderIndex += 1
+			endWhile
+		EndIf
+		if !found
+			counter = 0
 			;BONE SLIDERS
 			while(counter < snusnuMain.totalCurrentBones && !found)
 				If a_option == boneSliders[counter]
@@ -1463,7 +1524,7 @@ String Function boneSliderHasValue(Float sliderVal)
 EndFunction
 
 Function initPageNames()
-	pageNames = new String[10]
+	pageNames = new String[11]
 	
 	pageNames[0] = "Main Options"
 	pageNames[1] = "Save & Load"
@@ -1471,10 +1532,11 @@ Function initPageNames()
 	pageNames[3] = "UUNP/BHUNP Morphs 1"
 	pageNames[4] = "UUNP/BHUNP Morphs 2"
 	pageNames[5] = "Extra BHUNP Morphs"
-	pageNames[6] = "CBBE Morphs Page 1"
-	pageNames[7] = "CBBE Morphs Page 2"
-	pageNames[8] = "CBBE Special Morphs"
-	pageNames[9] = "Bone Morphs"
+	pageNames[6] = "Extra BHUNP Morphs 2"
+	pageNames[7] = "CBBE Morphs Page 1"
+	pageNames[8] = "CBBE Morphs Page 2"
+	pageNames[9] = "CBBE Special Morphs"
+	pageNames[10] = "Bone Morphs"
 EndFunction
 
 Function initStringArrays()
@@ -1718,6 +1780,51 @@ Function initStringArrays()
 	cbbe3BAStrings[37] = "BellySideDownFat_v2"
 	cbbe3BAStrings[38] = "BellyUnder_v2"
 	cbbe3BAStrings[39] = "HipBone"
+	
+	bhunp3Strings[0] = "BreastSaggy"
+	bhunp3Strings[1] = "BreastsSpread"
+	bhunp3Strings[2] = "BreastDiameter"
+	bhunp3Strings[3] = "AreolaPull"
+	bhunp3Strings[4] = "NippleErection"
+	bhunp3Strings[5] = "NeckSmooth"
+	bhunp3Strings[6] = "RibsMore"
+	bhunp3Strings[7] = "BackWing"
+	bhunp3Strings[8] = "BackValley"
+	bhunp3Strings[9] = "ButtSaggy"
+	bhunp3Strings[10] = "ButtConverge"
+	bhunp3Strings[11] = "ThighApart"
+	bhunp3Strings[12] = "ThighOuter"
+	bhunp3Strings[13] = "ThighThicker"
+	bhunp3Strings[14] = "ThighInnerThicker"
+	bhunp3Strings[15] = "ThighFBThicker"
+	bhunp3Strings[16] = "LegSpread"
+	bhunp3Strings[17] = "CrotchGap"
+	bhunp3Strings[18] = "Soleus"
+	bhunp3Strings[19] = "HipNarrow"
+	bhunp3Strings[20] = "ArmpitShape"
+	bhunp3Strings[21] = "Clavicle"
+	bhunp3Strings[22] = "ClaviclesSize"
+	bhunp3Strings[23] = "ClaviclesFront"
+	bhunp3Strings[24] = "ClaviclesAngle"
+	bhunp3Strings[25] = "BellyUnder"
+	;Muscle related
+	bhunp3Strings[26] = "BellyDefine"
+	bhunp3Strings[27] = "RectusOuterDetail"
+	bhunp3Strings[28] = "RectusAbdominis"
+	bhunp3Strings[29] = "Biceps"
+	bhunp3Strings[30] = "Triceps"
+	bhunp3Strings[31] = "Deltoid"
+	bhunp3Strings[32] = "Brachioradialis"
+	bhunp3Strings[33] = "Flexor"
+	bhunp3Strings[34] = "ExtensorDigitorum"
+	bhunp3Strings[35] = "TricepsLateral"
+	bhunp3Strings[36] = "Sartorius"
+	bhunp3Strings[37] = "RectusFemoris"
+	bhunp3Strings[38] = "VastusLateralis"
+	bhunp3Strings[39] = "VastusMedialis"
+	bhunp3Strings[40] = "Hamstrings"
+	bhunp3Strings[41] = "BicepsFemoris"
+	bhunp3Strings[42] = "BackTrapezius"
 	
 	boneStrings[0] = "Upper spine"
 	boneStrings[1] = "Advanced forearms"
@@ -2064,15 +2171,26 @@ Function applyBodyOption(Bool showMSG = true)
 	if snusnuMain.selectedBody == 2 ;Vanilla
 		snusnuMain.usePecs = false
 		snusnuMain.useWeightSlider = true
+		If editFMGMorphs
+			snusnuMain.LoadDefaultProfile(6)
+		EndIf
 	Else
 		snusnuMain.useWeightSlider = false
 		If snusnuMain.selectedBody == 0 ;UNP
 			snusnuMain.usePecs = false
-			snusnuMain.LoadDefaultProfile(1)
+			If editFMGMorphs
+				snusnuMain.LoadDefaultProfile(4)
+			Else
+				snusnuMain.LoadDefaultProfile(1)
+			EndIf
 			needBodyUpdate = true
 		ElseIf snusnuMain.selectedBody == 1 ;CBBE
 			snusnuMain.usePecs = true
-			snusnuMain.LoadDefaultProfile(3)
+			If editFMGMorphs
+				snusnuMain.LoadDefaultProfile(5)
+			Else
+				snusnuMain.LoadDefaultProfile(3)
+			EndIf
 			needBodyUpdate = true
 		EndIf
 	EndIf
